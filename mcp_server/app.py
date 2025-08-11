@@ -11,7 +11,7 @@ from .config import get_settings
 from .utils.logging import setup_logging, get_logger
 from .server import get_mcp_server
 from .schemas import (
-    WeatherInput, MobilityInput, CalendarInput, TodoInput
+    WeatherInput, MobilityInput, CalendarInput, TodoInput, FinancialInput
 )
 
 # Initialize logger
@@ -129,6 +129,24 @@ def create_app() -> Flask:
             
         except Exception as e:
             logger.error(f"Error in todo.list: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Financial tool endpoint
+    @app.route('/tools/financial.get_data', methods=['POST'])
+    async def financial_get_data():
+        """Get financial data for stocks and cryptocurrencies."""
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("financial.get_data", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in financial.get_data: {e}")
             return jsonify({"error": str(e)}), 500
     
     # Error handlers

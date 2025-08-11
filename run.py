@@ -41,6 +41,7 @@ def main():
     print(f"  🚗  Mobility:     http://{settings.host}:{settings.port}/tools/mobility.get_commute")
     print(f"  📅  Calendar:     http://{settings.host}:{settings.port}/tools/calendar.list_events")
     print(f"  ✅  Todos:        http://{settings.host}:{settings.port}/tools/todo.list")
+    print(f"  💰  Financial:    http://{settings.host}:{settings.port}/tools/financial.get_data")
     print()
     
     try:
