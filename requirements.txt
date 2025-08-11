@@ -1,0 +1,29 @@
+# Core Flask dependencies (with async support)
+flask[async]==3.0.0
+flask-cors==4.0.0
+flask-limiter==3.5.0
+
+# Schema validation (updated for Python 3.13 compatibility)
+pydantic>=2.10.0
+pydantic-settings>=2.4.0
+
+# Async HTTP client
+httpx==0.25.2
+
+# Logging
+loguru==0.7.2
+
+# Metrics (optional)
+prometheus-flask-exporter==0.23.0
+
+# Caching (optional)
+redis[hiredis]==5.0.1
+
+# External API integrations
+requests==2.31.0
+
+# Environment file loading (optional)
+python-dotenv==1.0.0
+
+# MCP Protocol (placeholder - replace when SDK is available)
+# mcp-sdk==0.1.0

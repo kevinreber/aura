@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  mcp-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: base
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      # Add your API keys here or use .env file
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    volumes:
+      # Mount source code for development hot reload
+      - ../mcp_server:/app/mcp_server
+      - ../run.py:/app/run.py
+    networks:
+      - mcp-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - mcp-network
+
+  # Optional: Redis web UI for development
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - mcp-network
+    profiles:
+      - tools
+
+volumes:
+  redis-data:
+
+networks:
+  mcp-network:
+    driver: bridge

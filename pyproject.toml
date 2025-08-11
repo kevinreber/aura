@@ -1,0 +1,100 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "daily-mcp-server"
+version = "0.1.0"
+description = "A Model Context Protocol (MCP) server providing morning routine tools for AI agents"
+authors = [
+    {name = "Kevin Reber"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+
+# Tell hatchling where our package is located
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
+dependencies = [
+    # Core Flask dependencies (with async support)
+    "flask[async]==3.0.0",
+    "flask-cors==4.0.0", 
+    "flask-limiter==3.5.0",
+    
+    # Schema validation (updated for Python 3.13 compatibility)
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.4.0",
+    
+    # Async HTTP client
+    "httpx==0.25.2",
+    
+    # Logging
+    "loguru==0.7.2",
+    
+    # Metrics (optional)
+    "prometheus-flask-exporter==0.23.0",
+    
+    # Caching (optional)
+    "redis[hiredis]==5.0.1",
+    
+    # External API integrations
+    "requests==2.31.0",
+    
+    # Environment file loading (optional) 
+    "python-dotenv==1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest==7.4.3",
+    "pytest-cov==4.1.0",
+    "pytest-asyncio==0.21.1",
+    "pytest-mock==3.12.0",
+    
+    # Code formatting and linting
+    "black==23.11.0",
+    "flake8==6.1.0",
+    "mypy==1.7.1",
+    
+    # Development tools
+    "ipython==8.17.2",
+]
+
+[project.scripts]
+mcp-server = "run:main"
+
+[project.urls]
+Homepage = "https://github.com/kevinreber/daily-mcp-server"
+Repository = "https://github.com/kevinreber/daily-mcp-server"
+Issues = "https://github.com/kevinreber/daily-mcp-server/issues"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short", 
+    "--strict-markers",
+    "--disable-warnings"
+]
+markers = [
+    "asyncio: marks tests as async",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow"
+]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
