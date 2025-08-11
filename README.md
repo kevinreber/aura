@@ -32,6 +32,15 @@ List todo items from different buckets/categories.
 - **Input**: `bucket` ("work" | "home" | "errands" | "personal"), `include_completed` (boolean)
 - **Output**: List of todos with priorities, due dates, tags
 
+### 💰 Financial (`financial.get_data`)
+
+Get real-time stock and cryptocurrency market data.
+
+- **Input**: `symbols` (array of symbols like ["MSFT", "BTC", "ETH"]), `data_type` ("stocks" | "crypto" | "mixed")
+- **Output**: Current prices, daily changes, percentage changes, market status, portfolio summary
+- **Data Sources**: Alpha Vantage (stocks), CoinGecko (crypto)
+- **Example Symbols**: MSFT, NVDA, GOOGL, VOO, BTC, ETH
+
 ## 🚀 Quick Start
 
 ### 1. Setup Environment
@@ -156,6 +165,12 @@ curl -X POST http://localhost:8000/tools/todo.list \
 2. Enable the Directions API
 3. Create an API key
 4. Add to `.env`: `GOOGLE_MAPS_API_KEY=your_key_here`
+
+### Alpha Vantage (Financial Tool)
+
+1. Sign up at [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
+2. Get your free API key (500 requests/day)
+3. Add to `.env`: `ALPHA_VANTAGE_API_KEY=your_key_here`
 
 **Note**: The server works without API keys using mock data for development/testing.
 
