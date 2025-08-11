@@ -303,3 +303,4 @@ MIT License - feel free to use this code for your own learning projects!
 ---
 
 **Happy coding!** 🚀 This MCP server is perfect for learning about AI agents, API integrations, and modern Python web development.
+# Trigger Railway deployment with Swagger UI support
