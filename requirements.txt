@@ -2,6 +2,7 @@
 flask[async]==3.0.0
 flask-cors==4.0.0
 flask-limiter==3.5.0
+flasgger==0.9.7.1
 
 # Schema validation (updated for Python 3.13 compatibility)
 pydantic>=2.10.0
