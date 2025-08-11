@@ -36,11 +36,13 @@ def main():
     print()
     print("Available endpoints:")
     print(f"  📋 Health check: http://{settings.host}:{settings.port}/health")
+    print(f"  📚 Swagger UI:   http://{settings.host}:{settings.port}/docs")
     print(f"  🛠️  List tools:   http://{settings.host}:{settings.port}/tools")
     print(f"  🌤️  Weather:      http://{settings.host}:{settings.port}/tools/weather.get_daily")
     print(f"  🚗  Mobility:     http://{settings.host}:{settings.port}/tools/mobility.get_commute")
     print(f"  📅  Calendar:     http://{settings.host}:{settings.port}/tools/calendar.list_events")
     print(f"  ✅  Todos:        http://{settings.host}:{settings.port}/tools/todo.list")
+    print(f"  💰  Financial:    http://{settings.host}:{settings.port}/tools/financial.get_data")
     print()
     
     try:

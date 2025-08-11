@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # External API Keys (for tools)
     weather_api_key: str = ""  # OpenWeatherMap API key
     google_maps_api_key: str = ""  # Google Maps API key
+    alpha_vantage_api_key: str = ""  # Alpha Vantage API key for financial data
     
     # Optional calendar integration
     google_calendar_credentials_path: Optional[str] = None

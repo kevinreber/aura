@@ -8,12 +8,13 @@ from typing import Dict, Any, List
 import json
 from datetime import datetime
 
-from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool
+from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool
 from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, 
     CalendarInput, CalendarOutput,
-    TodoInput, TodoOutput
+    TodoInput, TodoOutput,
+    FinancialInput, FinancialOutput
 )
 from .utils.logging import get_logger
 
@@ -58,6 +59,13 @@ class MCPServer:
                 "output_schema": TodoOutput,
                 "description": "List todo items from a specific bucket",
                 "method": "list_todos"
+            },
+            "financial.get_data": {
+                "tool": FinancialTool(),
+                "input_schema": FinancialInput,
+                "output_schema": FinancialOutput,
+                "description": "Get financial data for stocks and cryptocurrencies",
+                "method": "get_financial_data"
             }
         }
     
