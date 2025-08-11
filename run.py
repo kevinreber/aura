@@ -36,6 +36,7 @@ def main():
     print()
     print("Available endpoints:")
     print(f"  📋 Health check: http://{settings.host}:{settings.port}/health")
+    print(f"  📚 Swagger UI:   http://{settings.host}:{settings.port}/docs")
     print(f"  🛠️  List tools:   http://{settings.host}:{settings.port}/tools")
     print(f"  🌤️  Weather:      http://{settings.host}:{settings.port}/tools/weather.get_daily")
     print(f"  🚗  Mobility:     http://{settings.host}:{settings.port}/tools/mobility.get_commute")
