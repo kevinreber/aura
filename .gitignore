@@ -1,5 +1,7 @@
 # Environment variables (contains API keys)
 .env
+google_calendar_credentials.json
+token.pickle
 
 # Python
 __pycache__/
