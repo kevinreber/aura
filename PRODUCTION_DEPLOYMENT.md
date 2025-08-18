@@ -12,6 +12,7 @@ Add these environment variables in your Railway project dashboard:
 # Core Configuration
 ENVIRONMENT=production
 LOG_LEVEL=INFO
+HOST=0.0.0.0
 SECRET_KEY=your-super-secret-key-change-in-production
 
 # External API Keys

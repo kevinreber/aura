@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Core MCP Server Settings
     environment: str = "development"
     log_level: str = "INFO"
-    host: str = "0.0.0.0"
+    host: str = os.getenv("HOST", "0.0.0.0")  # Default to 0.0.0.0 for production compatibility
     port: int = int(os.getenv("PORT", "8000"))  # Railway provides PORT env var
     debug: bool = False
 
