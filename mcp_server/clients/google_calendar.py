@@ -89,6 +89,20 @@ class GoogleCalendarClient:
         
         return creds
     
+    def _get_calendar_display_name(self, calendar_id: str) -> str:
+        """Convert calendar ID to a user-friendly display name."""
+        if calendar_id == 'primary':
+            return 'primary'
+        
+        # Get calendar list to find the display name
+        calendar_mapping = self.get_calendar_list()
+        for name, cal_id in calendar_mapping.items():
+            if cal_id == calendar_id:
+                return name
+        
+        # If not found, return the ID itself
+        return calendar_id
+
     async def get_events_for_date(self, query_date: dt.date, calendar_id: str = 'primary') -> List[CalendarEvent]:
         """
         Get calendar events for a specific date.
@@ -129,10 +143,11 @@ class GoogleCalendarClient:
             logger.info(f"Found {len(events)} events for {query_date}")
             
             # Convert Google Calendar events to our CalendarEvent schema
+            calendar_source = self._get_calendar_display_name(calendar_id)
             calendar_events = []
             for event in events:
                 try:
-                    calendar_event = self._convert_google_event(event)
+                    calendar_event = self._convert_google_event(event, calendar_source)
                     if calendar_event:
                         calendar_events.append(calendar_event)
                 except Exception as e:
@@ -145,7 +160,7 @@ class GoogleCalendarClient:
             logger.error(f"Error fetching Google Calendar events: {e}")
             return []
     
-    def _convert_google_event(self, google_event: Dict[str, Any]) -> Optional[CalendarEvent]:
+    def _convert_google_event(self, google_event: Dict[str, Any], calendar_source: str = "primary") -> Optional[CalendarEvent]:
         """Convert a Google Calendar event to our CalendarEvent schema."""
         try:
             # Extract basic event info
@@ -191,7 +206,8 @@ class GoogleCalendarClient:
                 location=location if location else None,
                 description=description if description else None,
                 all_day=all_day,
-                attendees=attendees if attendees else None
+                attendees=attendees if attendees else None,
+                calendar_source=calendar_source
             )
             
         except Exception as e:
@@ -218,6 +234,105 @@ class GoogleCalendarClient:
             logger.error(f"Error parsing datetime '{datetime_str}': {e}")
             return None
     
+    def get_calendar_list(self) -> Dict[str, str]:
+        """
+        Get a list of all available calendars for the authenticated user.
+        
+        Returns:
+            Dictionary mapping calendar names to calendar IDs
+        """
+        if not self.service:
+            logger.error("Google Calendar service not initialized")
+            return {}
+        
+        try:
+            # Get all calendars including hidden/secondary ones
+            calendar_list = self.service.calendarList().list(
+                showHidden=True,
+                showDeleted=False
+            ).execute()
+            calendars = {}
+            
+            for calendar_item in calendar_list.get('items', []):
+                calendar_id = calendar_item['id']
+                calendar_name = calendar_item.get('summary', calendar_id)
+                access_role = calendar_item.get('accessRole', 'unknown')
+                primary = calendar_item.get('primary', False)
+                
+                calendars[calendar_name] = calendar_id
+                logger.info(f"Found calendar: '{calendar_name}' (ID: {calendar_id}, Access: {access_role}, Primary: {primary})")
+            
+            return calendars
+        except Exception as e:
+            logger.error(f"Error fetching calendar list: {e}")
+            return {}
+    
+    async def get_events_for_multiple_calendars(self, start_date: dt.date, end_date: dt.date, calendar_names: List[str] = None) -> List[CalendarEvent]:
+        """
+        Get calendar events from multiple calendars for a date range.
+        
+        Args:
+            start_date: Start date of the range (inclusive)
+            end_date: End date of the range (inclusive)
+            calendar_names: List of calendar names to fetch from. If None, fetches from primary + Runna + Family
+            
+        Returns:
+            Combined list of CalendarEvent objects from all specified calendars
+        """
+        if calendar_names is None:
+            # Default to primary calendar + Runna + Family calendars
+            # Note: Work calendar is an Outlook import and not accessible via Google Calendar API
+            calendar_names = ['primary', 'Runna', 'Family']
+        
+        # Get the mapping of calendar names to IDs
+        calendar_mapping = self.get_calendar_list()
+        
+        all_events = []
+        
+        for calendar_name in calendar_names:
+            try:
+                # Handle 'primary' specially
+                if calendar_name == 'primary':
+                    calendar_id = 'primary'
+                else:
+                    # Find the calendar ID by name
+                    calendar_id = None
+                    for name, cal_id in calendar_mapping.items():
+                        if name.lower() == calendar_name.lower():
+                            calendar_id = cal_id
+                            break
+                    
+                    if not calendar_id:
+                        logger.warning(f"Calendar '{calendar_name}' not found. Available calendars: {list(calendar_mapping.keys())}")
+                        continue
+                
+                # Fetch events from this calendar
+                logger.info(f"Fetching events from calendar: {calendar_name} (ID: {calendar_id})")
+                calendar_events = await self.get_events_for_range(start_date, end_date, calendar_id)
+                
+                # The calendar_source is now set by _convert_google_event
+                all_events.extend(calendar_events)
+                
+            except Exception as e:
+                logger.error(f"Error fetching events from calendar '{calendar_name}': {e}")
+                continue
+        
+        # Sort all events by start time (handle timezone-aware and naive datetimes)
+        def get_sort_key(event):
+            if not hasattr(event, 'start_time') or not event.start_time:
+                return datetime.min.replace(tzinfo=None)
+            
+            start_time = event.start_time
+            # If it's timezone-aware, convert to naive for consistent comparison
+            if hasattr(start_time, 'tzinfo') and start_time.tzinfo is not None:
+                return start_time.replace(tzinfo=None)
+            return start_time
+        
+        all_events.sort(key=get_sort_key)
+        
+        logger.info(f"Total events fetched from {len(calendar_names)} calendars: {len(all_events)}")
+        return all_events
+
     async def get_events_for_range(self, start_date: dt.date, end_date: dt.date, calendar_id: str = 'primary') -> List[CalendarEvent]:
         """
         Get calendar events for a date range (much more efficient than multiple single-date calls).
@@ -260,9 +375,10 @@ class GoogleCalendarClient:
             logger.info(f"Found {len(events)} events from {start_date} to {end_date}")
             
             # Convert Google Calendar events to our CalendarEvent schema (reuse existing logic)
+            calendar_source = self._get_calendar_display_name(calendar_id)
             calendar_events = []
             for event in events:
-                converted_event = self._convert_google_event(event)
+                converted_event = self._convert_google_event(event, calendar_source)
                 if converted_event:
                     calendar_events.append(converted_event)
             

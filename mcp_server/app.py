@@ -169,6 +169,31 @@ def create_app() -> Flask:
         """
         return jsonify(mcp_server.list_tools())
     
+    @app.route('/calendars')
+    def list_calendars():
+        """List all available Google calendars for debugging multi-calendar integration."""
+        try:
+            from .tools.calendar import CalendarTool
+            calendar_tool = CalendarTool()
+            
+            if calendar_tool.google_calendar_client:
+                calendars = calendar_tool.google_calendar_client.get_calendar_list()
+                return jsonify({
+                    "available_calendars": calendars,
+                    "total_calendars": len(calendars),
+                    "status": "success"
+                })
+            else:
+                return jsonify({
+                    "error": "Google Calendar client not available",
+                    "status": "error"
+                }), 500
+        except Exception as e:
+            return jsonify({
+                "error": str(e),
+                "status": "error"
+            }), 500
+    
     # Weather tool endpoint
     @app.route('/tools/weather.get_daily', methods=['POST'])
     async def weather_get_daily():

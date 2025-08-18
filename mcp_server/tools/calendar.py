@@ -118,13 +118,14 @@ class CalendarTool:
             raise
     
     async def _get_events_for_date(self, query_date: dt.date) -> List[CalendarEvent]:
-        """Get events for a specific date."""
+        """Get events for a specific date from multiple calendars (primary, Runna, Family)."""
         
         if self.google_calendar_client:
             try:
-                logger.info(f"Fetching real Google Calendar events for {query_date}")
-                events = await self.google_calendar_client.get_events_for_date(query_date)
-                logger.info(f"Retrieved {len(events)} events from Google Calendar")
+                logger.info(f"Fetching real Google Calendar events for {query_date} from multiple calendars")
+                # Use the multi-calendar method for consistency, with same start/end date
+                events = await self.google_calendar_client.get_events_for_multiple_calendars(query_date, query_date)
+                logger.info(f"Retrieved {len(events)} events from Google Calendar across all calendars")
                 return events
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events, falling back to mock data: {e}")
@@ -134,13 +135,14 @@ class CalendarTool:
             return await self._get_mock_events(query_date)
     
     async def _get_events_for_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
-        """Get events for a date range."""
+        """Get events for a date range from multiple calendars (primary, Runna, Family)."""
         
         if self.google_calendar_client:
             try:
-                logger.info(f"Fetching real Google Calendar events for range {start_date} to {end_date}")
-                events = await self.google_calendar_client.get_events_for_range(start_date, end_date)
-                logger.info(f"Retrieved {len(events)} events from Google Calendar for range")
+                logger.info(f"Fetching real Google Calendar events for range {start_date} to {end_date} from multiple calendars")
+                # Fetch from primary + Runna + Family calendars by default
+                events = await self.google_calendar_client.get_events_for_multiple_calendars(start_date, end_date)
+                logger.info(f"Retrieved {len(events)} events from Google Calendar for range across all calendars")
                 return events
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events for range, falling back to mock data: {e}")
@@ -203,7 +205,8 @@ class CalendarTool:
                 location="Conference Room A",
                 description="Daily team sync and planning",
                 all_day=False,
-                attendees=["team@company.com"]
+                attendees=["team@company.com"],
+                calendar_source="Work"
             ))
         
         # Mid-morning meeting (random chance)
@@ -225,7 +228,8 @@ class CalendarTool:
                 location="Zoom",
                 description=description,
                 all_day=False,
-                attendees=["colleague@company.com"]
+                attendees=["colleague@company.com"],
+                calendar_source="Work"
             ))
         
         # Lunch (sometimes scheduled)
@@ -239,7 +243,8 @@ class CalendarTool:
                 location="Local Cafe",
                 description="Casual lunch with colleague",
                 all_day=False,
-                attendees=["friend@company.com"]
+                attendees=["friend@company.com"],
+                calendar_source="primary"
             ))
         
         # Afternoon meeting (random chance)
@@ -261,7 +266,8 @@ class CalendarTool:
                 location="Conference Room B",
                 description=description,
                 all_day=False,
-                attendees=["manager@company.com"]
+                attendees=["manager@company.com"],
+                calendar_source="Work"
             ))
         
         return events
@@ -294,7 +300,8 @@ class CalendarTool:
                 location=location,
                 description=description,
                 all_day=False,
-                attendees=None
+                attendees=None,
+                calendar_source="Runna" if "Run" in title or "Workout" in title else "primary"
             ))
         
         return events

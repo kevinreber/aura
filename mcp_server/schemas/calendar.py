@@ -39,6 +39,7 @@ class CalendarEvent(BaseModel):
     description: Optional[str] = Field(default=None, description="Event description")
     all_day: bool = Field(default=False, description="Whether this is an all-day event")
     attendees: Optional[List[str]] = Field(default=None, description="List of attendee emails")
+    calendar_source: Optional[str] = Field(default=None, description="Source calendar name (e.g., 'Work', 'Runna', 'primary')")
     
     class Config:
         json_schema_extra = {
@@ -50,7 +51,8 @@ class CalendarEvent(BaseModel):
                 "location": "Conference Room A",
                 "description": "Weekly team sync",
                 "all_day": False,
-                "attendees": ["alice@example.com", "bob@example.com"]
+                "attendees": ["alice@example.com", "bob@example.com"],
+                "calendar_source": "Work"
             }
         }
 
