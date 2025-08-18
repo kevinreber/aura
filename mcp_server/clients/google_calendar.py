@@ -24,14 +24,16 @@ SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 class GoogleCalendarClient:
     """Client for accessing Google Calendar API."""
     
-    def __init__(self, credentials_path: str):
+    def __init__(self, credentials_path: str = None, credentials_json: str = None):
         """
         Initialize Google Calendar client.
         
         Args:
-            credentials_path: Path to Google API credentials JSON file
+            credentials_path: Path to Google API credentials JSON file (for local dev)
+            credentials_json: JSON string of credentials (for production env var)
         """
         self.credentials_path = credentials_path
+        self.credentials_json = credentials_json
         self.service = None
         self._initialize_service()
     
@@ -52,6 +54,47 @@ class GoogleCalendarClient:
         """Get or refresh Google API credentials."""
         creds = None
         
+        # Production mode: Use credentials from environment variable
+        if self.credentials_json:
+            try:
+                import json
+                creds_info = json.loads(self.credentials_json)
+                
+                # Create credentials from the JSON data
+                if 'refresh_token' in creds_info:
+                    # Has refresh token - create credentials directly
+                    creds = Credentials(
+                        token=creds_info.get('token'),
+                        refresh_token=creds_info.get('refresh_token'),
+                        token_uri=creds_info.get('token_uri', 'https://oauth2.googleapis.com/token'),
+                        client_id=creds_info.get('client_id'),
+                        client_secret=creds_info.get('client_secret'),
+                        scopes=SCOPES
+                    )
+                    
+                    # Refresh if needed
+                    if not creds.valid and creds.refresh_token:
+                        try:
+                            creds.refresh(Request())
+                            logger.info("Refreshed Google Calendar credentials from env var")
+                        except Exception as e:
+                            logger.error(f"Error refreshing credentials from env var: {e}")
+                            return None
+                else:
+                    logger.error("No refresh token found in credentials JSON")
+                    return None
+                    
+                return creds
+                
+            except Exception as e:
+                logger.error(f"Error parsing credentials JSON: {e}")
+                return None
+        
+        # Development mode: Use file-based credentials
+        if not self.credentials_path:
+            logger.error("No credentials path or JSON provided")
+            return None
+            
         # The file token.pickle stores the user's access and refresh tokens
         token_path = str(Path(self.credentials_path).parent / "token.pickle")
         

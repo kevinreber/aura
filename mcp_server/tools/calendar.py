@@ -25,24 +25,37 @@ class CalendarTool:
     
     def _initialize_google_calendar(self):
         """Initialize Google Calendar client if credentials are available."""
-        if self.settings.google_calendar_credentials_path:
-            if os.path.exists(self.settings.google_calendar_credentials_path):
-                try:
+        try:
+            # Try production mode first (env var credentials)
+            if self.settings.google_calendar_credentials_json:
+                logger.info("Initializing Google Calendar client with environment credentials")
+                self.google_calendar_client = GoogleCalendarClient(
+                    credentials_json=self.settings.google_calendar_credentials_json
+                )
+            # Fall back to development mode (file credentials)
+            elif self.settings.google_calendar_credentials_path:
+                if os.path.exists(self.settings.google_calendar_credentials_path):
+                    logger.info("Initializing Google Calendar client with file credentials")
                     self.google_calendar_client = GoogleCalendarClient(
-                        self.settings.google_calendar_credentials_path
+                        credentials_path=self.settings.google_calendar_credentials_path
                     )
-                    if self.google_calendar_client.test_connection():
-                        logger.info("Google Calendar client initialized successfully")
-                    else:
-                        logger.warning("Google Calendar client failed connection test")
-                        self.google_calendar_client = None
-                except Exception as e:
-                    logger.error(f"Error initializing Google Calendar client: {e}")
-                    self.google_calendar_client = None
+                else:
+                    logger.warning(f"Google Calendar credentials file not found: {self.settings.google_calendar_credentials_path}")
+                    return
             else:
-                logger.warning(f"Google Calendar credentials file not found: {self.settings.google_calendar_credentials_path}")
-        else:
-            logger.info("No Google Calendar credentials path configured")
+                logger.info("Google Calendar credentials not configured (neither env var nor file)")
+                return
+            
+            # Test the connection
+            if self.google_calendar_client and self.google_calendar_client.test_connection():
+                logger.info("Google Calendar client initialized successfully")
+            else:
+                logger.warning("Google Calendar client failed connection test")
+                self.google_calendar_client = None
+                
+        except Exception as e:
+            logger.error(f"Error initializing Google Calendar client: {e}")
+            self.google_calendar_client = None
     
     async def list_events(self, input_data: CalendarInput) -> CalendarOutput:
         """

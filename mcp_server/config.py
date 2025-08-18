@@ -20,8 +20,9 @@ class Settings(BaseSettings):
     google_maps_api_key: str = ""  # Google Maps API key
     alpha_vantage_api_key: str = ""  # Alpha Vantage API key for financial data
     
-    # Optional calendar integration
+    # Google Calendar Integration
     google_calendar_credentials_path: Optional[str] = None
+    google_calendar_credentials_json: Optional[str] = None  # For production env var
     
     # Optional todo integration (e.g., Todoist, Any.do)
     todoist_api_key: Optional[str] = None
@@ -32,7 +33,13 @@ class Settings(BaseSettings):
 
     # Security & CORS
     secret_key: str = "your-secret-key-change-in-production"
-    allowed_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    allowed_origins: List[str] = [
+        "http://localhost:3000", 
+        "http://localhost:5173", 
+        "http://localhost:5174",
+        "https://daily-agent-ui.vercel.app",
+        "https://web-production-66f9.up.railway.app"
+    ]
     
     # Rate limiting
     rate_limit_per_minute: int = 60
