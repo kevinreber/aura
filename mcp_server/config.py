@@ -8,12 +8,12 @@ import os
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
     
-    # Core MCP Server Settings
-    environment: str = "development"
+    # Core MCP Server Settings  
+    environment: str = os.getenv("ENVIRONMENT", "development")
     log_level: str = "INFO"
     host: str = os.getenv("HOST", "0.0.0.0")  # Default to 0.0.0.0 for production compatibility
     port: int = int(os.getenv("PORT", "8000"))  # Railway provides PORT env var
-    debug: bool = False
+    debug: bool = os.getenv("DEBUG", "false").lower() == "true"  # Default to False for production
 
     # External API Keys (for tools)
     weather_api_key: str = ""  # OpenWeatherMap API key

@@ -29,20 +29,35 @@ def main():
     app = create_app()
     settings = get_settings()
     
+    # Determine public URL for Railway vs local development
+    railway_url = os.getenv("RAILWAY_STATIC_URL") or os.getenv("RAILWAY_PUBLIC_DOMAIN")
+    
+    if settings.environment == "production" and railway_url:
+        # Use Railway-provided URL
+        public_url = railway_url if railway_url.startswith(('http://', 'https://')) else f"https://{railway_url}"
+        if public_url.endswith(":"):
+            public_url = public_url.rstrip(":")
+    elif settings.environment == "production":
+        # Fallback for production without Railway URL
+        public_url = "https://web-production-66f9.up.railway.app"
+    else:
+        # Local development
+        public_url = f"http://{settings.host}:{settings.port}"
+    
     print(f"🚀 Starting MCP Server on {settings.host}:{settings.port}")
     print(f"📊 Environment: {settings.environment}")
     print(f"🔧 Debug mode: {settings.debug}")
     print(f"📝 Log level: {settings.log_level}")
     print()
     print("Available endpoints:")
-    print(f"  📋 Health check: http://{settings.host}:{settings.port}/health")
-    print(f"  📚 Swagger UI:   http://{settings.host}:{settings.port}/docs")
-    print(f"  🛠️  List tools:   http://{settings.host}:{settings.port}/tools")
-    print(f"  🌤️  Weather:      http://{settings.host}:{settings.port}/tools/weather.get_daily")
-    print(f"  🚗  Mobility:     http://{settings.host}:{settings.port}/tools/mobility.get_commute")
-    print(f"  📅  Calendar:     http://{settings.host}:{settings.port}/tools/calendar.list_events")
-    print(f"  ✅  Todos:        http://{settings.host}:{settings.port}/tools/todo.list")
-    print(f"  💰  Financial:    http://{settings.host}:{settings.port}/tools/financial.get_data")
+    print(f"  📋 Health check: {public_url}/health")
+    print(f"  📚 Swagger UI:   {public_url}/docs")
+    print(f"  🛠️  List tools:   {public_url}/tools")
+    print(f"  🌤️  Weather:      {public_url}/tools/weather.get_daily")
+    print(f"  🚗  Mobility:     {public_url}/tools/mobility.get_commute")
+    print(f"  📅  Calendar:     {public_url}/tools/calendar.list_events")
+    print(f"  ✅  Todos:        {public_url}/tools/todo.list")
+    print(f"  💰  Financial:    {public_url}/tools/financial.get_data")
     print()
     
     try:

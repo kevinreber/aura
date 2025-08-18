@@ -13,6 +13,7 @@ Add these environment variables in your Railway project dashboard:
 ENVIRONMENT=production
 LOG_LEVEL=INFO
 HOST=0.0.0.0
+DEBUG=false
 SECRET_KEY=your-super-secret-key-change-in-production
 
 # External API Keys
@@ -83,8 +84,42 @@ curl https://your-railway-url.up.railway.app/health
 
 The Google Calendar client automatically handles token refresh using the refresh token stored in environment variables. No manual intervention required.
 
+## 🐛 **Troubleshooting Common Issues**
+
+### **"Name or service not known" Error**
+
+This DNS resolution error can occur when:
+
+- Railway's internal networking is still initializing
+- External API calls fail during startup
+- Network connectivity issues
+
+**Solutions:**
+
+1. **Wait and retry** - Often resolves automatically
+2. **Check environment variables** - Ensure all required vars are set
+3. **Verify API keys** - Invalid keys can cause network errors
+4. **Check Railway logs** - Look for specific failed requests
+
+### **Debug Mode in Production**
+
+If you see `Debug mode: True` in production:
+
+```bash
+DEBUG=false  # Add this environment variable in Railway
+```
+
+### **Malformed URLs in Logs**
+
+Fixed in latest version - URLs now show correctly as:
+
+```
+https://web-production-66f9.up.railway.app/health
+```
+
 ## 🚨 **Important**
 
 - Never commit `google_calendar_credentials.json` or `token.pickle` to git
 - Store all sensitive data in Railway environment variables
 - Test the deployment thoroughly before updating AI agent
+- Set `DEBUG=false` in production environment variables
