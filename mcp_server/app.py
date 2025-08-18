@@ -61,18 +61,39 @@ def create_app() -> Flask:
         "swagger": "2.0",
         "info": {
             "title": "Daily MCP Server API",
-            "description": "Model Context Protocol server providing morning routine tools for AI agents",
+            "description": """Model Context Protocol server providing comprehensive morning routine tools for AI agents.
+
+🌤️ **Weather**: Real-time conditions via OpenWeatherMap  
+📅 **Calendar**: Google Calendar integration with real events  
+💰 **Financial**: Stock/crypto prices via Alpha Vantage & CoinGecko  
+🚗 **Mobility**: Commute times via Google Maps  
+✅ **Todo**: Task management with filtering  
+
+**Quick Start**: All endpoints require POST with JSON body. Real APIs available when configured.""",
             "contact": {
                 "responsibleOrganization": "Personal Learning Project",
                 "responsibleDeveloper": "Kevin Reber",
+                "email": "kevinreber1@gmail.com"
             },
-            "version": "0.1.0"
+            "version": "0.1.0",
+            "license": {
+                "name": "MIT"
+            }
         },
         "host": "localhost:8000" if settings.environment == "development" else None,
         "basePath": "/",
         "schemes": ["http"] if settings.environment == "development" else ["https"],
         "produces": ["application/json"],
-        "consumes": ["application/json"]
+        "consumes": ["application/json"],
+        "tags": [
+            {"name": "Health", "description": "System health and status"},
+            {"name": "Tools", "description": "Available MCP tools"},
+            {"name": "Weather", "description": "Real-time weather via OpenWeatherMap"},
+            {"name": "Calendar", "description": "Google Calendar integration"},
+            {"name": "Financial", "description": "Stock and crypto market data"},
+            {"name": "Mobility", "description": "Commute and traffic info"},
+            {"name": "Todo", "description": "Task management"}
+        ]
     }
     
     swagger = Swagger(app, config=swagger_config, template=swagger_template)
@@ -151,7 +172,77 @@ def create_app() -> Flask:
     # Weather tool endpoint
     @app.route('/tools/weather.get_daily', methods=['POST'])
     async def weather_get_daily():
-        """Get daily weather forecast."""
+        """Get current weather and daily forecast with real OpenWeatherMap data.
+        ---
+        tags:
+          - Weather
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - location
+              properties:
+                location:
+                  type: string
+                  example: "San Francisco, CA"
+                  description: "City and state/country for weather lookup"
+        responses:
+          200:
+            description: Current weather and forecast data
+            schema:
+              type: object
+              properties:
+                location:
+                  type: string
+                  example: "San Francisco, CA"
+                  description: "Location queried"
+                current:
+                  type: object
+                  properties:
+                    temperature:
+                      type: number
+                      example: 18.5
+                      description: "Current temperature in Celsius"
+                    description:
+                      type: string
+                      example: "Partly cloudy"
+                      description: "Weather condition description"
+                    humidity:
+                      type: number
+                      example: 65
+                      description: "Humidity percentage"
+                    wind_speed:
+                      type: number
+                      example: 12.5
+                      description: "Wind speed in km/h"
+                forecast:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        format: date
+                        example: "2024-12-18"
+                      high:
+                        type: number
+                        example: 22.0
+                        description: "High temperature"
+                      low:
+                        type: number
+                        example: 15.0
+                        description: "Low temperature"
+                      description:
+                        type: string
+                        example: "Sunny"
+          400:
+            description: Invalid request format or missing location
+          500:
+            description: Weather service error
+        """
         try:
             data = request.get_json()
             if not data:
@@ -169,7 +260,79 @@ def create_app() -> Flask:
     # Mobility tool endpoint  
     @app.route('/tools/mobility.get_commute', methods=['POST'])
     async def mobility_get_commute():
-        """Get commute information."""
+        """Get commute and traffic information with travel times and route options.
+        ---
+        tags:
+          - Mobility
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - origin
+                - destination
+              properties:
+                origin:
+                  type: string
+                  example: "123 Main St, San Francisco, CA"
+                  description: "Starting location (address or place name)"
+                destination:
+                  type: string
+                  example: "456 Market St, San Francisco, CA"
+                  description: "Destination location (address or place name)"
+                mode:
+                  type: string
+                  enum: ['driving', 'walking', 'transit', 'bicycling']
+                  default: 'driving'
+                  description: "Transportation mode"
+                departure_time:
+                  type: string
+                  format: date-time
+                  example: "2024-12-18T08:00:00Z"
+                  description: "Departure time (optional, defaults to now)"
+        responses:
+          200:
+            description: Commute information with travel times and routes
+            schema:
+              type: object
+              properties:
+                origin:
+                  type: string
+                  example: "123 Main St, San Francisco, CA"
+                destination:
+                  type: string
+                  example: "456 Market St, San Francisco, CA"
+                mode:
+                  type: string
+                  example: "driving"
+                routes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      summary:
+                        type: string
+                        example: "Via US-101 N"
+                        description: "Route summary"
+                      duration:
+                        type: string
+                        example: "25 mins"
+                        description: "Estimated travel time"
+                      distance:
+                        type: string
+                        example: "12.3 km"
+                        description: "Total distance"
+                      traffic_info:
+                        type: string
+                        example: "Light traffic"
+                        description: "Current traffic conditions"
+          400:
+            description: Invalid request format or missing origin/destination
+          500:
+            description: Maps service error
+        """
         try:
             data = request.get_json()
             if not data:
@@ -187,7 +350,97 @@ def create_app() -> Flask:
     # Calendar tool endpoint
     @app.route('/tools/calendar.list_events', methods=['POST'])
     async def calendar_list_events():
-        """List calendar events."""
+        """List calendar events for a specific date with Google Calendar integration.
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - date
+              properties:
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-18"
+                  description: "Date to list events for (YYYY-MM-DD format)"
+        responses:
+          200:
+            description: Calendar events for the specified date
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  format: date
+                  example: "2024-12-18"
+                  description: "Date queried for events"
+                events:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "event_123"
+                        description: "Unique event identifier"
+                      title:
+                        type: string
+                        example: "Team Meeting"
+                        description: "Event title/summary"
+                      start_time:
+                        type: string
+                        format: date-time
+                        example: "2024-12-18T10:00:00Z"
+                        description: "Event start time (ISO format)"
+                      end_time:
+                        type: string
+                        format: date-time
+                        example: "2024-12-18T11:00:00Z"
+                        description: "Event end time (ISO format)"
+                      location:
+                        type: string
+                        example: "Conference Room A"
+                        description: "Event location (optional)"
+                      description:
+                        type: string
+                        example: "Weekly team sync"
+                        description: "Event description (optional)"
+                      all_day:
+                        type: boolean
+                        example: false
+                        description: "Whether this is an all-day event"
+                      attendees:
+                        type: array
+                        items:
+                          type: string
+                        example: ["alice@example.com", "bob@example.com"]
+                        description: "List of attendee emails (optional)"
+                total_events:
+                  type: integer
+                  example: 3
+                  description: "Total number of events found"
+          400:
+            description: Invalid request format or missing date
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "JSON body required"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error fetching calendar events"
+        """
         try:
             data = request.get_json()
             if not data:
@@ -202,10 +455,211 @@ def create_app() -> Flask:
             logger.error(f"Error in calendar.list_events: {e}")
             return jsonify({"error": str(e)}), 500
     
+    # Calendar range tool endpoint  
+    @app.route('/tools/calendar.list_events_range', methods=['POST'])
+    async def calendar_list_events_range():
+        """List calendar events for a date range (much more efficient than multiple single-date calls).
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - start_date
+                - end_date
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  example: "2025-08-18"
+                  description: "Start date of the range (YYYY-MM-DD format, inclusive)"
+                end_date:
+                  type: string
+                  format: date
+                  example: "2025-08-24"
+                  description: "End date of the range (YYYY-MM-DD format, inclusive)"
+        responses:
+          200:
+            description: Calendar events for the specified date range
+            schema:
+              type: object
+              properties:
+                start_date:
+                  type: string
+                  format: date
+                  example: "2025-08-18"
+                  description: "Start date of the queried range"
+                end_date:
+                  type: string
+                  format: date
+                  example: "2025-08-24"
+                  description: "End date of the queried range"
+                events:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "event_123"
+                        description: "Unique event identifier"
+                      title:
+                        type: string
+                        example: "Team Meeting"
+                        description: "Event title/summary"
+                      start_time:
+                        type: string
+                        format: date-time
+                        example: "2025-08-18T10:00:00Z"
+                        description: "Event start time (ISO format)"
+                      end_time:
+                        type: string
+                        format: date-time
+                        example: "2025-08-18T11:00:00Z"
+                        description: "Event end time (ISO format)"
+                      location:
+                        type: string
+                        example: "Conference Room A"
+                        description: "Event location (optional)"
+                      description:
+                        type: string
+                        example: "Weekly team sync"
+                        description: "Event description (optional)"
+                      all_day:
+                        type: boolean
+                        example: false
+                        description: "Whether this is an all-day event"
+                      attendees:
+                        type: array
+                        items:
+                          type: string
+                        example: ["alice@example.com", "bob@example.com"]
+                        description: "List of attendee emails (optional)"
+                total_events:
+                  type: integer
+                  example: 3
+                  description: "Total number of events found in the range"
+          400:
+            description: Invalid request format or missing dates
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "JSON body required"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error fetching calendar events for range"
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("calendar.list_events_range", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in calendar.list_events_range: {e}")
+            return jsonify({"error": str(e)}), 500
+    
     # Todo tool endpoint
     @app.route('/tools/todo.list', methods=['POST'])
     async def todo_list():
-        """List todo items."""
+        """List todo items and tasks with optional filtering and categorization.
+        ---
+        tags:
+          - Todo
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              properties:
+                filter:
+                  type: string
+                  enum: ['all', 'pending', 'completed', 'high_priority']
+                  default: 'all'
+                  description: "Filter todos by status or priority"
+                category:
+                  type: string
+                  example: "work"
+                  description: "Filter by category (optional)"
+                limit:
+                  type: integer
+                  example: 10
+                  description: "Maximum number of todos to return (optional)"
+        responses:
+          200:
+            description: List of todo items
+            schema:
+              type: object
+              properties:
+                total_todos:
+                  type: integer
+                  example: 5
+                  description: "Total number of todos"
+                filter_applied:
+                  type: string
+                  example: "all"
+                  description: "Filter that was applied"
+                todos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "todo_123"
+                        description: "Unique todo identifier"
+                      title:
+                        type: string
+                        example: "Complete project proposal"
+                        description: "Todo title"
+                      description:
+                        type: string
+                        example: "Finalize the Q1 project proposal document"
+                        description: "Detailed description"
+                      completed:
+                        type: boolean
+                        example: false
+                        description: "Whether the todo is completed"
+                      priority:
+                        type: string
+                        enum: ['low', 'medium', 'high', 'urgent']
+                        example: "high"
+                        description: "Priority level"
+                      category:
+                        type: string
+                        example: "work"
+                        description: "Todo category"
+                      due_date:
+                        type: string
+                        format: date
+                        example: "2024-12-20"
+                        description: "Due date (optional)"
+                      created_at:
+                        type: string
+                        format: date-time
+                        example: "2024-12-18T10:00:00Z"
+                        description: "Creation timestamp"
+          400:
+            description: Invalid request format
+          500:
+            description: Todo service error
+        """
         try:
             data = request.get_json()
             if not data:

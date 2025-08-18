@@ -12,7 +12,7 @@ from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialT
 from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, 
-    CalendarInput, CalendarOutput,
+    CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
     TodoInput, TodoOutput,
     FinancialInput, FinancialOutput
 )
@@ -52,6 +52,13 @@ class MCPServer:
                 "output_schema": CalendarOutput,
                 "description": "List calendar events for a specific date",
                 "method": "list_events"
+            },
+            "calendar.list_events_range": {
+                "tool": CalendarTool(),
+                "input_schema": CalendarRangeInput,
+                "output_schema": CalendarRangeOutput,
+                "description": "List calendar events for a date range (more efficient than multiple single-date calls)",
+                "method": "list_events_range"
             },
             "todo.list": {
                 "tool": TodoTool(),

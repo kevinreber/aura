@@ -5,19 +5,44 @@ from datetime import datetime, timedelta
 import datetime as dt
 from typing import Dict, Any, List
 import random
+import os
 
-from ..schemas.calendar import CalendarInput, CalendarOutput, CalendarEvent
+from ..schemas.calendar import CalendarInput, CalendarOutput, CalendarEvent, CalendarRangeInput, CalendarRangeOutput
 from ..utils.logging import get_logger, log_tool_call
 from ..config import get_settings
+from ..clients.google_calendar import GoogleCalendarClient
 
 logger = get_logger("calendar_tool")
 
 
 class CalendarTool:
-    """Tool for listing calendar events. Supports mock data and future Google Calendar integration."""
+    """Tool for listing calendar events with Google Calendar integration."""
     
     def __init__(self):
         self.settings = get_settings()
+        self.google_calendar_client = None
+        self._initialize_google_calendar()
+    
+    def _initialize_google_calendar(self):
+        """Initialize Google Calendar client if credentials are available."""
+        if self.settings.google_calendar_credentials_path:
+            if os.path.exists(self.settings.google_calendar_credentials_path):
+                try:
+                    self.google_calendar_client = GoogleCalendarClient(
+                        self.settings.google_calendar_credentials_path
+                    )
+                    if self.google_calendar_client.test_connection():
+                        logger.info("Google Calendar client initialized successfully")
+                    else:
+                        logger.warning("Google Calendar client failed connection test")
+                        self.google_calendar_client = None
+                except Exception as e:
+                    logger.error(f"Error initializing Google Calendar client: {e}")
+                    self.google_calendar_client = None
+            else:
+                logger.warning(f"Google Calendar credentials file not found: {self.settings.google_calendar_credentials_path}")
+        else:
+            logger.info("No Google Calendar credentials path configured")
     
     async def list_events(self, input_data: CalendarInput) -> CalendarOutput:
         """
@@ -55,16 +80,88 @@ class CalendarTool:
             logger.error(f"Error getting calendar events: {e}")
             raise
     
+    async def list_events_range(self, input_data: "CalendarRangeInput") -> "CalendarRangeOutput":
+        """
+        Get calendar events for a date range (much more efficient than multiple single-date calls).
+        
+        Args:
+            input_data: CalendarRangeInput with start_date and end_date
+            
+        Returns:
+            CalendarRangeOutput with list of events for the entire range
+        """
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            logger.info(f"Getting calendar events from {input_data.start_date} to {input_data.end_date}")
+            
+            # Use the new range method from Google Calendar client
+            events = await self._get_events_for_range(input_data.start_date, input_data.end_date)
+            
+            result = CalendarRangeOutput(
+                start_date=input_data.start_date,
+                end_date=input_data.end_date,
+                events=events,
+                total_events=len(events)
+            )
+            
+            # Log the successful tool call
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("calendar.list_events_range", input_data.dict(), duration_ms)
+            
+            return result
+            
+        except Exception as e:
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("calendar.list_events_range", input_data.dict(), duration_ms)
+            logger.error(f"Error getting calendar events for range: {e}")
+            raise
+    
     async def _get_events_for_date(self, query_date: dt.date) -> List[CalendarEvent]:
         """Get events for a specific date."""
         
-        if self.settings.google_calendar_credentials_path:
-            # TODO: Implement Google Calendar API integration
-            logger.info("Google Calendar integration not yet implemented, using mock data")
-            return await self._get_mock_events(query_date)
+        if self.google_calendar_client:
+            try:
+                logger.info(f"Fetching real Google Calendar events for {query_date}")
+                events = await self.google_calendar_client.get_events_for_date(query_date)
+                logger.info(f"Retrieved {len(events)} events from Google Calendar")
+                return events
+            except Exception as e:
+                logger.error(f"Error fetching Google Calendar events, falling back to mock data: {e}")
+                return await self._get_mock_events(query_date)
         else:
-            logger.info("No calendar credentials configured, using mock data")
+            logger.info("Google Calendar client not available, using mock data")
             return await self._get_mock_events(query_date)
+    
+    async def _get_events_for_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
+        """Get events for a date range."""
+        
+        if self.google_calendar_client:
+            try:
+                logger.info(f"Fetching real Google Calendar events for range {start_date} to {end_date}")
+                events = await self.google_calendar_client.get_events_for_range(start_date, end_date)
+                logger.info(f"Retrieved {len(events)} events from Google Calendar for range")
+                return events
+            except Exception as e:
+                logger.error(f"Error fetching Google Calendar events for range, falling back to mock data: {e}")
+                return await self._get_mock_events_range(start_date, end_date)
+        else:
+            logger.info("Google Calendar client not available, using mock data for range")
+            return await self._get_mock_events_range(start_date, end_date)
+    
+    async def _get_mock_events_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
+        """Generate mock events for a date range."""
+        all_events = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            day_events = await self._get_mock_events(current_date)
+            all_events.extend(day_events)
+            current_date += timedelta(days=1)
+        
+        # Sort by start time
+        all_events.sort(key=lambda x: x.start_time)
+        return all_events
     
     async def _get_mock_events(self, query_date: dt.date) -> List[CalendarEvent]:
         """Generate realistic mock calendar events for the given date."""

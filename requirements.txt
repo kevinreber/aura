@@ -23,6 +23,11 @@ redis[hiredis]==5.0.1
 # External API integrations
 requests==2.31.0
 
+# Google Calendar API
+google-api-python-client>=2.140.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+
 # Environment file loading (optional)
 python-dotenv==1.0.0
 
