@@ -9,7 +9,8 @@ import os
 
 from ..schemas.calendar import (
     CalendarInput, CalendarOutput, CalendarEvent, CalendarRangeInput, CalendarRangeOutput,
-    CalendarCreateInput, CalendarCreateOutput
+    CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
+    CalendarDeleteInput, CalendarDeleteOutput
 )
 from ..utils.logging import get_logger, log_tool_call
 from ..config import get_settings
@@ -436,8 +437,229 @@ class CalendarTool:
                 message=f"Error creating event: {str(e)}",
                 conflicts=None
             )
+
+    async def update_event(self, input_data: CalendarUpdateInput) -> CalendarUpdateOutput:
+        """
+        Update an existing calendar event with conflict detection.
+        
+        Args:
+            input_data: CalendarUpdateInput with update details
+            
+        Returns:
+            CalendarUpdateOutput with update result and any conflicts
+        """
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            logger.info(f"Updating calendar event: {input_data.event_id}")
+            
+            # Check for conflicts if time is being changed
+            conflicts = []
+            if input_data.start_time is not None and input_data.end_time is not None:
+                conflicts = await self._detect_conflicts(
+                    input_data.start_time, 
+                    input_data.end_time, 
+                    input_data.calendar_name,
+                    exclude_event_id=input_data.event_id
+                )
+            
+            # Determine target calendar ID
+            calendar_id = await self._resolve_calendar_id(input_data.calendar_name)
+            
+            if self.google_calendar_client:
+                # Update the event using Google Calendar API
+                result = await self.google_calendar_client.update_event(
+                    event_id=input_data.event_id,
+                    title=input_data.title,
+                    start_time=input_data.start_time,
+                    end_time=input_data.end_time,
+                    description=input_data.description,
+                    location=input_data.location,
+                    attendees=input_data.attendees,
+                    calendar_id=calendar_id,
+                    all_day=input_data.all_day
+                )
+                
+                if result['success']:
+                    # Convert the events to our schema
+                    original_event = None
+                    updated_event = None
+                    
+                    if result.get('original_event'):
+                        original_event = self._convert_google_event_from_api(
+                            result['original_event'], 
+                            input_data.calendar_name or "primary"
+                        )
+                    
+                    if result.get('updated_event'):
+                        updated_event = self._convert_google_event_from_api(
+                            result['updated_event'], 
+                            input_data.calendar_name or "primary"
+                        )
+                    
+                    # Format success message
+                    changes_made = result.get('changes_made', [])
+                    message = result.get('message', 'Event updated successfully')
+                    
+                    if conflicts:
+                        message += f" (Warning: {len(conflicts)} conflicting event(s) detected)"
+
+                    logger.info(f"Event updated successfully in {asyncio.get_event_loop().time() - start_time:.2f}s")
+                    
+                    return CalendarUpdateOutput(
+                        success=True,
+                        event_id=result['event_id'],
+                        event_url=result['event_url'],
+                        updated_event=updated_event,
+                        original_event=original_event,
+                        changes_made=changes_made,
+                        message=message,
+                        conflicts=conflicts
+                    )
+                else:
+                    # Google Calendar API call failed
+                    error_msg = result.get('error', 'Unknown error updating event')
+                    logger.error(f"Google Calendar update failed: {error_msg}")
+                    
+                    return CalendarUpdateOutput(
+                        success=False,
+                        event_id=input_data.event_id,
+                        event_url=None,
+                        updated_event=None,
+                        original_event=None,
+                        changes_made=[],
+                        message=error_msg,
+                        conflicts=conflicts
+                    )
+            else:
+                # Mock success when Google Calendar is not available
+                logger.info("Google Calendar not available, returning mock update success")
+                
+                # Create a mock updated event
+                mock_event = CalendarEvent(
+                    id=input_data.event_id,
+                    title=input_data.title or "Updated Event",
+                    start_time=input_data.start_time or datetime.now(),
+                    end_time=input_data.end_time or (datetime.now() + timedelta(hours=1)),
+                    location=input_data.location or "",
+                    description=input_data.description or "",
+                    all_day=input_data.all_day or False,
+                    attendees=input_data.attendees or [],
+                    calendar_source=input_data.calendar_name or "primary"
+                )
+                
+                changes_made = []
+                if input_data.title is not None:
+                    changes_made.append('title')
+                if input_data.start_time is not None:
+                    changes_made.append('start_time')
+                if input_data.end_time is not None:
+                    changes_made.append('end_time')
+                if input_data.location is not None:
+                    changes_made.append('location')
+                if input_data.description is not None:
+                    changes_made.append('description')
+                if input_data.attendees is not None:
+                    changes_made.append('attendees')
+                
+                message = f"Mock: Event '{mock_event.title}' updated successfully"
+                if changes_made:
+                    message += f" ({len(changes_made)} changes: {', '.join(changes_made)})"
+                
+                return CalendarUpdateOutput(
+                    success=True,
+                    event_id=input_data.event_id,
+                    event_url=f"https://calendar.google.com/calendar/event?eid={input_data.event_id}",
+                    updated_event=mock_event,
+                    original_event=None,
+                    changes_made=changes_made,
+                    message=message,
+                    conflicts=conflicts
+                )
+                
+        except Exception as e:
+            logger.error(f"Error updating calendar event: {str(e)}")
+            
+            return CalendarUpdateOutput(
+                success=False,
+                event_id=input_data.event_id,
+                event_url=None,
+                updated_event=None,
+                original_event=None,
+                changes_made=[],
+                message=f"Error updating event: {str(e)}",
+                conflicts=[]
+            )
     
-    async def _detect_conflicts(self, start_time: datetime, end_time: datetime, calendar_name: str = None) -> List[CalendarEvent]:
+    async def delete_event(self, input_data: CalendarDeleteInput) -> CalendarDeleteOutput:
+        """
+        Delete a calendar event.
+        
+        Args:
+            input_data: The delete request with event_id and calendar_name
+            
+        Returns:
+            CalendarDeleteOutput with success status and deleted event details
+        """
+        try:
+            # Resolve calendar ID from name
+            calendar_id = await self._resolve_calendar_id(input_data.calendar_name)
+            
+            if self.google_calendar_client:
+                # Call the Google Calendar API to delete the event
+                result = await self.google_calendar_client.delete_event(
+                    event_id=input_data.event_id,
+                    calendar_id=calendar_id
+                )
+                
+                if result['success']:
+                    logger.info(f"Successfully deleted event {input_data.event_id}")
+                    return CalendarDeleteOutput(
+                        success=True,
+                        event_id=input_data.event_id,
+                        deleted_event=result.get('deleted_event'),
+                        message=result.get('message', f"Event {input_data.event_id} deleted successfully")
+                    )
+                else:
+                    logger.error(f"Google Calendar delete failed: {result.get('error', 'Unknown error')}")
+                    return CalendarDeleteOutput(
+                        success=False,
+                        event_id=input_data.event_id,
+                        deleted_event=None,
+                        message=result.get('message', f"Failed to delete event {input_data.event_id}")
+                    )
+            else:
+                # Mock success for development without Google Calendar
+                logger.info(f"MOCK: Delete event {input_data.event_id} from {input_data.calendar_name}")
+                mock_deleted_event = CalendarEvent(
+                    id=input_data.event_id,
+                    title="Deleted Event (Mock)",
+                    start_time=datetime.now(),
+                    end_time=datetime.now() + timedelta(hours=1),
+                    location="Mock Location",
+                    description="This event was deleted in mock mode",
+                    all_day=False,
+                    attendees=[],
+                    calendar_source=input_data.calendar_name or "primary"
+                )
+                
+                return CalendarDeleteOutput(
+                    success=True,
+                    event_id=input_data.event_id,
+                    deleted_event=mock_deleted_event,
+                    message=f"Event {input_data.event_id} deleted successfully (mock mode)"
+                )
+                
+        except Exception as e:
+            logger.error(f"Error deleting event: {str(e)}")
+            return CalendarDeleteOutput(
+                success=False,
+                event_id=input_data.event_id,
+                deleted_event=None,
+                message=f"Error deleting event: {str(e)}"
+            )
+    
+    async def _detect_conflicts(self, start_time: datetime, end_time: datetime, calendar_name: str = None, exclude_event_id: str = None) -> List[CalendarEvent]:
         """Detect conflicting events at the same time."""
         try:
             # Get events for the same date
@@ -446,6 +668,10 @@ class CalendarTool:
             
             conflicts = []
             for event in existing_events:
+                # Skip the event being updated (if specified)
+                if exclude_event_id and event.id == exclude_event_id:
+                    continue
+                    
                 # Check if events overlap
                 if self._events_overlap(start_time, end_time, event.start_time, event.end_time):
                     conflicts.append(event)

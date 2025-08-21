@@ -11,6 +11,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 from ..schemas.calendar import CalendarEvent
 from ..utils.logging import get_logger
@@ -523,6 +524,248 @@ class GoogleCalendarClient:
                 'error': error_msg,
                 'event_id': None,
                 'event_url': None
+            }
+
+    async def update_event(self, event_id: str, title: str = None, start_time: datetime = None,
+                          end_time: datetime = None, description: str = None, location: str = None,
+                          attendees: List[str] = None, calendar_id: str = 'primary',
+                          all_day: bool = None) -> Dict[str, Any]:
+        """Update an existing calendar event.
+        
+        Args:
+            event_id: Google Calendar event ID to update
+            title: New event title/summary (optional)
+            start_time: New event start time (optional)
+            end_time: New event end time (optional)
+            description: New event description (optional)
+            location: New event location (optional)
+            attendees: New list of attendee email addresses (optional)
+            calendar_id: Google Calendar ID (default: 'primary')
+            all_day: Whether this should be an all-day event (optional)
+            
+        Returns:
+            Dict containing success status, event details, and any errors
+        """
+        if not self.service:
+            error_msg = "Google Calendar service not available. Check your credentials."
+            logger.warning(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'event_id': event_id,
+                'event_url': None,
+                'original_event': None,
+                'updated_event': None,
+                'changes_made': []
+            }
+
+        try:
+            # First, get the existing event
+            existing_event = self.service.events().get(
+                calendarId=calendar_id,
+                eventId=event_id
+            ).execute()
+
+            if not existing_event:
+                error_msg = f"Event with ID {event_id} not found"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'event_id': event_id,
+                    'event_url': None,
+                    'original_event': None,
+                    'updated_event': None,
+                    'changes_made': []
+                }
+
+            # Track changes made
+            changes_made = []
+            
+            # Update only the fields that were provided
+            if title is not None and title != existing_event.get('summary', ''):
+                existing_event['summary'] = title
+                changes_made.append('title')
+
+            if description is not None and description != existing_event.get('description', ''):
+                existing_event['description'] = description
+                changes_made.append('description')
+
+            if location is not None and location != existing_event.get('location', ''):
+                existing_event['location'] = location
+                changes_made.append('location')
+
+            # Handle time updates
+            if start_time is not None or end_time is not None or all_day is not None:
+                current_all_day = 'date' in existing_event.get('start', {})
+                new_all_day = all_day if all_day is not None else current_all_day
+
+                if new_all_day:
+                    # All-day event
+                    if start_time:
+                        start_date = start_time.strftime('%Y-%m-%d')
+                        if existing_event.get('start', {}).get('date') != start_date:
+                            existing_event['start'] = {'date': start_date, 'timeZone': self.timezone}
+                            changes_made.append('start_time')
+                    
+                    if end_time:
+                        # For all-day events, end date should be the day after
+                        end_date = (end_time + timedelta(days=1)).strftime('%Y-%m-%d')
+                        if existing_event.get('end', {}).get('date') != end_date:
+                            existing_event['end'] = {'date': end_date, 'timeZone': self.timezone}
+                            changes_made.append('end_time')
+                else:
+                    # Timed event
+                    if start_time:
+                        start_dt = start_time.isoformat()
+                        if existing_event.get('start', {}).get('dateTime') != start_dt:
+                            existing_event['start'] = {'dateTime': start_dt, 'timeZone': self.timezone}
+                            changes_made.append('start_time')
+                    
+                    if end_time:
+                        end_dt = end_time.isoformat()
+                        if existing_event.get('end', {}).get('dateTime') != end_dt:
+                            existing_event['end'] = {'dateTime': end_dt, 'timeZone': self.timezone}
+                            changes_made.append('end_time')
+
+            # Handle attendees
+            if attendees is not None:
+                new_attendees = [{'email': email} for email in attendees]
+                existing_attendees = existing_event.get('attendees', [])
+                
+                # Check if attendees changed
+                existing_emails = {att.get('email') for att in existing_attendees}
+                new_emails = set(attendees)
+                
+                if existing_emails != new_emails:
+                    existing_event['attendees'] = new_attendees
+                    changes_made.append('attendees')
+
+            # Only update if there are actual changes
+            if not changes_made:
+                logger.info(f"No changes needed for event {event_id}")
+                return {
+                    'success': True,
+                    'event_id': event_id,
+                    'event_url': f"https://calendar.google.com/calendar/event?eid={event_id}",
+                    'original_event': self._convert_google_event(existing_event),
+                    'updated_event': self._convert_google_event(existing_event),
+                    'changes_made': [],
+                    'message': "No changes were needed - event is already up to date"
+                }
+
+            # Update the event
+            updated_event = self.service.events().update(
+                calendarId=calendar_id,
+                eventId=event_id,
+                body=existing_event
+            ).execute()
+
+            # Convert the response to our standard format
+            converted_original = self._convert_google_event(existing_event)
+            converted_updated = self._convert_google_event(updated_event)
+            
+            event_url = f"https://calendar.google.com/calendar/event?eid={updated_event['id']}"
+            
+            success_msg = f"Event '{updated_event.get('summary', 'Untitled')}' updated successfully"
+            if changes_made:
+                success_msg += f" ({len(changes_made)} changes: {', '.join(changes_made)})"
+            
+            logger.info(success_msg)
+            
+            return {
+                'success': True,
+                'event_id': updated_event['id'],
+                'event_url': event_url,
+                'original_event': converted_original,
+                'updated_event': converted_updated,
+                'changes_made': changes_made,
+                'message': success_msg
+            }
+
+        except Exception as e:
+            error_msg = f"Failed to update calendar event: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'event_id': event_id,
+                'event_url': None,
+                'original_event': None,
+                'updated_event': None,
+                'changes_made': []
+            }
+
+    async def delete_event(self, event_id: str, calendar_id: str = 'primary') -> Dict[str, Any]:
+        """
+        Delete an event from Google Calendar.
+        
+        Args:
+            event_id: The Google Calendar event ID to delete
+            calendar_id: The calendar ID (defaults to 'primary')
+        
+        Returns:
+            Dict with success status and event details
+        """
+        if not self.service:
+            logger.error("Google Calendar service not initialized")
+            return {
+                'success': False,
+                'error': 'Google Calendar service not initialized',
+                'message': 'Failed to delete calendar event: Service not available'
+            }
+        
+        try:
+            # First, get the event details before deletion for confirmation
+            logger.info(f"Retrieving event {event_id} before deletion from calendar {calendar_id}")
+            event = self.service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+            
+            # Convert the event to our internal format for the response
+            deleted_event = self._convert_google_event(event)
+            
+            # Delete the event
+            logger.info(f"Deleting event {event_id} from calendar {calendar_id}")
+            self.service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
+            
+            logger.info(f"Successfully deleted event: {event.get('summary', 'Untitled')} (ID: {event_id})")
+            
+            return {
+                'success': True,
+                'event_id': event_id,
+                'deleted_event': deleted_event,
+                'message': f"Event '{event.get('summary', 'Untitled')}' deleted successfully"
+            }
+            
+        except HttpError as e:
+            error_details = e.error_details[0] if e.error_details else {}
+            error_message = f"Failed to delete calendar event: {e}"
+            
+            if e.resp.status == 404:
+                error_message = f"Event with ID {event_id} not found"
+                logger.error(f"Event not found: {event_id}")
+            elif e.resp.status == 403:
+                error_message = f"Permission denied: Cannot delete event {event_id}"
+                logger.error(f"Permission denied for event deletion: {event_id}")
+            else:
+                logger.error(f"HTTP error during event deletion: {e}")
+            
+            return {
+                'success': False,
+                'event_id': event_id,
+                'deleted_event': None,
+                'error': error_message,
+                'message': error_message
+            }
+            
+        except Exception as e:
+            error_message = f"Failed to delete calendar event: {e}"
+            logger.error(f"Unexpected error during event deletion: {e}")
+            return {
+                'success': False,
+                'event_id': event_id,
+                'deleted_event': None,
+                'error': error_message,
+                'message': error_message
             }
 
     def test_connection(self) -> bool:

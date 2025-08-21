@@ -1,8 +1,8 @@
 """Pydantic schemas for calendar tool validation."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import datetime as dt  # Import module to avoid name clash
 
 
@@ -202,5 +202,133 @@ class CalendarCreateOutput(BaseModel):
                 },
                 "message": "Event 'Lunch with John' created successfully for January 15, 2024 at 12:00 PM",
                 "conflicts": []
+            }
+        }
+
+
+class CalendarUpdateInput(BaseModel):
+    """Input schema for calendar.update_event tool."""
+    event_id: str = Field(description="Google Calendar event ID to update")
+    title: Optional[str] = Field(default=None, description="New event title/summary")
+    start_time: Optional[datetime] = Field(default=None, description="New event start time")
+    end_time: Optional[datetime] = Field(default=None, description="New event end time")
+    description: Optional[str] = Field(default=None, description="New event description/notes")
+    location: Optional[str] = Field(default=None, description="New event location")
+    attendees: Optional[List[str]] = Field(default=None, description="New list of attendee email addresses")
+    calendar_name: Optional[str] = Field(default="primary", description="Calendar to update event in (primary, work, personal, etc.)")
+    all_day: Optional[bool] = Field(default=None, description="Whether this should be an all-day event")
+
+    @field_validator('attendees')
+    @classmethod
+    def validate_attendees(cls, v):
+        if v is not None:
+            for email in v:
+                if not email or '@' not in email:
+                    raise ValueError(f"Invalid email address: {email}")
+        return v
+
+    @field_validator('start_time', 'end_time')
+    @classmethod
+    def validate_times(cls, v):
+        if v is not None and v.tzinfo is None:
+            # Add UTC timezone if none specified
+            v = v.replace(tzinfo=timezone.utc)
+        return v
+
+    @model_validator(mode='after')
+    def validate_time_range(self):
+        if self.start_time is not None and self.end_time is not None:
+            if self.start_time >= self.end_time:
+                raise ValueError("Start time must be before end time")
+        return self
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "event_id": "abc123def456",
+                "title": "Updated Lunch Meeting",
+                "start_time": "2024-01-15T13:00:00",
+                "end_time": "2024-01-15T14:00:00",
+                "location": "New Location",
+                "description": "Updated description",
+                "attendees": ["john@example.com", "sarah@example.com"],
+                "calendar_name": "primary"
+            }
+        }
+
+
+class CalendarUpdateOutput(BaseModel):
+    """Output schema for calendar.update_event tool."""
+    success: bool = Field(description="Whether the event was updated successfully")
+    event_id: str = Field(description="Google Calendar event ID that was updated")
+    event_url: Optional[str] = Field(description="URL to view the updated event in Google Calendar")
+    updated_event: Optional[CalendarEvent] = Field(description="The updated event details")
+    original_event: Optional[CalendarEvent] = Field(description="The original event details before update")
+    changes_made: List[str] = Field(default_factory=list, description="List of changes that were made")
+    message: str = Field(description="Success or error message")
+    conflicts: Optional[List[CalendarEvent]] = Field(default=None, description="Any conflicting events found at the new time")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "event_id": "abc123def456",
+                "event_url": "https://calendar.google.com/calendar/event?eid=abc123def456",
+                "updated_event": {
+                    "id": "abc123def456",
+                    "title": "Updated Lunch Meeting",
+                    "start_time": "2024-01-15T13:00:00Z",
+                    "end_time": "2024-01-15T14:00:00Z",
+                    "location": "New Location",
+                    "description": "Updated description",
+                    "all_day": False,
+                    "attendees": ["john@example.com", "sarah@example.com"],
+                    "calendar_source": "primary"
+                },
+                "changes_made": ["title", "start_time", "end_time", "location", "attendees"],
+                "message": "Event updated successfully from 12:00 PM to 1:00 PM with 2 changes",
+                "conflicts": []
+            }
+        }
+
+
+class CalendarDeleteInput(BaseModel):
+    """Input schema for calendar.delete_event tool."""
+    event_id: str = Field(description="Google Calendar event ID to delete")
+    calendar_name: Optional[str] = Field(default="primary", description="Calendar to delete event from (primary, work, personal, etc.)")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "event_id": "abc123def456",
+                "calendar_name": "primary"
+            }
+        }
+
+
+class CalendarDeleteOutput(BaseModel):
+    """Output schema for calendar.delete_event tool."""
+    success: bool = Field(description="Whether the event was deleted successfully")
+    event_id: str = Field(description="Google Calendar event ID that was deleted")
+    deleted_event: Optional[CalendarEvent] = Field(description="The deleted event details")
+    message: str = Field(description="Success or error message")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "event_id": "abc123def456",
+                "deleted_event": {
+                    "id": "abc123def456",
+                    "title": "Team Meeting",
+                    "start_time": "2024-01-15T14:00:00Z",
+                    "end_time": "2024-01-15T15:00:00Z",
+                    "location": "Conference Room A",
+                    "description": "Weekly team sync",
+                    "all_day": False,
+                    "attendees": ["john@example.com", "jane@example.com"],
+                    "calendar_source": "primary"
+                },
+                "message": "Event 'Team Meeting' deleted successfully"
             }
         }

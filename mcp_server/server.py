@@ -13,7 +13,8 @@ from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, 
     CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
-    CalendarCreateInput, CalendarCreateOutput,
+    CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
+    CalendarDeleteInput, CalendarDeleteOutput,
     TodoInput, TodoOutput,
     FinancialInput, FinancialOutput
 )
@@ -67,6 +68,20 @@ class MCPServer:
                 "output_schema": CalendarCreateOutput,
                 "description": "Create a new calendar event with conflict detection and smart scheduling",
                 "method": "create_event"
+            },
+            "calendar.update_event": {
+                "tool": CalendarTool(),
+                "input_schema": CalendarUpdateInput,
+                "output_schema": CalendarUpdateOutput,
+                "description": "Update an existing calendar event with conflict detection",
+                "method": "update_event"
+            },
+            "calendar.delete_event": {
+                "tool": CalendarTool(),
+                "input_schema": CalendarDeleteInput,
+                "output_schema": CalendarDeleteOutput,
+                "description": "Delete a calendar event",
+                "method": "delete_event"
             },
             "todo.list": {
                 "tool": TodoTool(),

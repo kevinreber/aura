@@ -821,6 +821,236 @@ def create_app() -> Flask:
             logger.error(f"Error in calendar.create_event: {e}")
             return jsonify({"error": str(e)}), 500
     
+    @app.route('/tools/calendar.update_event', methods=['POST'])
+    async def calendar_update_event():
+        """Update an existing calendar event with Google Calendar integration.
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - event_id
+              properties:
+                event_id:
+                  type: string
+                  example: "abc123def456"
+                  description: "Google Calendar event ID to update"
+                title:
+                  type: string
+                  example: "Updated Lunch Meeting"
+                  description: "New event title/summary (optional)"
+                start_time:
+                  type: string
+                  format: date-time
+                  example: "2024-12-18T13:00:00"
+                  description: "New event start time (ISO format, optional)"
+                end_time:
+                  type: string
+                  format: date-time
+                  example: "2024-12-18T14:00:00"
+                  description: "New event end time (ISO format, optional)"
+                description:
+                  type: string
+                  example: "Updated meeting agenda and notes"
+                  description: "New event description/notes (optional)"
+                location:
+                  type: string
+                  example: "Conference Room B"
+                  description: "New event location (optional)"
+                attendees:
+                  type: array
+                  items:
+                    type: string
+                  example: ["john@example.com", "sarah@example.com"]
+                  description: "New list of attendee email addresses (optional)"
+                calendar_name:
+                  type: string
+                  example: "primary"
+                  description: "Target calendar name (defaults to primary)"
+                all_day:
+                  type: boolean
+                  example: false
+                  description: "Whether this should be an all-day event (optional)"
+        responses:
+          200:
+            description: Calendar event update result
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                  description: "Whether the event was updated successfully"
+                event_id:
+                  type: string
+                  example: "abc123def456"
+                  description: "Google Calendar event ID that was updated"
+                event_url:
+                  type: string
+                  example: "https://calendar.google.com/calendar/event?eid=abc123def456"
+                  description: "URL to view the updated event in Google Calendar"
+                updated_event:
+                  type: object
+                  description: "The updated event details"
+                original_event:
+                  type: object
+                  description: "The original event details before update"
+                changes_made:
+                  type: array
+                  items:
+                    type: string
+                  example: ["title", "start_time", "location"]
+                  description: "List of fields that were changed"
+                message:
+                  type: string
+                  example: "Event 'Updated Lunch Meeting' updated successfully (3 changes: title, start_time, location)"
+                  description: "Success or error message"
+                conflicts:
+                  type: array
+                  items:
+                    type: object
+                  description: "Any conflicting events found at the new time"
+          400:
+            description: Invalid request format or missing event_id
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "JSON body required"
+          404:
+            description: Event not found
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Event with ID abc123def456 not found"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error updating calendar event"
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            if not data.get('event_id'):
+                return jsonify({"error": "event_id is required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("calendar.update_event", data)
+            
+            # Handle event not found as 404
+            if not result.get('success') and 'not found' in result.get('message', '').lower():
+                return jsonify({"error": result.get('message', 'Event not found')}), 404
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in calendar.update_event: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route('/tools/calendar.delete_event', methods=['POST'])
+    async def calendar_delete_event():
+        """Delete a calendar event from Google Calendar.
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - event_id
+              properties:
+                event_id:
+                  type: string
+                  example: "abc123def456"
+                  description: "Google Calendar event ID to delete"
+                calendar_name:
+                  type: string
+                  example: "primary"
+                  description: "Calendar to delete event from (defaults to primary)"
+        responses:
+          200:
+            description: Calendar event deletion result
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                  description: "Whether the event was deleted successfully"
+                event_id:
+                  type: string
+                  example: "abc123def456"
+                  description: "Google Calendar event ID that was deleted"
+                deleted_event:
+                  type: object
+                  description: "The deleted event details"
+                message:
+                  type: string
+                  example: "Event 'Team Meeting' deleted successfully"
+                  description: "Success or error message"
+          400:
+            description: Invalid request format or missing event_id
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "JSON body required"
+          404:
+            description: Event not found
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Event with ID abc123def456 not found"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error deleting calendar event"
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            if not data.get('event_id'):
+                return jsonify({"error": "event_id is required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("calendar.delete_event", data)
+            
+            # Handle event not found as 404
+            if not result.get('success') and 'not found' in result.get('message', '').lower():
+                return jsonify({"error": result.get('message', 'Event not found')}), 404
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in calendar.delete_event: {e}")
+            return jsonify({"error": str(e)}), 500
+    
     # Financial tool endpoint
     @app.route('/tools/financial.get_data', methods=['POST'])
     async def financial_get_data():
