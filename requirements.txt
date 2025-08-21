@@ -27,6 +27,7 @@ requests==2.31.0
 google-api-python-client>=2.140.0
 google-auth-httplib2>=0.2.0
 google-auth-oauthlib>=1.2.0
+pytz==2025.2  # Timezone handling for smart scheduling
 
 # Environment file loading (optional)
 python-dotenv==1.0.0

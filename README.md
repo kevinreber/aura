@@ -4,13 +4,14 @@ A Model Context Protocol (MCP) server providing comprehensive daily productivity
 
 ## 🚀 **NEW: Complete Calendar Management!**
 
-✨ **Phase 2.1 Complete** - Full Calendar CRUD: Create, Read, Update, Delete events with smart conflict detection!
+✨ **Phase 2.2 In Progress** - Smart Scheduling AI with intelligent time finding!
 
 ### 🎯 **Recent Achievements**
 
 - ✅ **Calendar Event Creation** with conflict detection
 - ✅ **Calendar Event Updates** with change tracking
 - ✅ **Calendar Event Deletion** with confirmation
+- ✅ **Smart Time Finding** with AI-powered scheduling 🆕
 - ✅ **Fixed Calendar Reading Bug** - events now properly discoverable
 
 ## 🛠️ Available Tools
@@ -106,6 +107,29 @@ Real-time stock and cryptocurrency market data.
   - ⚠️ **Error Handling** - Proper 404 responses for missing events
   - 🔗 **Real Integration** - Events removed from Google Calendar instantly
 - **Real API**: ✅ Google Calendar Events API with delete permissions
+
+### 🧠 **Smart Scheduling**
+
+#### 📅🔍 Find Free Time (`calendar.find_free_time`) 🆕
+
+**AI-powered smart scheduling that finds optimal available time slots!**
+
+- **Input**: `duration_minutes`, `start_date`, `end_date`, `earliest_time`, `latest_time`, `preferred_time`, `max_results`
+- **Output**: Ranked available time slots with preference scoring, conflict context
+- **Features**:
+  - 🎯 **Intelligent Time Finding** - Finds gaps between existing events
+  - ⏰ **Duration-Based Search** - Specify exact time needed (30min - 8 hours)
+  - 📅 **Multi-Day Search** - Search across date ranges for flexibility
+  - 🕐 **Time Window Filtering** - Restrict to business hours or custom windows
+  - 🌅 **Preference Scoring** - Prioritize morning, afternoon, or evening slots
+  - 🚫 **All-Day Event Filtering** - Workouts and holidays don't block time slots
+  - 🌍 **Timezone-Aware** - Proper handling of Google Calendar timezone data
+  - 📊 **Conflict Context** - See events before/after each available slot
+- **Perfect For**:
+  - *"Find me 60 minutes free tomorrow afternoon"* 
+  - *"When can I schedule a 2-hour deep work session this week?"*
+  - *"Show me 30-minute slots available between meetings"*
+- **Real API**: ✅ Google Calendar integration with smart gap analysis
 
 ## 🚀 Quick Start
 
@@ -247,6 +271,22 @@ curl -X POST http://localhost:8000/tools/calendar.delete_event \
   -d '{
     "event_id": "your_event_id_here",
     "calendar_name": "primary"
+  }'
+```
+
+### 🆕 Test Smart Time Finding
+
+```bash
+curl -X POST http://localhost:8000/tools/calendar.find_free_time \
+  -H "Content-Type: application/json" \
+  -d '{
+    "duration_minutes": 60,
+    "start_date": "2024-01-15",
+    "end_date": "2024-01-16",
+    "earliest_time": "09:00",
+    "latest_time": "18:00",
+    "preferred_time": "afternoon",
+    "max_results": 3
   }'
 ```
 
