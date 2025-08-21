@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ✨ **New Tools**
 
 - `calendar.update_event` - Update existing calendar events with granular field updates
+
   - Partial updates (only change specified fields)
   - Enhanced conflict detection (excludes event being updated)
   - Change tracking (reports exactly what was modified)
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🔄 **Updated Tool Capabilities**
 
 - **Read Operations**:
+
   - `weather.get_daily` - Weather forecasts via OpenWeatherMap
   - `calendar.list_events` - Single date calendar events (✅ **FIXED**)
   - `calendar.list_events_range` - Multi-day calendar events
@@ -67,11 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🎯 **User Experience Improvements**
 
 **AI Assistant can now handle complete calendar management:**
-- *"Remove my 4pm workout tomorrow"* ✅
-- *"Move my meeting to 3pm"* ✅  
-- *"Update the location to Conference Room B"* ✅
-- *"Add Sarah to my client presentation"* ✅
-- *"Cancel that duplicate lunch meeting"* ✅
+
+- _"Remove my 4pm workout tomorrow"_ ✅
+- _"Move my meeting to 3pm"_ ✅
+- _"Update the location to Conference Room B"_ ✅
+- _"Add Sarah to my client presentation"_ ✅
+- _"Cancel that duplicate lunch meeting"_ ✅
 
 ### 🚀 **Production Impact**
 

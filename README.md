@@ -7,8 +7,9 @@ A Model Context Protocol (MCP) server providing comprehensive daily productivity
 ✨ **Phase 2.1 Complete** - Full Calendar CRUD: Create, Read, Update, Delete events with smart conflict detection!
 
 ### 🎯 **Recent Achievements**
+
 - ✅ **Calendar Event Creation** with conflict detection
-- ✅ **Calendar Event Updates** with change tracking  
+- ✅ **Calendar Event Updates** with change tracking
 - ✅ **Calendar Event Deletion** with confirmation
 - ✅ **Fixed Calendar Reading Bug** - events now properly discoverable
 
