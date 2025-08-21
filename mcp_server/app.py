@@ -61,21 +61,28 @@ def create_app() -> Flask:
         "swagger": "2.0",
         "info": {
             "title": "Daily MCP Server API",
-            "description": """Model Context Protocol server providing comprehensive morning routine tools for AI agents.
+            "description": """🎉 **Phase 1.5 Complete** - Model Context Protocol server with both READ and WRITE operations!
 
+**🆕 NEW: Calendar Event Creation** - First write tool with smart conflict detection!
+
+**📊 Read Operations**:
 🌤️ **Weather**: Real-time conditions via OpenWeatherMap  
-📅 **Calendar**: Google Calendar integration with real events  
-💰 **Financial**: Stock/crypto prices via Alpha Vantage & CoinGecko  
-🚗 **Mobility**: Commute times via Google Maps  
-✅ **Todo**: Task management with filtering  
+📅 **Calendar**: Multi-calendar events via Google Calendar API  
+💰 **Financial**: Live stock/crypto prices via Alpha Vantage & CoinGecko  
+🚗 **Mobility**: Real-time commute times via Google Maps  
+✅ **Todo**: Task management with smart filtering  
 
-**Quick Start**: All endpoints require POST with JSON body. Real APIs available when configured.""",
+**✨ Write Operations**:
+📅+ **Calendar Create**: Create events with conflict detection and multi-calendar support
+
+**🎯 Features**: Real APIs, conflict detection, multi-calendar support, production deployment
+**⚡ Quick Start**: All endpoints require POST with JSON body. Try `/docs` for interactive testing!""",
             "contact": {
                 "responsibleOrganization": "Personal Learning Project",
                 "responsibleDeveloper": "Kevin Reber",
                 "email": "kevinreber1@gmail.com"
             },
-            "version": "0.1.0",
+            "version": "0.2.0",
             "license": {
                 "name": "MIT"
             }
@@ -86,13 +93,13 @@ def create_app() -> Flask:
         "produces": ["application/json"],
         "consumes": ["application/json"],
         "tags": [
-            {"name": "Health", "description": "System health and status"},
-            {"name": "Tools", "description": "Available MCP tools"},
-            {"name": "Weather", "description": "Real-time weather via OpenWeatherMap"},
-            {"name": "Calendar", "description": "Google Calendar integration"},
-            {"name": "Financial", "description": "Stock and crypto market data"},
-            {"name": "Mobility", "description": "Commute and traffic info"},
-            {"name": "Todo", "description": "Task management"}
+            {"name": "Health", "description": "System health and status monitoring"},
+            {"name": "Tools", "description": "Available MCP tools and capabilities"},
+            {"name": "Weather", "description": "🌤️ Real-time weather via OpenWeatherMap API"},
+            {"name": "Calendar", "description": "📅 Google Calendar R/W - Events, creation, conflict detection"},
+            {"name": "Financial", "description": "💰 Live stock and crypto market data"},
+            {"name": "Mobility", "description": "🚗 Real-time commute and traffic information"},
+            {"name": "Todo", "description": "✅ Task management with smart filtering"}
         ]
     }
     
@@ -697,6 +704,121 @@ def create_app() -> Flask:
             
         except Exception as e:
             logger.error(f"Error in todo.list: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Calendar create event tool endpoint
+    @app.route('/tools/calendar.create_event', methods=['POST'])
+    async def calendar_create_event():
+        """Create a new calendar event with Google Calendar integration.
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - title
+                - start_time
+                - end_time
+              properties:
+                title:
+                  type: string
+                  example: "Lunch with John"
+                  description: "Event title/summary"
+                start_time:
+                  type: string
+                  format: date-time
+                  example: "2024-12-18T12:00:00"
+                  description: "Event start time (ISO format)"
+                end_time:
+                  type: string
+                  format: date-time
+                  example: "2024-12-18T13:00:00"
+                  description: "Event end time (ISO format)"
+                description:
+                  type: string
+                  example: "Catching up over lunch"
+                  description: "Event description/notes (optional)"
+                location:
+                  type: string
+                  example: "Downtown Cafe"
+                  description: "Event location (optional)"
+                attendees:
+                  type: array
+                  items:
+                    type: string
+                  example: ["john@example.com"]
+                  description: "List of attendee email addresses (optional)"
+                calendar_name:
+                  type: string
+                  example: "primary"
+                  description: "Target calendar name (defaults to primary)"
+                all_day:
+                  type: boolean
+                  example: false
+                  description: "Whether this is an all-day event"
+        responses:
+          200:
+            description: Calendar event creation result
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                  description: "Whether the event was created successfully"
+                event_id:
+                  type: string
+                  example: "abc123def456"
+                  description: "Google Calendar event ID if created"
+                event_url:
+                  type: string
+                  example: "https://calendar.google.com/calendar/event?eid=abc123def456"
+                  description: "URL to view the event in Google Calendar"
+                created_event:
+                  type: object
+                  description: "The created event details"
+                message:
+                  type: string
+                  example: "Event 'Lunch with John' created successfully for December 18, 2024 at 12:00 PM"
+                  description: "Success or error message"
+                conflicts:
+                  type: array
+                  items:
+                    type: object
+                  description: "Any conflicting events found at the same time"
+          400:
+            description: Invalid request format or missing required fields
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "JSON body required"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error creating calendar event"
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("calendar.create_event", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in calendar.create_event: {e}")
             return jsonify({"error": str(e)}), 500
     
     # Financial tool endpoint

@@ -1,45 +1,77 @@
 # Daily MCP Server 🌅
 
-A Model Context Protocol (MCP) server providing morning routine tools for AI agents. Built with Flask and Python for personal learning and experimentation.
+A Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features both **read** and **write** operations for real-world integration. Built with Flask and Python for personal productivity and AI agent learning.
 
-## 🛠️ Tools Available
+## 🎉 **NEW: Write Operations!**
 
-### 🌤️ Weather (`weather.get_daily`)
+✨ **Phase 1.5 Complete** - Now supports calendar event creation with smart conflict detection!
 
-Get daily weather forecasts for any location.
+## 🛠️ Available Tools
+
+### 📊 **Read Operations**
+
+#### 🌤️ Weather (`weather.get_daily`)
+
+Get daily weather forecasts powered by OpenWeatherMap.
 
 - **Input**: `location` (string), `when` ("today" | "tomorrow")
-- **Output**: Temperature highs/lows, precipitation chance, summary
+- **Output**: Temperature highs/lows, precipitation chance, detailed summary
+- **Real API**: ✅ OpenWeatherMap integration
 
-### 🚗 Mobility (`mobility.get_commute`)
+#### 🚗 Mobility (`mobility.get_commute`)
 
-Get commute time and route information between locations.
+Get real-time commute and traffic information.
 
 - **Input**: `origin`, `destination`, `mode` ("driving" | "transit" | "bicycling" | "walking")
-- **Output**: Duration, distance, route summary, traffic status
+- **Output**: Duration, distance, route summary, live traffic status
+- **Real API**: ✅ Google Maps Directions integration
 
-### 📅 Calendar (`calendar.list_events`)
+#### 📅 Calendar (`calendar.list_events`)
 
-List calendar events for a specific date.
+List calendar events for any date with multi-calendar support.
 
 - **Input**: `date` (YYYY-MM-DD)
-- **Output**: List of events with times, locations, descriptions
+- **Output**: Events with times, locations, descriptions, attendees
+- **Real API**: ✅ Google Calendar (Primary, Runna, Family calendars)
 
-### ✅ Todo (`todo.list`)
+#### 📅 Calendar Range (`calendar.list_events_range`)
 
-List todo items from different buckets/categories.
+Efficiently get events for date ranges (much faster than multiple single-date calls).
+
+- **Input**: `start_date`, `end_date` (YYYY-MM-DD)
+- **Output**: All events in range sorted by time
+- **Real API**: ✅ Google Calendar multi-calendar support
+
+#### ✅ Todo (`todo.list`)
+
+List todo items with smart filtering and categorization.
 
 - **Input**: `bucket` ("work" | "home" | "errands" | "personal"), `include_completed` (boolean)
-- **Output**: List of todos with priorities, due dates, tags
+- **Output**: Todos with priorities, due dates, completion status
+- **API Status**: 🔄 Mock data (Todoist integration planned)
 
-### 💰 Financial (`financial.get_data`)
+#### 💰 Financial (`financial.get_data`)
 
-Get real-time stock and cryptocurrency market data.
+Real-time stock and cryptocurrency market data.
 
-- **Input**: `symbols` (array of symbols like ["MSFT", "BTC", "ETH"]), `data_type` ("stocks" | "crypto" | "mixed")
-- **Output**: Current prices, daily changes, percentage changes, market status, portfolio summary
-- **Data Sources**: Alpha Vantage (stocks), CoinGecko (crypto)
-- **Example Symbols**: MSFT, NVDA, GOOGL, VOO, BTC, ETH
+- **Input**: `symbols` (["MSFT", "BTC", "ETH", "NVDA"]), `data_type` ("stocks" | "crypto" | "mixed")
+- **Output**: Live prices, daily changes, market status, portfolio summary
+- **Real APIs**: ✅ Alpha Vantage (stocks) + CoinGecko (crypto)
+
+### ✨ **Write Operations**
+
+#### 📅+ Calendar Create (`calendar.create_event`) 🆕
+
+**Create new calendar events with intelligent conflict detection!**
+
+- **Input**: `title`, `start_time`, `end_time`, `description`, `location`, `attendees`, `calendar_name`
+- **Output**: Created event details, conflict warnings, Google Calendar URL
+- **Features**:
+  - ⚠️ **Smart Conflict Detection** - Warns about overlapping events
+  - 🎯 **Multi-Calendar Support** - Target specific calendars (primary, work, etc.)
+  - 🔗 **Real Integration** - Events appear in Google Calendar instantly
+  - 📧 **Attendee Management** - Email invitations and notifications
+- **Real API**: ✅ Google Calendar Events API with write permissions
 
 ## 🚀 Quick Start
 
@@ -143,6 +175,22 @@ curl -X POST http://localhost:8000/tools/calendar.list_events \
   -d '{"date": "2024-01-15"}'
 ```
 
+### 🆕 Test Calendar Event Creation
+
+```bash
+curl -X POST http://localhost:8000/tools/calendar.create_event \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Team Meeting",
+    "start_time": "2024-01-15T14:00:00",
+    "end_time": "2024-01-15T15:00:00",
+    "location": "Conference Room A",
+    "description": "Weekly team sync",
+    "attendees": ["colleague@example.com"],
+    "calendar_name": "primary"
+  }'
+```
+
 ### Test Todo Tool
 
 ```bash
@@ -159,12 +207,29 @@ curl -X POST http://localhost:8000/tools/todo.list \
 2. Get your free API key
 3. Add to `.env`: `WEATHER_API_KEY=your_key_here`
 
-### Google Maps (Mobility Tool)
+### Google APIs (Mobility & Calendar Tools)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the Directions API
-3. Create an API key
-4. Add to `.env`: `GOOGLE_MAPS_API_KEY=your_key_here`
+2. Create a new project or select existing
+3. Enable APIs:
+   - **Directions API** (for mobility/commute)
+   - **Calendar API** (for calendar read/write)
+4. Create credentials:
+   - **API Key** for Directions API
+   - **OAuth 2.0** for Calendar API (download JSON file)
+5. Add to `.env`:
+   ```
+   GOOGLE_MAPS_API_KEY=your_api_key_here
+   GOOGLE_CALENDAR_CREDENTIALS_PATH=path/to/credentials.json
+   ```
+
+### Google Calendar Setup (for Write Operations)
+
+1. Set up OAuth consent screen in Google Cloud Console
+2. Add scopes: `calendar.readonly` and `calendar.events`
+3. Add yourself as a test user
+4. Download OAuth credentials JSON file
+5. Place in your project and update `.env` path
 
 ### Alpha Vantage (Financial Tool)
 
@@ -185,7 +250,7 @@ This repository contains **only the MCP server**. The complete morning routine s
 │       ui)           │    │      agent)         │    │    [THIS REPO]      │
 ├─────────────────────┤    ├─────────────────────┤    ├─────────────────────┤
 │ • User Interface    │    │ • LangChain/LlamaIdx│    │ • Flask Server      │
-│ • Data Loading      │◄──►│ • OpenAI/Claude     │◄──►│ • 4 Core Tools      │
+│ • Data Loading      │◄──►│ • OpenAI/Claude     │◄──►│ • 6 Tools (5R+1W)   │
 │ • Error Boundaries  │    │ • Tool Orchestration│    │ • External APIs     │
 │ • Remix Routes      │    │ • Optional BFF API  │    │ • Schema Validation │
 └─────────────────────┘    └─────────────────────┘    └─────────────────────┘
@@ -279,14 +344,32 @@ flake8 mcp_server/
 mypy mcp_server/
 ```
 
-## 🔮 Future Integrations
+## 📊 API Integration Status
 
-The tools currently use mock data but are designed for easy integration with real services:
+| Tool               | Status      | API Provider              | Features                           |
+| ------------------ | ----------- | ------------------------- | ---------------------------------- |
+| 🌤️ Weather         | ✅ **Live** | OpenWeatherMap            | Current conditions, forecasts      |
+| 🚗 Mobility        | ✅ **Live** | Google Maps               | Real-time traffic, routes          |
+| 📅 Calendar Read   | ✅ **Live** | Google Calendar           | Multi-calendar support             |
+| 📅+ Calendar Write | ✅ **Live** | Google Calendar           | Event creation, conflict detection |
+| 💰 Financial       | ✅ **Live** | Alpha Vantage + CoinGecko | Stocks + crypto prices             |
+| ✅ Todo            | 🔄 **Mock** | Todoist (planned)         | Smart categorization               |
 
-- **Weather**: ✅ OpenWeatherMap API (ready)
-- **Mobility**: ✅ Google Maps API (ready)
-- **Calendar**: 🔄 Google Calendar API (planned)
-- **Todo**: 🔄 Todoist API (planned)
+## 🎯 **Current Capabilities**
+
+- ✅ **5 Read Tools** - All with real API integration
+- ✅ **1 Write Tool** - Calendar event creation with smart features
+- ✅ **Multi-Calendar Support** - Primary, Runna, Family calendars
+- ✅ **Conflict Detection** - Smart scheduling assistance
+- ✅ **Production Deployment** - Railway.app with auto-deployment
+
+## 🔮 **Phase 2 Roadmap**
+
+- 🎯 **Smart Scheduling** - AI-powered optimal meeting time suggestions
+- ✏️ **Calendar CRUD** - Update and delete calendar events
+- 📝 **Todo Write Operations** - Create, update, complete tasks
+- 🧠 **Natural Language** - Enhanced parsing for relative times
+- 👥 **Multi-tenancy** - Multiple user support
 
 ## 🤝 Contributing
 
@@ -302,5 +385,24 @@ MIT License - feel free to use this code for your own learning projects!
 
 ---
 
-**Happy coding!** 🚀 This MCP server is perfect for learning about AI agents, API integrations, and modern Python web development.
-# Trigger Railway deployment with Swagger UI support
+## 📖 **Interactive Documentation**
+
+Visit `http://localhost:8000/docs` for comprehensive Swagger UI documentation with:
+
+- 📋 **All Tool Schemas** - Input/output examples and validation
+- 🧪 **Try It Out** - Test tools directly in the browser
+- 📊 **Response Examples** - See real API responses
+- 🔍 **Schema Explorer** - Understand data structures
+
+## 🎉 **What Makes This Special**
+
+This isn't just another API - it's a **complete productivity assistant backend**:
+
+- 🤖 **AI Agent Ready** - Purpose-built for LLM integration
+- 🔄 **Read + Write** - Both information retrieval AND action taking
+- 🧠 **Smart Features** - Conflict detection, multi-calendar support
+- ⚡ **Real Integrations** - Live data from Google, OpenWeatherMap, financial APIs
+- 📱 **Production Deployed** - Working system you can use daily
+- 🎯 **Personal Use** - Designed for individual productivity
+
+**Happy coding!** 🚀 This MCP server demonstrates modern AI agent architecture with real-world integrations and write capabilities.

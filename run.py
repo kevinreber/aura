@@ -56,6 +56,7 @@ def main():
     print(f"  🌤️  Weather:      {public_url}/tools/weather.get_daily")
     print(f"  🚗  Mobility:     {public_url}/tools/mobility.get_commute")
     print(f"  📅  Calendar:     {public_url}/tools/calendar.list_events")
+    print(f"  📅+ Create Event: {public_url}/tools/calendar.create_event")
     print(f"  ✅  Todos:        {public_url}/tools/todo.list")
     print(f"  💰  Financial:    {public_url}/tools/financial.get_data")
     print()

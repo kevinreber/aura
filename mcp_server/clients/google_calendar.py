@@ -17,8 +17,11 @@ from ..utils.logging import get_logger
 
 logger = get_logger("google_calendar_client")
 
-# Google Calendar API scopes
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+# Google Calendar API scopes - updated to include write permissions for event creation
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar.readonly',
+    'https://www.googleapis.com/auth/calendar.events'
+]
 
 
 class GoogleCalendarClient:
@@ -430,6 +433,97 @@ class GoogleCalendarClient:
         except Exception as e:
             logger.error(f"Error fetching Google Calendar events for range: {e}")
             return []
+
+    async def create_event(self, title: str, start_time: datetime, end_time: datetime, 
+                          description: str = None, location: str = None, 
+                          attendees: List[str] = None, calendar_id: str = 'primary',
+                          all_day: bool = False) -> Dict[str, Any]:
+        """
+        Create a new calendar event.
+        
+        Args:
+            title: Event title/summary
+            start_time: Event start time
+            end_time: Event end time  
+            description: Event description (optional)
+            location: Event location (optional)
+            attendees: List of attendee email addresses (optional)
+            calendar_id: Target calendar ID (default: 'primary')
+            all_day: Whether this is an all-day event
+            
+        Returns:
+            Dictionary with created event details or error info
+        """
+        if not self.service:
+            logger.error("Google Calendar service not initialized")
+            return {
+                'success': False,
+                'error': 'Google Calendar service not available',
+                'event_id': None,
+                'event_url': None
+            }
+        
+        try:
+            # Build the event object
+            event_body = {
+                'summary': title,
+                'description': description or '',
+                'location': location or '',
+            }
+            
+            # Handle all-day vs timed events
+            if all_day:
+                # All-day events use date format (YYYY-MM-DD)
+                start_date = start_time.date().isoformat()
+                end_date = end_time.date().isoformat()
+                event_body['start'] = {'date': start_date}
+                event_body['end'] = {'date': end_date}
+            else:
+                # Timed events use dateTime format (RFC3339)
+                event_body['start'] = {
+                    'dateTime': start_time.isoformat(),
+                    'timeZone': 'America/Los_Angeles',  # TODO: Make timezone configurable
+                }
+                event_body['end'] = {
+                    'dateTime': end_time.isoformat(),
+                    'timeZone': 'America/Los_Angeles',
+                }
+            
+            # Add attendees if provided
+            if attendees:
+                event_body['attendees'] = [{'email': email} for email in attendees]
+            
+            logger.info(f"Creating calendar event: {title} on {calendar_id}")
+            logger.debug(f"Event body: {event_body}")
+            
+            # Create the event
+            created_event = self.service.events().insert(
+                calendarId=calendar_id, 
+                body=event_body
+            ).execute()
+            
+            event_id = created_event.get('id')
+            event_url = created_event.get('htmlLink', f"https://calendar.google.com/calendar/event?eid={event_id}")
+            
+            logger.info(f"Successfully created event: {event_id}")
+            
+            return {
+                'success': True,
+                'event_id': event_id,
+                'event_url': event_url,
+                'created_event': created_event,
+                'error': None
+            }
+            
+        except Exception as e:
+            error_msg = f"Error creating calendar event: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'event_id': None,
+                'event_url': None
+            }
 
     def test_connection(self) -> bool:
         """Test if the Google Calendar connection is working."""

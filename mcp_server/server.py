@@ -13,6 +13,7 @@ from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, 
     CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
+    CalendarCreateInput, CalendarCreateOutput,
     TodoInput, TodoOutput,
     FinancialInput, FinancialOutput
 )
@@ -59,6 +60,13 @@ class MCPServer:
                 "output_schema": CalendarRangeOutput,
                 "description": "List calendar events for a date range (more efficient than multiple single-date calls)",
                 "method": "list_events_range"
+            },
+            "calendar.create_event": {
+                "tool": CalendarTool(),
+                "input_schema": CalendarCreateInput,
+                "output_schema": CalendarCreateOutput,
+                "description": "Create a new calendar event with conflict detection and smart scheduling",
+                "method": "create_event"
             },
             "todo.list": {
                 "tool": TodoTool(),
@@ -187,7 +195,7 @@ class MCPServer:
                 "sampling": False    # Not implemented yet
             },
             "tool_count": len(self.tools),
-            "supported_tool_types": ["weather", "mobility", "calendar", "todo"],
+            "supported_tool_types": ["weather", "mobility", "calendar", "todo", "financial"],
             "created_at": datetime.now().isoformat()
         }
 
