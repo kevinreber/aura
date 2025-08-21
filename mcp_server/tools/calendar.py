@@ -15,6 +15,7 @@ from ..schemas.calendar import (
     FreeTimeSlot
 )
 from ..utils.logging import get_logger, log_tool_call
+from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
 from ..config import get_settings
 from ..clients.google_calendar import GoogleCalendarClient
 
@@ -137,7 +138,16 @@ class CalendarTool:
             raise
     
     async def _get_events_for_date(self, query_date: dt.date) -> List[CalendarEvent]:
-        """Get events for a specific date from multiple calendars (primary, Runna, Family)."""
+        """Get events for a specific date from multiple calendars with caching."""
+        cache = await get_cache_service()
+        cache_key = generate_cache_key("calendar_events", query_date.isoformat())
+        
+        # Check cache first
+        cached_events = await cache.get(cache_key)
+        if cached_events:
+            logger.debug(f"Using cached calendar events for {query_date}")
+            # Convert dict back to CalendarEvent objects
+            return [CalendarEvent(**event) for event in cached_events]
         
         if self.google_calendar_client:
             try:
@@ -145,16 +155,41 @@ class CalendarTool:
                 # Use the multi-calendar method for consistency, with same start/end date
                 events = await self.google_calendar_client.get_events_for_multiple_calendars(query_date, query_date)
                 logger.info(f"Retrieved {len(events)} events from Google Calendar across all calendars")
+                
+                # Cache the events (convert to dicts for JSON serialization)
+                events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+                await cache.set(cache_key, events_dict, CacheTTL.CALENDAR_EVENTS)
+                logger.debug(f"Cached {len(events)} calendar events for {query_date}")
+                
                 return events
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events, falling back to mock data: {e}")
-                return await self._get_mock_events(query_date)
+                events = await self._get_mock_events(query_date)
+                # Cache mock events too (but with shorter TTL)
+                events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+                await cache.set(cache_key, events_dict, 60)  # 1 minute for mock data
+                return events
         else:
             logger.info("Google Calendar client not available, using mock data")
-            return await self._get_mock_events(query_date)
+            events = await self._get_mock_events(query_date)
+            # Cache mock events too (but with shorter TTL)
+            events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+            await cache.set(cache_key, events_dict, 60)  # 1 minute for mock data
+            return events
     
     async def _get_events_for_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
-        """Get events for a date range from multiple calendars (primary, Runna, Family)."""
+        """Get events for a date range from multiple calendars with caching."""
+        cache = await get_cache_service()
+        cache_key = generate_cache_key("calendar_events_range", 
+                                     start_date.isoformat(), 
+                                     end_date.isoformat())
+        
+        # Check cache first
+        cached_events = await cache.get(cache_key)
+        if cached_events:
+            logger.debug(f"Using cached calendar events for range {start_date} to {end_date}")
+            # Convert dict back to CalendarEvent objects
+            return [CalendarEvent(**event) for event in cached_events]
         
         if self.google_calendar_client:
             try:
@@ -162,13 +197,27 @@ class CalendarTool:
                 # Fetch from primary + Runna + Family calendars by default
                 events = await self.google_calendar_client.get_events_for_multiple_calendars(start_date, end_date)
                 logger.info(f"Retrieved {len(events)} events from Google Calendar for range across all calendars")
+                
+                # Cache the events (convert to dicts for JSON serialization)
+                events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+                await cache.set(cache_key, events_dict, CacheTTL.CALENDAR_EVENTS)
+                logger.debug(f"Cached {len(events)} calendar events for range {start_date} to {end_date}")
+                
                 return events
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events for range, falling back to mock data: {e}")
-                return await self._get_mock_events_range(start_date, end_date)
+                events = await self._get_mock_events_range(start_date, end_date)
+                # Cache mock events too (but with shorter TTL)
+                events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+                await cache.set(cache_key, events_dict, 60)  # 1 minute for mock data
+                return events
         else:
             logger.info("Google Calendar client not available, using mock data for range")
-            return await self._get_mock_events_range(start_date, end_date)
+            events = await self._get_mock_events_range(start_date, end_date)
+            # Cache mock events too (but with shorter TTL)
+            events_dict = [event.dict() if hasattr(event, 'dict') else event.__dict__ for event in events]
+            await cache.set(cache_key, events_dict, 60)  # 1 minute for mock data
+            return events
     
     async def _get_mock_events_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
         """Generate mock events for a date range."""
@@ -420,6 +469,9 @@ class CalendarTool:
                     conflicts=conflicts if conflicts else None
                 )
             
+            # Invalidate cache for the event date
+            await self._invalidate_calendar_cache(input_data.start_time.date())
+            
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call("calendar.create_event", input_data.dict(), duration_ms)
@@ -507,6 +559,10 @@ class CalendarTool:
                         message += f" (Warning: {len(conflicts)} conflicting event(s) detected)"
 
                     logger.info(f"Event updated successfully in {asyncio.get_event_loop().time() - start_time:.2f}s")
+                    
+                    # Invalidate cache for relevant dates
+                    if input_data.start_time:
+                        await self._invalidate_calendar_cache(input_data.start_time.date())
                     
                     return CalendarUpdateOutput(
                         success=True,
@@ -616,6 +672,10 @@ class CalendarTool:
                 
                 if result['success']:
                     logger.info(f"Successfully deleted event {input_data.event_id}")
+                    
+                    # Invalidate calendar cache (we don't know the date, so invalidate recent dates)
+                    await self._invalidate_recent_calendar_cache()
+                    
                     return CalendarDeleteOutput(
                         success=True,
                         event_id=input_data.event_id,
@@ -644,6 +704,9 @@ class CalendarTool:
                     attendees=[],
                     calendar_source=input_data.calendar_name or "primary"
                 )
+                
+                # Invalidate calendar cache for mock deletion too
+                await self._invalidate_recent_calendar_cache()
                 
                 return CalendarDeleteOutput(
                     success=True,
@@ -1047,3 +1110,36 @@ class CalendarTool:
         except Exception as e:
             logger.error(f"Error parsing datetime '{datetime_str}': {e}")
             return datetime.now()
+    
+    async def _invalidate_calendar_cache(self, target_date: dt.date):
+        """Invalidate calendar cache for a specific date and related ranges."""
+        cache = await get_cache_service()
+        
+        # Invalidate single date cache
+        single_cache_key = generate_cache_key("calendar_events", target_date.isoformat())
+        await cache.delete(single_cache_key)
+        
+        # Invalidate range caches that might include this date
+        # We'll invalidate common ranges around this date
+        for days_before in range(0, 8):  # up to a week before
+            for days_after in range(1, 8):  # up to a week after
+                start_date = target_date - timedelta(days=days_before)
+                end_date = target_date + timedelta(days=days_after)
+                range_cache_key = generate_cache_key("calendar_events_range", 
+                                                   start_date.isoformat(), 
+                                                   end_date.isoformat())
+                await cache.delete(range_cache_key)
+        
+        logger.debug(f"Invalidated calendar cache for {target_date}")
+    
+    async def _invalidate_recent_calendar_cache(self):
+        """Invalidate calendar cache for recent dates (when exact date is unknown)."""
+        cache = await get_cache_service()
+        
+        # Invalidate cache for the past week and next week
+        today = dt.date.today()
+        for days_offset in range(-7, 8):
+            target_date = today + timedelta(days=days_offset)
+            await self._invalidate_calendar_cache(target_date)
+        
+        logger.debug("Invalidated recent calendar cache")

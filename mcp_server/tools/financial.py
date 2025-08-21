@@ -9,6 +9,7 @@ from loguru import logger
 from ..schemas.financial import FinancialInput, FinancialOutput, FinancialItem, PortfolioSummary
 from ..utils.http_client import HTTPClient
 from ..utils.logging import get_logger, log_tool_call
+from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
 from ..config import get_settings
 
 logger = get_logger("financial_tool")
@@ -113,13 +114,23 @@ class FinancialTool:
             return result
 
     async def _fetch_stock_data(self, symbols: List[str], api_key: str) -> List[FinancialItem]:
-        """Fetch stock data from Alpha Vantage."""
+        """Fetch stock data from Alpha Vantage with caching."""
         financial_items = []
+        cache = await get_cache_service()
         
         # Alpha Vantage requires individual calls for each symbol using GLOBAL_QUOTE
         try:
-            # Make individual calls for each symbol
+            # Check cache for each symbol individually
             for symbol in symbols:
+                cache_key = generate_cache_key("stock_data", symbol)
+                cached_data = await cache.get(cache_key)
+                
+                if cached_data:
+                    logger.debug(f"Using cached stock data for {symbol}")
+                    financial_items.append(FinancialItem(**cached_data))
+                    continue
+                
+                # Fetch from API if not cached
                 url = f"https://www.alphavantage.co/query"
                 params = {
                     "function": "GLOBAL_QUOTE",
@@ -139,7 +150,7 @@ class FinancialTool:
                     change_percent_str = quote.get("10. change percent", "0%").replace("%", "")
                     change_percent = float(change_percent_str)
                     
-                    financial_items.append(FinancialItem(
+                    financial_item = FinancialItem(
                         symbol=symbol_name,
                         name=self._get_company_name(symbol_name),
                         price=price,
@@ -148,7 +159,13 @@ class FinancialTool:
                         currency="USD",
                         data_type="stocks",
                         last_updated=dt.datetime.now().isoformat()
-                    ))
+                    )
+                    
+                    financial_items.append(financial_item)
+                    
+                    # Cache the result
+                    await cache.set(cache_key, financial_item.dict(), CacheTTL.FINANCIAL_STOCKS)
+                    logger.debug(f"Cached stock data for {symbol}")
                 else:
                     logger.warning(f"No quote data found for {symbol}: {data}")
                 
@@ -162,56 +179,85 @@ class FinancialTool:
             return []
 
     async def _fetch_crypto_data(self, symbols: List[str]) -> List[FinancialItem]:
-        """Fetch crypto data from CoinGecko (free API)."""
+        """Fetch crypto data from CoinGecko (free API) with caching."""
         financial_items = []
+        cache = await get_cache_service()
         
         try:
-            # Convert symbols to CoinGecko IDs
-            crypto_ids = {
-                "BTC": "bitcoin",
-                "ETH": "ethereum",
-                "ADA": "cardano",
-                "SOL": "solana",
-                "DOGE": "dogecoin",
-                "LTC": "litecoin",
-                "XRP": "ripple",
-                "DOT": "polkadot",
-                "LINK": "chainlink",
-                "UNI": "uniswap"
-            }
-            
-            ids_list = [crypto_ids.get(symbol, symbol.lower()) for symbol in symbols]
-            ids_str = ",".join(ids_list)
-            
-            url = f"https://api.coingecko.com/api/v3/simple/price"
-            params = {
-                "ids": ids_str,
-                "vs_currencies": "usd",
-                "include_24hr_change": "true"
-            }
-            
-            async with HTTPClient() as client:
-                response = await client.get(url, params=params)
-            data = response.json()
+            # Check if we have all symbols in cache first
+            cached_symbols = []
+            uncached_symbols = []
             
             for symbol in symbols:
-                crypto_id = crypto_ids.get(symbol, symbol.lower())
-                if crypto_id in data:
-                    crypto_data = data[crypto_id]
-                    price = crypto_data.get("usd", 0)
-                    change_percent = crypto_data.get("usd_24h_change", 0)
-                    change = (price * change_percent) / 100
-                    
-                    financial_items.append(FinancialItem(
-                        symbol=symbol,
-                        name=self._get_crypto_name(symbol),
-                        price=price,
-                        change=change,
-                        change_percent=change_percent,
-                        currency="USD",
-                        data_type="crypto",
-                        last_updated=dt.datetime.now().isoformat()
-                    ))
+                cache_key = generate_cache_key("crypto_data", symbol)
+                cached_data = await cache.get(cache_key)
+                
+                if cached_data:
+                    logger.debug(f"Using cached crypto data for {symbol}")
+                    financial_items.append(FinancialItem(**cached_data))
+                    cached_symbols.append(symbol)
+                else:
+                    uncached_symbols.append(symbol)
+            
+            # Fetch uncached symbols from API
+            if uncached_symbols:
+                # Convert symbols to CoinGecko IDs
+                crypto_ids = {
+                    "BTC": "bitcoin",
+                    "ETH": "ethereum",
+                    "ADA": "cardano",
+                    "SOL": "solana",
+                    "DOGE": "dogecoin",
+                    "LTC": "litecoin",
+                    "XRP": "ripple",
+                    "DOT": "polkadot",
+                    "LINK": "chainlink",
+                    "UNI": "uniswap"
+                }
+                
+                ids_list = [crypto_ids.get(symbol, symbol.lower()) for symbol in uncached_symbols]
+                ids_str = ",".join(ids_list)
+                
+                url = f"https://api.coingecko.com/api/v3/simple/price"
+                params = {
+                    "ids": ids_str,
+                    "vs_currencies": "usd",
+                    "include_24hr_change": "true"
+                }
+                
+                async with HTTPClient() as client:
+                    response = await client.get(url, params=params)
+                data = response.json()
+                
+                for symbol in uncached_symbols:
+                    crypto_id = crypto_ids.get(symbol, symbol.lower())
+                    if crypto_id in data:
+                        crypto_data = data[crypto_id]
+                        price = crypto_data.get("usd", 0)
+                        change_percent = crypto_data.get("usd_24h_change", 0)
+                        change = (price * change_percent) / 100
+                        
+                        financial_item = FinancialItem(
+                            symbol=symbol,
+                            name=self._get_crypto_name(symbol),
+                            price=price,
+                            change=change,
+                            change_percent=change_percent,
+                            currency="USD",
+                            data_type="crypto",
+                            last_updated=dt.datetime.now().isoformat()
+                        )
+                        
+                        financial_items.append(financial_item)
+                        
+                        # Cache the result
+                        cache_key = generate_cache_key("crypto_data", symbol)
+                        await cache.set(cache_key, financial_item.dict(), CacheTTL.FINANCIAL_CRYPTO)
+                        logger.debug(f"Cached crypto data for {symbol}")
+                
+                logger.info(f"Fetched crypto data for {len(uncached_symbols)} symbols from API, used cache for {len(cached_symbols)} symbols")
+            else:
+                logger.info(f"All {len(symbols)} crypto symbols served from cache")
             
             return financial_items
             

@@ -7,6 +7,7 @@ from typing import Dict, Any
 from ..schemas.weather import WeatherInput, WeatherOutput, WhenEnum
 from ..utils.http_client import HTTPClient
 from ..utils.logging import get_logger, log_tool_call
+from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
 from ..config import get_settings
 
 logger = get_logger("weather_tool")
@@ -64,55 +65,89 @@ class WeatherTool:
             raise
     
     async def _geocode_location(self, location: str) -> Dict[str, Any]:
-        """Convert location string to coordinates using OpenWeatherMap Geocoding API."""
+        """Convert location string to coordinates using OpenWeatherMap Geocoding API with caching."""
+        cache = await get_cache_service()
+        cache_key = generate_cache_key("weather_geocoding", location.lower())
+        
+        # Check cache first (coordinates don't change)
+        cached_coords = await cache.get(cache_key)
+        if cached_coords:
+            logger.debug(f"Using cached coordinates for {location}")
+            return cached_coords
+        
         if not self.settings.weather_api_key:
             # Return mock coordinates for development
             logger.warning("No weather API key configured, using mock coordinates")
-            return {
+            coordinates = {
                 "lat": 37.7749,
                 "lon": -122.4194,
                 "display_name": f"{location} (mock)"
             }
-        
-        url = f"http://api.openweathermap.org/geo/1.0/direct"
-        params = {
-            "q": location,
-            "limit": 1,
-            "appid": self.settings.weather_api_key
-        }
-        
-        async with HTTPClient() as client:
-            response = await client.get(url, params=params)
-            data = response.json()
-            
-            if not data:
-                raise ValueError(f"Location '{location}' not found")
-            
-            location_data = data[0]
-            return {
-                "lat": location_data["lat"],
-                "lon": location_data["lon"],
-                "display_name": f"{location_data.get('name', location)}, {location_data.get('country', '')}"
+        else:
+            url = f"http://api.openweathermap.org/geo/1.0/direct"
+            params = {
+                "q": location,
+                "limit": 1,
+                "appid": self.settings.weather_api_key
             }
+            
+            async with HTTPClient() as client:
+                response = await client.get(url, params=params)
+                data = response.json()
+                
+                if not data:
+                    raise ValueError(f"Location '{location}' not found")
+                
+                location_data = data[0]
+                coordinates = {
+                    "lat": location_data["lat"],
+                    "lon": location_data["lon"],
+                    "display_name": f"{location_data.get('name', location)}, {location_data.get('country', '')}"
+                }
+        
+        # Cache coordinates (they don't change, so long TTL)
+        await cache.set(cache_key, coordinates, CacheTTL.WEATHER_GEOCODING)
+        logger.debug(f"Cached coordinates for {location}")
+        
+        return coordinates
     
     async def _get_weather_forecast(self, lat: float, lon: float, when: WhenEnum) -> Dict[str, Any]:
-        """Get weather forecast from OpenWeatherMap API."""
+        """Get weather forecast from OpenWeatherMap API with caching."""
+        cache = await get_cache_service()
+        
+        # Create cache key based on location and date (not exact time since forecast covers periods)
+        today = datetime.now().date()
+        target_date = today if when == WhenEnum.TODAY else today + timedelta(days=1)
+        cache_key = generate_cache_key("weather_forecast", f"{lat:.4f}_{lon:.4f}", target_date.isoformat())
+        
+        # Check cache first
+        cached_forecast = await cache.get(cache_key)
+        if cached_forecast:
+            logger.debug(f"Using cached weather forecast for {lat:.4f}, {lon:.4f} on {target_date}")
+            return cached_forecast
+        
         if not self.settings.weather_api_key:
             # Return mock weather data for development
             logger.warning("No weather API key configured, returning mock data")
-            return self._get_mock_weather_data(when)
+            forecast_data = self._get_mock_weather_data(when)
+        else:
+            url = f"{self.base_url}/forecast"
+            params = {
+                "lat": lat,
+                "lon": lon,
+                "appid": self.settings.weather_api_key,
+                "units": "imperial"  # Fahrenheit
+            }
+            
+            async with HTTPClient() as client:
+                response = await client.get(url, params=params)
+                forecast_data = response.json()
         
-        url = f"{self.base_url}/forecast"
-        params = {
-            "lat": lat,
-            "lon": lon,
-            "appid": self.settings.weather_api_key,
-            "units": "imperial"  # Fahrenheit
-        }
+        # Cache the forecast data
+        await cache.set(cache_key, forecast_data, CacheTTL.WEATHER_FORECAST)
+        logger.debug(f"Cached weather forecast for {lat:.4f}, {lon:.4f} on {target_date}")
         
-        async with HTTPClient() as client:
-            response = await client.get(url, params=params)
-            return response.json()
+        return forecast_data
     
     async def _format_weather_response(
         self, 

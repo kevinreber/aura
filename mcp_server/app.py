@@ -10,6 +10,7 @@ from typing import Dict, Any
 
 from .config import get_settings
 from .utils.logging import setup_logging, get_logger
+from .utils.cache import get_cache_service
 from .server import get_mcp_server
 from .schemas import (
     WeatherInput, MobilityInput, CalendarInput, TodoInput, FinancialInput
@@ -108,6 +109,18 @@ def create_app() -> Flask:
     # Initialize MCP server
     mcp_server = get_mcp_server()
     
+    # Initialize cache service
+    async def init_cache():
+        """Initialize cache service on startup."""
+        cache_service = await get_cache_service()
+        stats = await cache_service.get_cache_stats()
+        logger.info(f"Cache service initialized: {stats}")
+    
+    # Initialize cache service on startup
+    with app.app_context():
+        import asyncio
+        asyncio.run(init_cache())
+    
     # Health check endpoint
     @app.route('/health')
     def health_check():
@@ -195,6 +208,22 @@ def create_app() -> Flask:
                     "error": "Google Calendar client not available",
                     "status": "error"
                 }), 500
+        except Exception as e:
+            return jsonify({
+                "error": str(e),
+                "status": "error"
+            }), 500
+    
+    @app.route('/cache/stats')
+    async def cache_stats():
+        """Get cache statistics for monitoring."""
+        try:
+            cache_service = await get_cache_service()
+            stats = await cache_service.get_cache_stats()
+            return jsonify({
+                "cache_stats": stats,
+                "status": "success"
+            })
         except Exception as e:
             return jsonify({
                 "error": str(e),

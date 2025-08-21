@@ -7,6 +7,7 @@ import random
 from ..schemas.mobility import MobilityInput, MobilityOutput, TransportMode
 from ..utils.http_client import HTTPClient
 from ..utils.logging import get_logger, log_tool_call
+from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
 from ..config import get_settings
 
 logger = get_logger("mobility_tool")
@@ -67,37 +68,55 @@ class MobilityTool:
         destination: str, 
         mode: TransportMode
     ) -> Dict[str, Any]:
-        """Get directions from Google Maps Directions API."""
+        """Get directions from Google Maps Directions API with caching."""
+        cache = await get_cache_service()
+        
+        # Create cache key based on origin, destination, and mode
+        # For driving mode, we use shorter TTL due to traffic changes
+        cache_key = generate_cache_key("mobility_directions", 
+                                     origin.lower(), 
+                                     destination.lower(), 
+                                     mode.value)
+        
+        # Check cache first
+        cached_directions = await cache.get(cache_key)
+        if cached_directions:
+            logger.debug(f"Using cached directions for {origin} -> {destination} ({mode.value})")
+            return cached_directions
         
         if not self.settings.google_maps_api_key:
             # Return mock directions data for development
             logger.warning("No Google Maps API key configured, returning mock data")
-            return self._get_mock_directions_data(origin, destination, mode)
-        
-        # Map our transport modes to Google's API
-        google_mode_map = {
-            TransportMode.DRIVING: "driving",
-            TransportMode.TRANSIT: "transit",
-            TransportMode.BICYCLING: "bicycling", 
-            TransportMode.WALKING: "walking"
-        }
-        
-        params = {
-            "origin": origin,
-            "destination": destination,
-            "mode": google_mode_map[mode],
-            "departure_time": "now",  # For current traffic conditions
-            "key": self.settings.google_maps_api_key
-        }
-        
-        async with HTTPClient() as client:
-            response = await client.get(self.base_url, params=params)
-            data = response.json()
+            directions_data = self._get_mock_directions_data(origin, destination, mode)
+        else:
+            # Map our transport modes to Google's API
+            google_mode_map = {
+                TransportMode.DRIVING: "driving",
+                TransportMode.TRANSIT: "transit",
+                TransportMode.BICYCLING: "bicycling", 
+                TransportMode.WALKING: "walking"
+            }
             
-            if data.get("status") != "OK":
-                raise ValueError(f"Google Maps API error: {data.get('status', 'Unknown error')}")
+            params = {
+                "origin": origin,
+                "destination": destination,
+                "mode": google_mode_map[mode],
+                "departure_time": "now",  # For current traffic conditions
+                "key": self.settings.google_maps_api_key
+            }
             
-            return data
+            async with HTTPClient() as client:
+                response = await client.get(self.base_url, params=params)
+                directions_data = response.json()
+                
+                if directions_data.get("status") != "OK":
+                    raise ValueError(f"Google Maps API error: {directions_data.get('status', 'Unknown error')}")
+        
+        # Cache the directions data
+        await cache.set(cache_key, directions_data, CacheTTL.MOBILITY_DIRECTIONS)
+        logger.debug(f"Cached directions for {origin} -> {destination} ({mode.value})")
+        
+        return directions_data
     
     async def _format_directions_response(
         self,
