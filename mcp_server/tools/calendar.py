@@ -1,16 +1,18 @@
 """Calendar tool for listing daily events."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import datetime as dt
 from typing import Dict, Any, List
 import random
 import os
+import pytz
 
 from ..schemas.calendar import (
     CalendarInput, CalendarOutput, CalendarEvent, CalendarRangeInput, CalendarRangeOutput,
     CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
-    CalendarDeleteInput, CalendarDeleteOutput
+    CalendarDeleteInput, CalendarDeleteOutput, CalendarFindFreeTimeInput, CalendarFindFreeTimeOutput,
+    FreeTimeSlot
 )
 from ..utils.logging import get_logger, log_tool_call
 from ..config import get_settings
@@ -658,6 +660,266 @@ class CalendarTool:
                 deleted_event=None,
                 message=f"Error deleting event: {str(e)}"
             )
+    
+    async def find_free_time(self, input_data: CalendarFindFreeTimeInput) -> CalendarFindFreeTimeOutput:
+        """
+        Find available time slots based on duration and constraints.
+        
+        Args:
+            input_data: The search criteria for free time slots
+            
+        Returns:
+            CalendarFindFreeTimeOutput with available time slots
+        """
+        try:
+            # Parse dates
+            start_date = datetime.strptime(input_data.start_date, '%Y-%m-%d').date()
+            end_date = start_date if not input_data.end_date else datetime.strptime(input_data.end_date, '%Y-%m-%d').date()
+            
+            # Parse time constraints
+            earliest_time = datetime.strptime(input_data.earliest_time, '%H:%M').time()
+            latest_time = datetime.strptime(input_data.latest_time, '%H:%M').time()
+            
+            # Get all events in the date range
+            all_events = []
+            current_date = start_date
+            while current_date <= end_date:
+                day_events = await self._get_events_for_date(current_date)
+                all_events.extend(day_events)
+                current_date += timedelta(days=1)
+            
+            # Find free time slots
+            free_slots = []
+            current_date = start_date
+            
+            while current_date <= end_date:
+                day_slots = await self._find_free_slots_for_day(
+                    current_date, 
+                    all_events,
+                    input_data.duration_minutes,
+                    earliest_time,
+                    latest_time,
+                    input_data.preferred_time
+                )
+                free_slots.extend(day_slots)
+                current_date += timedelta(days=1)
+            
+            # Sort slots by preference score (highest first)
+            free_slots.sort(key=lambda x: x.preference_score, reverse=True)
+            
+            # Limit results
+            limited_slots = free_slots[:input_data.max_results]
+            
+            # Build search criteria summary
+            search_criteria = {
+                "duration": f"{input_data.duration_minutes} minutes",
+                "date_range": f"{input_data.start_date}" + (f" to {input_data.end_date}" if input_data.end_date else ""),
+                "time_window": f"{input_data.earliest_time} to {input_data.latest_time}",
+                "calendars": input_data.calendar_names or "all",
+                "preference": input_data.preferred_time or "none"
+            }
+            
+            # Generate message
+            if limited_slots:
+                top_slot = limited_slots[0]
+                message = f"Found {len(free_slots)} available time slots. Top result: {top_slot.day_of_week} {top_slot.start_time.strftime('%I:%M %p')} ({input_data.duration_minutes} minutes)"
+            else:
+                message = f"No available time slots found matching your criteria. Try expanding your time window or reducing duration."
+            
+            return CalendarFindFreeTimeOutput(
+                success=len(limited_slots) > 0,
+                free_slots=limited_slots,
+                total_slots_found=len(free_slots),
+                search_criteria=search_criteria,
+                message=message
+            )
+                
+        except Exception as e:
+            logger.error(f"Error finding free time: {str(e)}")
+            return CalendarFindFreeTimeOutput(
+                success=False,
+                free_slots=[],
+                total_slots_found=0,
+                search_criteria={},
+                message=f"Error finding free time: {str(e)}"
+            )
+    
+    async def _find_free_slots_for_day(self, date: dt.date, all_events: List[CalendarEvent], 
+                                     duration_minutes: int, earliest_time: dt.time, 
+                                     latest_time: dt.time, preferred_time: str = None) -> List[FreeTimeSlot]:
+        """Find free time slots for a specific day."""
+        
+        # Filter events for this specific day and convert to datetime objects
+        # Handle timezone-aware events properly
+        utc = pytz.UTC
+        day_events = []
+        
+        for event in all_events:
+            # Handle both timezone-aware and naive datetime objects
+            if hasattr(event.start_time, 'date'):
+                event_start = event.start_time
+            else:
+                event_start = datetime.fromisoformat(str(event.start_time))
+            
+            # Extract date for comparison
+            event_date = event_start.date() if hasattr(event_start, 'date') else event_start.date()
+            
+            if event_date == date:
+                # Skip all-day events as they shouldn't block specific time slots
+                if hasattr(event, 'all_day') and event.all_day:
+                    continue
+                day_events.append(event)
+        
+        # Sort events by start time
+        day_events.sort(key=lambda x: self._get_event_datetime(x.start_time))
+        
+        # Create timezone-aware time boundaries for the day
+        # Use UTC timezone to match Google Calendar events
+        day_start = datetime.combine(date, earliest_time, tzinfo=utc)
+        day_end = datetime.combine(date, latest_time, tzinfo=utc)
+        
+        # Find gaps between events
+        free_slots = []
+        current_time = day_start
+        
+        for event in day_events:
+            event_start = self._get_event_datetime(event.start_time)
+            event_end = self._get_event_datetime(event.end_time)
+            
+            # Skip events outside our time window
+            if event_end <= day_start or event_start >= day_end:
+                continue
+                
+            # Adjust event times to our window
+            event_start = max(event_start, day_start)
+            event_end = min(event_end, day_end)
+            
+            # Check if there's a gap before this event
+            if current_time < event_start:
+                gap_duration = int((event_start - current_time).total_seconds() / 60)
+                if gap_duration >= duration_minutes:
+                    slot = await self._create_free_time_slot(
+                        current_time, 
+                        event_start,
+                        duration_minutes,
+                        preferred_time,
+                        day_events,
+                        event
+                    )
+                    free_slots.append(slot)
+            
+            # Move current time to end of this event
+            current_time = max(current_time, event_end)
+        
+        # Check for gap after the last event
+        if current_time < day_end:
+            gap_duration = int((day_end - current_time).total_seconds() / 60)
+            if gap_duration >= duration_minutes:
+                slot = await self._create_free_time_slot(
+                    current_time,
+                    day_end, 
+                    duration_minutes,
+                    preferred_time,
+                    day_events,
+                    None
+                )
+                free_slots.append(slot)
+        
+        return free_slots
+    
+    async def _create_free_time_slot(self, gap_start: datetime, gap_end: datetime, 
+                                   duration_minutes: int, preferred_time: str,
+                                   day_events: List[CalendarEvent], 
+                                   next_event: CalendarEvent = None) -> FreeTimeSlot:
+        """Create a FreeTimeSlot object from a time gap."""
+        
+        # Calculate actual slot time (use full gap or just the needed duration)
+        slot_start = gap_start
+        slot_end = slot_start + timedelta(minutes=duration_minutes)
+        
+        # Ensure we don't exceed the gap
+        if slot_end > gap_end:
+            slot_end = gap_end
+            slot_start = slot_end - timedelta(minutes=duration_minutes)
+        
+        # Find events before and after this slot
+        conflicts_before = None
+        conflicts_after = next_event
+        
+        for event in day_events:
+            event_end = self._get_event_datetime(event.end_time)
+            if event_end <= slot_start:
+                if not conflicts_before or self._get_event_datetime(conflicts_before.end_time) < event_end:
+                    conflicts_before = event
+        
+        # Calculate preference score
+        preference_score = await self._calculate_preference_score(slot_start, preferred_time)
+        
+        # Determine time period
+        hour = slot_start.hour
+        if hour < 12:
+            time_period = "morning"
+        elif hour < 17:
+            time_period = "afternoon"
+        else:
+            time_period = "evening"
+        
+        return FreeTimeSlot(
+            start_time=slot_start,
+            end_time=slot_end,
+            duration_minutes=int((slot_end - slot_start).total_seconds() / 60),
+            date=slot_start.strftime('%Y-%m-%d'),
+            day_of_week=slot_start.strftime('%A'),
+            time_period=time_period,
+            conflicts_before=conflicts_before,
+            conflicts_after=conflicts_after,
+            preference_score=preference_score
+        )
+    
+    async def _calculate_preference_score(self, slot_start: datetime, preferred_time: str = None) -> float:
+        """Calculate preference score for a time slot (0-1, higher is better)."""
+        
+        base_score = 0.5  # Default score
+        hour = slot_start.hour
+        
+        # Time-based scoring
+        if preferred_time == "morning" and 8 <= hour <= 11:
+            base_score = 0.9
+        elif preferred_time == "afternoon" and 13 <= hour <= 16:
+            base_score = 0.9
+        elif preferred_time == "evening" and 17 <= hour <= 19:
+            base_score = 0.8
+        elif not preferred_time:
+            # General preference for mid-morning and mid-afternoon
+            if 9 <= hour <= 11 or 14 <= hour <= 16:
+                base_score = 0.7
+            elif 8 <= hour <= 12 or 13 <= hour <= 17:
+                base_score = 0.6
+        
+        # Avoid very early or very late times
+        if hour < 8 or hour > 18:
+            base_score *= 0.5
+        
+        # Prefer non-lunch hours
+        if 12 <= hour <= 13:
+            base_score *= 0.7
+        
+        return min(1.0, base_score)
+    
+    def _get_event_datetime(self, dt_obj) -> datetime:
+        """Convert various datetime representations to timezone-aware datetime objects."""
+        if hasattr(dt_obj, 'tzinfo') and dt_obj.tzinfo is not None:
+            # Already timezone-aware
+            return dt_obj
+        elif hasattr(dt_obj, 'time'):
+            # timezone-naive datetime object
+            return dt_obj.replace(tzinfo=pytz.UTC)
+        else:
+            # String representation
+            parsed = datetime.fromisoformat(str(dt_obj))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=pytz.UTC)
+            return parsed
     
     async def _detect_conflicts(self, start_time: datetime, end_time: datetime, calendar_name: str = None, exclude_event_id: str = None) -> List[CalendarEvent]:
         """Detect conflicting events at the same time."""

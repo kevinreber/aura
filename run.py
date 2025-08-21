@@ -59,6 +59,7 @@ def main():
     print(f"  📅+ Create Event: {public_url}/tools/calendar.create_event")
     print(f"  📅✏️ Update Event: {public_url}/tools/calendar.update_event")
     print(f"  📅🗑️ Delete Event: {public_url}/tools/calendar.delete_event")
+    print(f"  📅🔍 Find Free Time: {public_url}/tools/calendar.find_free_time")
     print(f"  ✅  Todos:        {public_url}/tools/todo.list")
     print(f"  💰  Financial:    {public_url}/tools/financial.get_data")
     print()

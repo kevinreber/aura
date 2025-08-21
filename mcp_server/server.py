@@ -14,7 +14,7 @@ from .schemas import (
     MobilityInput, MobilityOutput, 
     CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
     CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
-    CalendarDeleteInput, CalendarDeleteOutput,
+    CalendarDeleteInput, CalendarDeleteOutput, CalendarFindFreeTimeInput, CalendarFindFreeTimeOutput,
     TodoInput, TodoOutput,
     FinancialInput, FinancialOutput
 )
@@ -82,6 +82,13 @@ class MCPServer:
                 "output_schema": CalendarDeleteOutput,
                 "description": "Delete a calendar event",
                 "method": "delete_event"
+            },
+            "calendar.find_free_time": {
+                "tool": CalendarTool(),
+                "input_schema": CalendarFindFreeTimeInput,
+                "output_schema": CalendarFindFreeTimeOutput,
+                "description": "Find available time slots based on duration and constraints for smart scheduling",
+                "method": "find_free_time"
             },
             "todo.list": {
                 "tool": TodoTool(),

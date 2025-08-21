@@ -1051,6 +1051,143 @@ def create_app() -> Flask:
             logger.error(f"Error in calendar.delete_event: {e}")
             return jsonify({"error": str(e)}), 500
     
+    @app.route('/tools/calendar.find_free_time', methods=['POST'])
+    async def calendar_find_free_time():
+        """Find available time slots for smart scheduling.
+        ---
+        tags:
+          - Calendar
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - duration_minutes
+                - start_date
+              properties:
+                duration_minutes:
+                  type: integer
+                  example: 60
+                  description: "Duration needed in minutes (e.g., 30, 60, 120)"
+                  minimum: 1
+                  maximum: 480
+                start_date:
+                  type: string
+                  example: "2024-01-15"
+                  description: "Start date to search from (YYYY-MM-DD format)"
+                end_date:
+                  type: string
+                  example: "2024-01-19"
+                  description: "End date to search until (YYYY-MM-DD format, defaults to start_date)"
+                earliest_time:
+                  type: string
+                  example: "09:00"
+                  description: "Earliest time to consider (HH:MM format, 24-hour, defaults to 09:00)"
+                latest_time:
+                  type: string
+                  example: "18:00"
+                  description: "Latest time to consider (HH:MM format, 24-hour, defaults to 18:00)"
+                calendar_names:
+                  type: array
+                  items:
+                    type: string
+                  example: ["primary", "work"]
+                  description: "Calendars to check for conflicts (defaults to all)"
+                max_results:
+                  type: integer
+                  example: 5
+                  description: "Maximum number of time slots to return (defaults to 5)"
+                preferred_time:
+                  type: string
+                  example: "afternoon"
+                  enum: ["morning", "afternoon", "evening"]
+                  description: "Preferred time preference for scoring"
+        responses:
+          200:
+            description: Available time slots found successfully
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: true
+                  description: "Whether free time slots were found"
+                free_slots:
+                  type: array
+                  description: "Available time slots matching criteria"
+                  items:
+                    type: object
+                    properties:
+                      start_time:
+                        type: string
+                        example: "2024-01-15T14:00:00Z"
+                        description: "Start time of the free slot"
+                      end_time:
+                        type: string
+                        example: "2024-01-15T15:00:00Z"
+                        description: "End time of the free slot"
+                      duration_minutes:
+                        type: integer
+                        example: 60
+                        description: "Duration of the slot in minutes"
+                      date:
+                        type: string
+                        example: "2024-01-15"
+                        description: "Date of the slot (YYYY-MM-DD)"
+                      day_of_week:
+                        type: string
+                        example: "Monday"
+                        description: "Day of week"
+                      time_period:
+                        type: string
+                        example: "afternoon"
+                        description: "Time period (morning, afternoon, evening)"
+                      preference_score:
+                        type: number
+                        example: 0.9
+                        description: "Score based on preferences (0-1, higher is better)"
+                total_slots_found:
+                  type: integer
+                  example: 3
+                  description: "Total number of slots found"
+                search_criteria:
+                  type: object
+                  description: "Summary of search parameters used"
+                message:
+                  type: string
+                  example: "Found 3 available time slots. Top result: Monday 2:00 PM (60 minutes)"
+                  description: "Summary message about the search results"
+          400:
+            description: Invalid input parameters
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "duration_minutes must be positive"
+          500:
+            description: Internal server error
+            schema:
+              type: object
+              properties:
+                error:
+                  type: string
+                  example: "Error finding free time: ..."
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "No data provided"}), 400
+            
+            result = await mcp_server.call_tool("calendar.find_free_time", data)
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in calendar.find_free_time: {e}")
+            return jsonify({"error": str(e)}), 500
+    
     # Financial tool endpoint
     @app.route('/tools/financial.get_data', methods=['POST'])
     async def financial_get_data():
