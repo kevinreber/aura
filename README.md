@@ -1,10 +1,16 @@
 # Daily MCP Server 🌅
 
-A Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features both **read** and **write** operations for real-world integration. Built with Flask and Python for personal productivity and AI agent learning.
+A Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features **complete Calendar CRUD** operations for real-world integration. Built with Flask and Python for personal productivity and AI agent learning.
 
-## 🎉 **NEW: Write Operations!**
+## 🚀 **NEW: Complete Calendar Management!**
 
-✨ **Phase 1.5 Complete** - Now supports calendar event creation with smart conflict detection!
+✨ **Phase 2.1 Complete** - Full Calendar CRUD: Create, Read, Update, Delete events with smart conflict detection!
+
+### 🎯 **Recent Achievements**
+- ✅ **Calendar Event Creation** with conflict detection
+- ✅ **Calendar Event Updates** with change tracking  
+- ✅ **Calendar Event Deletion** with confirmation
+- ✅ **Fixed Calendar Reading Bug** - events now properly discoverable
 
 ## 🛠️ Available Tools
 
@@ -60,7 +66,7 @@ Real-time stock and cryptocurrency market data.
 
 ### ✨ **Write Operations**
 
-#### 📅+ Calendar Create (`calendar.create_event`) 🆕
+#### 📅+ Calendar Create (`calendar.create_event`)
 
 **Create new calendar events with intelligent conflict detection!**
 
@@ -72,6 +78,33 @@ Real-time stock and cryptocurrency market data.
   - 🔗 **Real Integration** - Events appear in Google Calendar instantly
   - 📧 **Attendee Management** - Email invitations and notifications
 - **Real API**: ✅ Google Calendar Events API with write permissions
+
+#### 📅✏️ Calendar Update (`calendar.update_event`) 🆕
+
+**Update existing calendar events with granular field changes!**
+
+- **Input**: `event_id` (required), `title`, `start_time`, `end_time`, `description`, `location`, `attendees`, `calendar_name`
+- **Output**: Updated event details, change tracking, conflict warnings for new times
+- **Features**:
+  - 🎯 **Partial Updates** - Only change the fields you specify
+  - 📝 **Change Tracking** - See exactly what was modified
+  - ⚠️ **Smart Conflict Detection** - Excludes the event being updated from conflicts
+  - 🔄 **Real-Time Sync** - Changes appear in Google Calendar instantly
+  - 📊 **Before/After Comparison** - Returns both original and updated event details
+- **Real API**: ✅ Google Calendar Events API with update permissions
+
+#### 📅🗑️ Calendar Delete (`calendar.delete_event`) 🆕
+
+**Safely delete calendar events with confirmation details!**
+
+- **Input**: `event_id`, `calendar_name` (optional)
+- **Output**: Deleted event details for audit trail, success confirmation
+- **Features**:
+  - 🛡️ **Safe Deletion** - Retrieves event details before deletion for confirmation
+  - 📋 **Audit Trail** - Returns complete event details for logging
+  - ⚠️ **Error Handling** - Proper 404 responses for missing events
+  - 🔗 **Real Integration** - Events removed from Google Calendar instantly
+- **Real API**: ✅ Google Calendar Events API with delete permissions
 
 ## 🚀 Quick Start
 
@@ -187,6 +220,31 @@ curl -X POST http://localhost:8000/tools/calendar.create_event \
     "location": "Conference Room A",
     "description": "Weekly team sync",
     "attendees": ["colleague@example.com"],
+    "calendar_name": "primary"
+  }'
+```
+
+### 🆕 Test Calendar Event Update
+
+```bash
+curl -X POST http://localhost:8000/tools/calendar.update_event \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "your_event_id_here",
+    "title": "Updated Team Meeting",
+    "start_time": "2024-01-15T15:00:00",
+    "end_time": "2024-01-15T16:00:00",
+    "location": "Conference Room B"
+  }'
+```
+
+### 🆕 Test Calendar Event Deletion
+
+```bash
+curl -X POST http://localhost:8000/tools/calendar.delete_event \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event_id": "your_event_id_here",
     "calendar_name": "primary"
   }'
 ```

@@ -5,6 +5,83 @@ All notable changes to the Daily MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-08-20 - 🚀 **PHASE 2.1 COMPLETE: Full Calendar CRUD**
+
+### 🎉 **MAJOR MILESTONE: Complete Calendar Management**
+
+- **Full Calendar CRUD Operations**: Create, Read, Update, Delete calendar events
+- **Production-Ready Calendar Integration**: Real Google Calendar API integration with comprehensive error handling
+- **Enhanced Conflict Detection**: Smart conflict detection for both creation and updates
+- **Change Tracking**: Detailed tracking of what fields are modified during updates
+
+### ✨ **New Tools**
+
+- `calendar.update_event` - Update existing calendar events with granular field updates
+  - Partial updates (only change specified fields)
+  - Enhanced conflict detection (excludes event being updated)
+  - Change tracking (reports exactly what was modified)
+  - Support for all event properties (title, time, location, attendees, etc.)
+
+- `calendar.delete_event` - Delete calendar events safely
+  - Pre-deletion event retrieval for confirmation
+  - Comprehensive error handling (404 for missing events, 403 for permissions)
+  - Event details returned for audit trail
+
+### 🔧 **API Enhancements**
+
+- **New Endpoints**:
+  - `POST /tools/calendar.update_event` - Update calendar events
+  - `POST /tools/calendar.delete_event` - Delete calendar events
+- **Enhanced Schemas**: `CalendarUpdateInput/Output` and `CalendarDeleteInput/Output`
+- **Improved Error Responses**: Proper HTTP status codes (404 for missing events)
+- **Advanced Validation**: Field-level validation for updates with timezone awareness
+
+### 🐛 **Critical Bug Fixes**
+
+- **Fixed Calendar Reading Bug**: Resolved duplicate `_convert_google_event` method causing parameter mismatch
+- **Event Discovery Issue**: Calendar events now properly readable (was showing "no events" despite events existing)
+- **Method Signature Conflicts**: Eliminated conflicting method signatures in Google Calendar client
+
+### 📊 **Enhanced Capabilities**
+
+- **Complete Calendar Management**: Users can now fully manage their calendar through AI
+- **Smart Conflict Resolution**: Advanced logic to prevent double-booking during updates
+- **Audit Trail**: Complete tracking of calendar operations for debugging and compliance
+- **Production Reliability**: Robust error handling and graceful degradation
+
+### 🔄 **Updated Tool Capabilities**
+
+- **Read Operations**:
+  - `weather.get_daily` - Weather forecasts via OpenWeatherMap
+  - `calendar.list_events` - Single date calendar events (✅ **FIXED**)
+  - `calendar.list_events_range` - Multi-day calendar events
+  - `todo.list` - Task management with filtering
+  - `mobility.get_commute` - Travel times via Google Maps
+  - `financial.get_data` - Stock/crypto prices
+
+- **Write Operations**:
+  - `calendar.create_event` - Create calendar events with conflict detection
+  - `calendar.update_event` - **NEW**: Update existing events with change tracking
+  - `calendar.delete_event` - **NEW**: Delete calendar events safely
+
+### 🎯 **User Experience Improvements**
+
+**AI Assistant can now handle complete calendar management:**
+- *"Remove my 4pm workout tomorrow"* ✅
+- *"Move my meeting to 3pm"* ✅  
+- *"Update the location to Conference Room B"* ✅
+- *"Add Sarah to my client presentation"* ✅
+- *"Cancel that duplicate lunch meeting"* ✅
+
+### 🚀 **Production Impact**
+
+- **Zero Downtime**: Hot deployment of new features
+- **Backward Compatibility**: All existing integrations continue working
+- **Enhanced Monitoring**: Improved logging for calendar operations
+- **Performance**: Optimized calendar client initialization
+
+---
+
 ## [0.2.0] - 2025-08-20 - 🎉 **PHASE 1.5 COMPLETE: First Write Tool**
 
 ### 🚀 **Major Features Added**
