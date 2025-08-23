@@ -1,0 +1,247 @@
+# Daily MCP Server - Cursor AI Rules
+
+## Project Overview
+
+You are working on a high-performance Model Context Protocol (MCP) server that provides comprehensive daily productivity tools for AI agents. This is a Flask-based Python application with real API integrations, intelligent caching, and production deployment capabilities.
+
+## 🏗️ Architecture & Structure
+
+### Core Components
+
+- **Flask Server** (`mcp_server/app.py`) - Main application factory with async support
+- **MCP Server** (`mcp_server/server.py`) - Protocol implementation with tool management
+- **Tools** (`mcp_server/tools/`) - Individual tool implementations (weather, calendar, etc.)
+- **Schemas** (`mcp_server/schemas/`) - Pydantic validation models
+- **Utils** (`mcp_server/utils/`) - Shared utilities (caching, logging, HTTP client)
+- **Config** (`mcp_server/config.py`) - Environment-based configuration
+
+### Tool Categories
+
+1. **Read Tools**: weather, mobility, calendar (list), todo, financial
+2. **Write Tools**: calendar (create/update/delete), calendar (find_free_time)
+3. **Smart Features**: Conflict detection, multi-calendar support, intelligent caching
+
+## 🎯 Development Guidelines
+
+### Code Style & Quality
+
+- **Python Version**: 3.11+ required
+- **Dependency Manager**: Prefer UV commands (`uv run`, `uv sync`) over pip
+- **Code Format**: Black with 100 char line length
+- **Type Checking**: MyPy with strict typing (`disallow_untyped_defs = true`)
+- **Linting**: Flake8 for code quality
+- **Testing**: Pytest with async support and coverage reporting
+
+### Key Patterns to Follow
+
+#### 1. Tool Implementation Pattern
+
+```python
+# Each tool follows this structure:
+class ToolName(BaseTool):
+    def __init__(self):
+        self.cache = get_cache()
+        self.http_client = get_http_client()
+
+    async def method_name(self, input_data: InputSchema) -> OutputSchema:
+        # Validate input with Pydantic
+        # Check cache first
+        # Make API call if needed
+        # Cache result
+        # Return structured response
+```
+
+#### 2. Schema Pattern
+
+```python
+# Input/Output schemas in schemas/ folder
+class ToolInput(BaseModel):
+    required_field: str
+    optional_field: Optional[str] = None
+
+class ToolOutput(BaseModel):
+    status: str
+    data: dict
+    cached: bool = False
+```
+
+#### 3. Error Handling
+
+- Use structured error responses with status codes
+- Log errors with `get_logger("module_name")`
+- Graceful fallbacks for API failures
+- Cache validation and expiration handling
+
+#### 4. Caching Strategy
+
+- Redis primary, in-memory fallback
+- Smart TTL values based on data volatility:
+  - Weather: 30 minutes
+  - Financial: 2-5 minutes
+  - Calendar: No caching (real-time)
+  - Geocoding: 7 days
+- Always return `cached: true/false` in responses
+
+### API Integration Best Practices
+
+#### Current API Integrations
+
+- **Google Calendar**: OAuth2 with read/write scopes, multi-calendar support
+- **OpenWeatherMap**: Weather forecasts with geocoding cache
+- **Google Maps**: Directions API for commute data
+- **Alpha Vantage**: Stock data (5 calls/minute limit - cache critical)
+- **CoinGecko**: Cryptocurrency data
+
+#### Adding New API Integrations
+
+When evaluating or adding new external services:
+
+1. **Evaluate Rate Limits**: Design caching strategy from the start
+2. **Schema Design**: Create Pydantic models for request/response
+3. **Error Handling**: Plan for API downtime and failures
+4. **Authentication**: Use environment variables for credentials
+5. **Tool Integration**: Follow the standard tool implementation pattern
+6. **Documentation**: Update tool descriptions and examples
+7. **Testing**: Include integration tests with mock responses
+8. **Caching Strategy**: Choose appropriate TTL based on data volatility
+
+#### Configuration Management
+
+- Use `get_settings()` for environment variables
+- Support both file-based (.env) and environment variable configs
+- Validate required keys in production environment
+- Support both credential files and JSON environment variables
+
+## 🚀 Development Commands
+
+### Setup & Dependencies
+
+```bash
+# Recommended: Use UV for faster dependency management
+uv sync --dev
+uv run python run.py
+
+# Traditional fallback
+pip install -r requirements.txt -r requirements-dev.txt
+python run.py
+```
+
+### Testing & Quality
+
+```bash
+# Run tests
+uv run pytest --cov=mcp_server --cov-report=html
+
+# Code formatting
+uv run black mcp_server/
+uv run flake8 mcp_server/
+uv run mypy mcp_server/
+```
+
+### Development Server
+
+- Server runs on `http://localhost:8000`
+- Interactive docs at `/docs` (Swagger UI)
+- Health check at `/health`
+- Tools list at `/tools`
+
+## 🛠️ Adding New Features
+
+### Adding a New Tool
+
+1. Create tool class in `mcp_server/tools/new_tool.py`
+2. Create schemas in `mcp_server/schemas/new_tool.py`
+3. Register in `mcp_server/server.py` tools dictionary
+4. Add to imports in `mcp_server/tools/__init__.py`
+5. Write tests in `tests/test_tools/test_new_tool.py`
+
+### Extending Existing Tools
+
+- Add new methods to existing tool classes
+- Create corresponding input/output schemas
+- Register new methods in MCP server tools dictionary
+- Update tool descriptions and documentation
+- Maintain backward compatibility
+
+### Cache Integration
+
+- Use `self.cache.get(key)` and `self.cache.set(key, value, ttl)`
+- Choose TTL based on data volatility
+- Always include `cached: bool` in response schemas
+- Handle cache misses gracefully
+
+## 🔧 Configuration & Deployment
+
+### Environment Variables
+
+```bash
+# Required for production
+WEATHER_API_KEY=your_openweathermap_key
+GOOGLE_MAPS_API_KEY=your_google_maps_key
+GOOGLE_CALENDAR_CREDENTIALS_PATH=path/to/credentials.json
+ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+
+# Optional
+REDIS_URL=redis://localhost:6379
+ENVIRONMENT=development|production
+DEBUG=true|false
+PORT=8000
+```
+
+### Production Considerations
+
+- Railway.app deployment with auto-deploy on push
+- Environment variables managed in Railway dashboard
+- Rate limiting configured per tool
+- CORS configured for frontend origins
+- Health monitoring and logging
+
+## 🎯 Common Tasks
+
+### Testing API Endpoints
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Test weather tool
+curl -X POST http://localhost:8000/tools/weather.get_daily \
+  -H "Content-Type: application/json" \
+  -d '{"location": "San Francisco, CA", "when": "today"}'
+```
+
+### Debugging
+
+- Check logs: `tail -f server.log`
+- Validate schemas with Pydantic validation errors
+- Test caching with Redis CLI: `redis-cli KEYS "*"`
+- Monitor API rate limits and cache hit rates
+
+### Performance Optimization
+
+- Cache frequently requested data (locations, routes)
+- Use async/await for I/O operations
+- Batch API calls where possible
+- Monitor external API rate limits
+
+## 🚨 Important Notes
+
+### Rate Limiting Awareness
+
+- Alpha Vantage: 5 calls/minute (cache critical)
+- Google Calendar: Use batch requests for ranges
+- OpenWeatherMap: 60 calls/minute (geocoding cache helps)
+
+### Data Privacy
+
+- Calendar data is real user data - handle with care
+- API keys should never be logged or exposed
+- Use structured logging for debugging without sensitive data
+
+### Multi-Calendar Support
+
+- Primary, Runna, Family calendars supported
+- Calendar-specific operations require `calendar_name` parameter
+- Conflict detection across all calendars
+
+This MCP server is designed for real-world AI agent productivity - focus on reliability, performance, and user data safety.
