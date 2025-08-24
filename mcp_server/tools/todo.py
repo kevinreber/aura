@@ -275,14 +275,19 @@ class TodoTool:
         try:
             logger.info("Fetching all todos from all Todoist projects")
             
+            # Get all projects first for efficient bucket mapping
+            projects = self.api.get_projects()
+            project_map = {project.id: project.name.lower() for project in projects}
+            logger.info(f"Found {len(projects)} projects: {list(project_map.values())}")
+            
             # Get all tasks (without project_id filter to get all tasks)
             tasks = self.api.get_tasks()
             logger.info(f"Retrieved {len(tasks)} total tasks from Todoist")
             
             todos = []
             for task in tasks:
-                # Determine bucket from project ID
-                bucket = self._determine_bucket_from_project(task.project_id)
+                # Determine bucket from project ID using our map
+                bucket = self._map_project_to_bucket(task.project_id, project_map)
                 
                 # Convert Todoist task to our TodoItem
                 todo_item = self._convert_todoist_task(task, bucket)
@@ -290,6 +295,8 @@ class TodoTool:
                 # Filter completed tasks if needed
                 if include_completed or not todo_item.completed:
                     todos.append(todo_item)
+            
+            logger.info(f"Processed {len(todos)} todos from all projects")
             
             # Sort by priority and due date
             priority_order = {TodoPriority.URGENT: 0, TodoPriority.HIGH: 1, TodoPriority.MEDIUM: 2, TodoPriority.LOW: 3}
@@ -551,6 +558,29 @@ class TodoTool:
             
         except Exception as e:
             logger.error(f"Error determining bucket from project {project_id}: {e}")
+            return TodoBucket.PERSONAL
+    
+    def _map_project_to_bucket(self, project_id: str, project_map: dict) -> TodoBucket:
+        """Efficiently map project ID to bucket using project name map."""
+        try:
+            project_name = project_map.get(project_id, '').lower()
+            
+            # Map project names to buckets
+            if project_name in ['work']:
+                return TodoBucket.WORK
+            elif project_name in ['home']:
+                return TodoBucket.HOME
+            elif project_name in ['errands']:
+                return TodoBucket.ERRANDS
+            elif project_name in ['personal']:
+                return TodoBucket.PERSONAL
+            else:
+                # For projects like "Inbox" or others, default to PERSONAL
+                logger.debug(f"Unknown project name '{project_name}' (ID: {project_id}), defaulting to PERSONAL")
+                return TodoBucket.PERSONAL
+                
+        except Exception as e:
+            logger.error(f"Error mapping project {project_id} to bucket: {e}")
             return TodoBucket.PERSONAL
     
     def _priority_to_todoist(self, priority: TodoPriority) -> int:
