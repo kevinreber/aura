@@ -60,7 +60,11 @@ def main():
     print(f"  📅✏️ Update Event: {public_url}/tools/calendar.update_event")
     print(f"  📅🗑️ Delete Event: {public_url}/tools/calendar.delete_event")
     print(f"  📅🔍 Find Free Time: {public_url}/tools/calendar.find_free_time")
-    print(f"  ✅  Todos:        {public_url}/tools/todo.list")
+    print(f"  ✅📋 List Todos:  {public_url}/tools/todo.list")
+    print(f"  ✅➕ Create Todo: {public_url}/tools/todo.create")
+    print(f"  ✅✏️  Update Todo: {public_url}/tools/todo.update")
+    print(f"  ✅✓ Complete Todo:{public_url}/tools/todo.complete")
+    print(f"  ✅🗑️  Delete Todo: {public_url}/tools/todo.delete")
     print(f"  💰  Financial:    {public_url}/tools/financial.get_data")
     print()
     

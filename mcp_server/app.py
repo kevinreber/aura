@@ -63,9 +63,9 @@ def create_app() -> Flask:
         "swagger": "2.0",
         "info": {
             "title": "Daily MCP Server API",
-            "description": """🎉 **Phase 1.5 Complete** - Model Context Protocol server with both READ and WRITE operations!
+            "description": """🎉 **Phase 2.0 Complete** - Model Context Protocol server with comprehensive READ and WRITE operations!
 
-**🆕 NEW: Commute Intelligence** - Real-time traffic + live Caltrain schedules + MV Connector shuttles!
+**🆕 NEW: Todoist Integration + Enhanced Todo Management** - Full CRUD operations with real Todoist API integration!
 
 **📊 Read Operations**:
 🌤️ **Weather**: Real-time conditions via OpenWeatherMap  
@@ -74,19 +74,20 @@ def create_app() -> Flask:
 🚗 **Basic Mobility**: Real-time commute times via Google Maps  
 🚗🚂 **Commute Intelligence**: Complete analysis with driving + transit options + fuel estimates  
 🚌 **Shuttle Schedules**: MV Connector timetables with real-time queries (Mon-Fri only)  
-✅ **Todo**: Task management with smart filtering  
+✅ **Todo**: Task management with smart filtering across buckets (work, home, errands, personal)  
 
 **✨ Write Operations**:
-📅+ **Calendar CRUD**: Create, update, delete events with conflict detection
+📅+ **Calendar CRUD**: Create, update, delete events with conflict detection  
+✅+ **Todo CRUD**: Create, update, complete, delete todos with Todoist API integration  
 
-**🎯 Features**: Live traffic data, official transit schedules, fuel consumption estimates, city-based routing, AI recommendations, production deployment
+**🎯 Features**: Live traffic data, official transit schedules, fuel consumption estimates, city-based routing, AI recommendations, production deployment, real Todoist sync
 **⚡ Quick Start**: All endpoints require POST with JSON body. Try `/docs` for interactive testing!""",
             "contact": {
                 "responsibleOrganization": "Personal Learning Project",
                 "responsibleDeveloper": "Kevin Reber",
                 "email": "kevinreber1@gmail.com"
             },
-            "version": "0.5.0",
+            "version": "2.0.0",
             "license": {
                 "name": "MIT"
             }
@@ -103,7 +104,7 @@ def create_app() -> Flask:
             {"name": "Calendar", "description": "📅 Google Calendar R/W - Events, creation, conflict detection"},
             {"name": "Financial", "description": "💰 Live stock and crypto market data"},
             {"name": "Mobility", "description": "🚗🚂 Complete commute intelligence - Real traffic, live transit, AI recommendations"},
-            {"name": "Todo", "description": "✅ Task management with smart filtering"}
+            {"name": "Todo", "description": "✅ Full CRUD task management with Todoist API integration - Create, read, update, complete, and delete todos across work, home, errands, and personal buckets"}
         ]
     }
     
@@ -435,7 +436,7 @@ def create_app() -> Flask:
                 departure_time:
                   type: string
                   example: "8:00 AM"
-                  description: "Preferred departure time (HH:MM AM/PM format, optional)"
+                  description: "Preferred departure time (format HH-MM AM/PM, optional)"
                 include_driving:
                   type: boolean
                   default: true
@@ -590,7 +591,7 @@ def create_app() -> Flask:
                 departure_time:
                   type: string
                   example: "9:00 AM"
-                  description: "Preferred departure time (HH:MM AM/PM format, optional)"
+                  description: "Preferred departure time (format HH-MM AM/PM, optional)"
         responses:
           200:
             description: MV Connector shuttle schedule information
@@ -882,7 +883,7 @@ def create_app() -> Flask:
     # Todo tool endpoint
     @app.route('/tools/todo.list', methods=['POST'])
     async def todo_list():
-        """List todo items and tasks with optional filtering and categorization.
+        """List todo items from Todoist with optional bucket-based filtering.
         ---
         tags:
           - Todo
@@ -893,34 +894,28 @@ def create_app() -> Flask:
             schema:
               type: object
               properties:
-                filter:
+                bucket:
                   type: string
-                  enum: ['all', 'pending', 'completed', 'high_priority']
-                  default: 'all'
-                  description: "Filter todos by status or priority"
-                category:
-                  type: string
+                  enum: ['work', 'home', 'errands', 'personal']
+                  description: "Category/bucket to list todos from. If omitted, returns all todos from all projects."
                   example: "work"
-                  description: "Filter by category (optional)"
-                limit:
-                  type: integer
-                  example: 10
-                  description: "Maximum number of todos to return (optional)"
+                include_completed:
+                  type: boolean
+                  default: false
+                  description: "Whether to include completed todo items in the results"
+                  example: false
         responses:
           200:
-            description: List of todo items
+            description: List of todo items from specified bucket or all buckets if none specified
             schema:
               type: object
               properties:
-                total_todos:
-                  type: integer
-                  example: 5
-                  description: "Total number of todos"
-                filter_applied:
+                bucket:
                   type: string
-                  example: "all"
-                  description: "Filter that was applied"
-                todos:
+                  enum: ['work', 'home', 'errands', 'personal']
+                  example: "work"
+                  description: "Bucket/category that was queried"
+                items:
                   type: array
                   items:
                     type: object
@@ -960,6 +955,18 @@ def create_app() -> Flask:
                         format: date-time
                         example: "2024-12-18T10:00:00Z"
                         description: "Creation timestamp"
+                total_items:
+                  type: integer
+                  example: 5
+                  description: "Total number of items found"
+                completed_count:
+                  type: integer
+                  example: 1
+                  description: "Number of completed items"
+                pending_count:
+                  type: integer
+                  example: 4
+                  description: "Number of pending items"
           400:
             description: Invalid request format
           500:
@@ -977,6 +984,266 @@ def create_app() -> Flask:
             
         except Exception as e:
             logger.error(f"Error in todo.list: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Todo create tool endpoint
+    @app.route('/tools/todo.create', methods=['POST'])
+    async def todo_create():
+        """Create a new todo item in Todoist with smart categorization and natural language due dates.
+        ---
+        tags:
+          - Todo
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  description: Todo item title/description
+                  example: "Review quarterly reports"
+                priority:
+                  type: string
+                  enum: [low, medium, high, urgent]
+                  description: Priority level (defaults to medium)
+                  example: "high"
+                bucket:
+                  type: string
+                  enum: [work, home, errands, personal]
+                  description: Category/bucket for the todo (defaults to personal)
+                  example: "work"
+                due_date:
+                  type: string
+                  description: Due date in natural language
+                  example: "next Friday"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: Tags to associate with the todo
+                  example: ["reports", "quarterly"]
+                description:
+                  type: string
+                  description: Additional description or notes
+                  example: "Need to review Q4 financial reports"
+        responses:
+          200:
+            description: Todo created successfully
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  description: Whether the todo was created successfully
+                todo:
+                  type: object
+                  description: The created todo item
+                message:
+                  type: string
+                  description: Success message
+          400:
+            description: Invalid input data
+          500:
+            description: Internal server error
+        """
+        try:
+            # Get and validate the input data
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("todo.create", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in todo.create: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Todo update tool endpoint
+    @app.route('/tools/todo.update', methods=['POST'])
+    async def todo_update():
+        """Update an existing todo item.
+        ---
+        tags:
+          - Todo
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  description: Unique todo item identifier to update
+                  example: "todo_123"
+                title:
+                  type: string
+                  description: New title/description
+                  example: "Review Q4 financial reports (updated)"
+                priority:
+                  type: string
+                  enum: [low, medium, high, urgent]
+                  description: New priority level
+                  example: "urgent"
+                due_date:
+                  type: string
+                  description: New due date in natural language
+                  example: "tomorrow"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  description: New tags (replaces existing)
+                  example: ["reports", "q4"]
+                description:
+                  type: string
+                  description: New description or notes
+        responses:
+          200:
+            description: Todo updated successfully
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                todo:
+                  type: object
+                  description: The updated todo item
+                changes:
+                  type: array
+                  items:
+                    type: string
+                  description: List of fields that were changed
+                message:
+                  type: string
+          400:
+            description: Invalid input data
+          500:
+            description: Internal server error
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            result = await mcp_server.call_tool("todo.update", data)
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in todo.update: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Todo complete tool endpoint
+    @app.route('/tools/todo.complete', methods=['POST'])
+    async def todo_complete():
+        """Mark a todo item as completed or uncompleted.
+        ---
+        tags:
+          - Todo
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  description: Unique todo item identifier to complete
+                  example: "todo_123"
+                completed:
+                  type: boolean
+                  description: Whether to mark as completed (defaults to true)
+                  example: true
+        responses:
+          200:
+            description: Todo completion status updated successfully
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                todo:
+                  type: object
+                  description: The updated todo item
+                message:
+                  type: string
+          400:
+            description: Invalid input data
+          500:
+            description: Internal server error
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            result = await mcp_server.call_tool("todo.complete", data)
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in todo.complete: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Todo delete tool endpoint
+    @app.route('/tools/todo.delete', methods=['POST'])
+    async def todo_delete():
+        """Delete a todo item permanently.
+        ---
+        tags:
+          - Todo
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  description: Unique todo item identifier to delete
+                  example: "todo_123"
+        responses:
+          200:
+            description: Todo deleted successfully
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                deleted_todo:
+                  type: object
+                  description: The deleted todo item (for audit trail)
+                message:
+                  type: string
+          400:
+            description: Invalid input data
+          500:
+            description: Internal server error
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            result = await mcp_server.call_tool("todo.delete", data)
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in todo.delete: {e}")
             return jsonify({"error": str(e)}), 500
     
     # Calendar create event tool endpoint
@@ -1357,11 +1624,11 @@ def create_app() -> Flask:
                 earliest_time:
                   type: string
                   example: "09:00"
-                  description: "Earliest time to consider (HH:MM format, 24-hour, defaults to 09:00)"
+                  description: "Earliest time to consider (format HH-MM 24-hour, defaults to 09-00)"
                 latest_time:
                   type: string
                   example: "18:00"
-                  description: "Latest time to consider (HH:MM format, 24-hour, defaults to 18:00)"
+                  description: "Latest time to consider (format HH-MM 24-hour, defaults to 18-00)"
                 calendar_names:
                   type: array
                   items:

@@ -22,6 +22,8 @@ redis[hiredis]==5.0.1
 
 # External API integrations
 requests==2.31.0
+todoist-api-python==2.1.4
+python-dateutil==2.8.2
 
 # Google Calendar API
 google-api-python-client>=2.140.0

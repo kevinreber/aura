@@ -24,8 +24,12 @@ dependencies = [
     "loguru>=0.7.3",
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
+    "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.1",
+    "pytz==2025.2",
+    "redis[hiredis]==5.0.1",
     "requests>=2.32.4",
+    "todoist-api-python==2.1.4",
 ]
 
 # Tell hatchling where our package is located

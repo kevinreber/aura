@@ -115,13 +115,63 @@ Efficiently get events for date ranges (much faster than multiple single-date ca
 - **Output**: All events in range sorted by time
 - **Real API**: ✅ Google Calendar multi-calendar support
 
-#### ✅ Todo (`todo.list`)
+#### ✅ Todo Operations - **Full CRUD with Todoist Integration!**
+
+**✅ List Todos (`todo.list`)**
 
 List todo items with smart filtering and categorization.
 
 - **Input**: `bucket` ("work" | "home" | "errands" | "personal"), `include_completed` (boolean)
 - **Output**: Todos with priorities, due dates, completion status
-- **API Status**: 🔄 Mock data (Todoist integration planned)
+- **API Status**: ✅ **Real Todoist API integration** with mock fallback
+
+**✅➕ Create Todos (`todo.create`)**
+
+Create new todo items with smart categorization and natural language due dates.
+
+- **Input**: `title`, `priority`, `bucket`, `due_date` (natural language), `tags`, `description`
+- **Output**: Created todo with Todoist ID, success confirmation
+- **Features**:
+  - Smart project mapping (buckets → Todoist projects)
+  - Natural language due dates ("tomorrow", "next Friday")
+  - Auto-categorization and priority mapping
+- **API Status**: ✅ **Real Todoist API integration**
+
+**✅✏️ Update Todos (`todo.update`)**
+
+Update existing todo items with granular field changes.
+
+- **Input**: `id` (required), `title`, `priority`, `due_date`, `tags`, `description`
+- **Output**: Updated todo with change tracking
+- **Features**:
+  - Partial updates (only change specified fields)
+  - Change audit trail showing what was modified
+  - Priority and due date updates with smart parsing
+- **API Status**: ✅ **Real Todoist API integration**
+
+**✅✓ Complete Todos (`todo.complete`)**
+
+Mark todo items as completed or uncompleted.
+
+- **Input**: `id` (required), `completed` (boolean, default: true)
+- **Output**: Updated todo with completion status
+- **Features**:
+  - Toggle completion status
+  - Maintains completion timestamps
+  - Supports both completing and uncompleting tasks
+- **API Status**: ✅ **Real Todoist API integration**
+
+**✅🗑️ Delete Todos (`todo.delete`)**
+
+Delete todo items permanently with audit trail.
+
+- **Input**: `id` (required)
+- **Output**: Deleted todo details for audit trail
+- **Features**:
+  - Safe deletion with confirmation
+  - Complete audit trail preservation
+  - Permanent removal from Todoist
+- **API Status**: ✅ **Real Todoist API integration**
 
 #### 💰 Financial (`financial.get_data`)
 
@@ -396,12 +446,50 @@ curl -X POST http://localhost:8000/tools/calendar.find_free_time \
   }'
 ```
 
-### Test Todo Tool
+### Test Todo Tools
 
 ```bash
+# List todos
 curl -X POST http://localhost:8000/tools/todo.list \
   -H "Content-Type: application/json" \
   -d '{"bucket": "work", "include_completed": false}'
+
+# Create new todo
+curl -X POST http://localhost:8000/tools/todo.create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Review quarterly reports",
+    "priority": "high",
+    "bucket": "work",
+    "due_date": "next Friday",
+    "tags": ["reports", "quarterly"],
+    "description": "Need to complete Q4 analysis"
+  }'
+
+# Update todo
+curl -X POST http://localhost:8000/tools/todo.update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "your_todo_id_here",
+    "title": "Updated: Review quarterly reports",
+    "priority": "urgent",
+    "due_date": "tomorrow"
+  }'
+
+# Complete todo
+curl -X POST http://localhost:8000/tools/todo.complete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "your_todo_id_here",
+    "completed": true
+  }'
+
+# Delete todo
+curl -X POST http://localhost:8000/tools/todo.delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "your_todo_id_here"
+  }'
 ```
 
 ## 🔑 API Keys Setup
@@ -442,6 +530,21 @@ curl -X POST http://localhost:8000/tools/todo.list \
 1. Sign up at [Alpha Vantage](https://www.alphavantage.co/support/#api-key)
 2. Get your free API key (500 requests/day)
 3. Add to `.env`: `ALPHA_VANTAGE_API_KEY=your_key_here`
+
+### 🆕 Todoist (Todo Management Tool)
+
+1. Sign up at [Todoist](https://todoist.com) (free account works)
+2. Go to [Integrations Settings](https://todoist.com/prefs/integrations)
+3. Scroll down to "API token" and copy your token
+4. Add to `.env`: `TODOIST_API_KEY=your_api_token_here`
+
+**Features with Todoist API:**
+
+- ✅ **Smart Project Management** - Buckets automatically create Todoist projects
+- ✅ **Natural Language Due Dates** - "tomorrow", "next Friday", "in 2 weeks"
+- ✅ **Priority Mapping** - Our priorities sync with Todoist's priority system
+- ✅ **Tags & Labels** - Full tag support with Todoist labels
+- ✅ **Real-time Sync** - Changes appear instantly in Todoist apps
 
 ### 🏠 Personal Address Configuration
 
@@ -589,16 +692,17 @@ mypy mcp_server/
 | 📅 Calendar Read        | ✅ **Live** | Google Calendar                 | Multi-calendar support                          |
 | 📅+ Calendar Write      | ✅ **Live** | Google Calendar                 | Event creation, conflict detection              |
 | 💰 Financial            | ✅ **Live** | Alpha Vantage + CoinGecko       | Stocks + crypto prices                          |
-| ✅ Todo                 | 🔄 **Mock** | Todoist (planned)               | Smart categorization                            |
+| ✅ Todo CRUD            | ✅ **Live** | **Todoist API Integration**     | **Complete task management with projects**      |
 
 ## 🎯 **Current Capabilities**
 
-- ✅ **8 Tools Total** - All with real API integration 🆕
+- ✅ **12 Tools Total** - All with real API integration 🆕
 - ✅ **Complete Commute Intelligence** - Real traffic + transit data 🆕
 - ✅ **Live GTFS Integration** - Official Caltrain schedules 🆕
 - ✅ **Personal Address Routing** - Door-to-door accuracy 🆕
 - ✅ **Multi-Modal Planning** - Drive vs transit comparisons 🆕
 - ✅ **Complete Calendar CRUD** - Create, read, update, delete events
+- ✅ **Complete Todo CRUD** - Full Todoist integration with project management 🆕
 - ✅ **Smart Time Finding** - AI-powered scheduling with conflict detection
 - ✅ **Multi-Calendar Support** - Primary, Runna, Family calendars
 - ✅ **Production Deployment** - Railway.app with auto-deployment

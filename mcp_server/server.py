@@ -16,7 +16,9 @@ from .schemas import (
     CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
     CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
     CalendarDeleteInput, CalendarDeleteOutput, CalendarFindFreeTimeInput, CalendarFindFreeTimeOutput,
-    TodoInput, TodoOutput,
+    TodoInput, TodoOutput, TodoCreateInput, TodoCreateOutput,
+    TodoUpdateInput, TodoUpdateOutput, TodoCompleteInput, TodoCompleteOutput,
+    TodoDeleteInput, TodoDeleteOutput,
     FinancialInput, FinancialOutput
 )
 from .utils.logging import get_logger
@@ -111,6 +113,34 @@ class MCPServer:
                 "output_schema": TodoOutput,
                 "description": "List todo items from a specific bucket",
                 "method": "list_todos"
+            },
+            "todo.create": {
+                "tool": TodoTool(),
+                "input_schema": TodoCreateInput,
+                "output_schema": TodoCreateOutput,
+                "description": "Create a new todo item with smart categorization and natural language due dates",
+                "method": "create_todo"
+            },
+            "todo.update": {
+                "tool": TodoTool(),
+                "input_schema": TodoUpdateInput,
+                "output_schema": TodoUpdateOutput,
+                "description": "Update an existing todo item (title, priority, due date, tags)",
+                "method": "update_todo"
+            },
+            "todo.complete": {
+                "tool": TodoTool(),
+                "input_schema": TodoCompleteInput,
+                "output_schema": TodoCompleteOutput,
+                "description": "Mark a todo item as completed or uncompleted",
+                "method": "complete_todo"
+            },
+            "todo.delete": {
+                "tool": TodoTool(),
+                "input_schema": TodoDeleteInput,
+                "output_schema": TodoDeleteOutput,
+                "description": "Delete a todo item permanently",
+                "method": "delete_todo"
             },
             "financial.get_data": {
                 "tool": FinancialTool(),
