@@ -3,6 +3,7 @@
 import asyncio
 from typing import Dict, Any, List, Optional
 import random
+import re
 from datetime import datetime, timedelta
 
 from ..schemas.mobility import (
@@ -182,16 +183,93 @@ class MobilityTool:
             mode=mode
         )
     
+    def _strip_html_tags(self, html_text: str) -> str:
+        """Remove HTML tags from text."""
+        if not html_text:
+            return ""
+        # Remove HTML tags using regex
+        clean_text = re.sub(r'<[^>]+>', '', html_text)
+        return clean_text.strip()
+    
     def _generate_route_summary(self, steps: list) -> str:
-        """Generate a brief route summary from direction steps."""
+        """Generate a brief route summary with city names from direction steps."""
         if not steps:
             return "Direct route"
         
-        # Extract major roads/highways mentioned in instructions
+        # Extract city names from step locations
+        cities = []
+        
+        # Sample intermediate points to get city names
+        step_count = len(steps)
+        if step_count > 1:
+            # Get cities from roughly evenly spaced steps (but skip first/last to avoid origin/destination)
+            sample_indices = []
+            if step_count >= 6:
+                # For longer routes, sample 2-3 intermediate points
+                sample_indices = [step_count//3, 2*step_count//3]
+            elif step_count >= 3:
+                # For medium routes, sample 1 intermediate point
+                sample_indices = [step_count//2]
+            
+            for idx in sample_indices:
+                if 0 < idx < step_count - 1:  # Skip first and last step
+                    step = steps[idx]
+                    
+                    # Try to extract city name from step location
+                    if 'end_location' in step:
+                        end_lat = step['end_location'].get('lat', 0)
+                        end_lng = step['end_location'].get('lng', 0)
+                        
+                        # Use a simple heuristic based on known Bay Area coordinates
+                        city = self._get_city_from_coordinates(end_lat, end_lng)
+                        if city and city not in cities:
+                            cities.append(city)
+        
+        if cities:
+            if len(cities) == 1:
+                return f"via {cities[0]}"
+            else:
+                return f"via {', '.join(cities)}"
+        else:
+            # Fallback to road-based summary if no cities found
+            return self._generate_road_summary(steps)
+    
+    def _get_city_from_coordinates(self, lat: float, lng: float) -> str:
+        """Get approximate city name from coordinates for Bay Area routes."""
+        # Simple coordinate-based city mapping for South SF to LinkedIn route
+        if not lat or not lng:
+            return ""
+            
+        # Rough coordinate boundaries for major cities on the route
+        if 37.6 <= lat <= 37.7 and -122.45 <= lng <= -122.35:
+            return "San Francisco"
+        elif 37.55 <= lat <= 37.65 and -122.45 <= lng <= -122.35:
+            return "Daly City"
+        elif 37.5 <= lat <= 37.6 and -122.45 <= lng <= -122.35:
+            return "San Bruno"
+        elif 37.45 <= lat <= 37.55 and -122.4 <= lng <= -122.3:
+            return "San Mateo"
+        elif 37.4 <= lat <= 37.5 and -122.3 <= lng <= -122.2:
+            return "Foster City"
+        elif 37.35 <= lat <= 37.45 and -122.25 <= lng <= -122.15:
+            return "Redwood City"
+        elif 37.3 <= lat <= 37.4 and -122.2 <= lng <= -122.1:
+            return "Palo Alto"
+        elif 37.25 <= lat <= 37.35 and -122.15 <= lng <= -122.05:
+            return "Mountain View"
+        elif 37.4 <= lat <= 37.5 and -122.1 <= lng <= -121.95:
+            return "Sunnyvale"
+        else:
+            return ""
+    
+    def _generate_road_summary(self, steps: list) -> str:
+        """Fallback method to generate road-based route summary."""
         major_roads = []
         for step in steps:
-            instruction = step.get("html_instructions", "")
-            # Simple extraction of road names (this could be more sophisticated)
+            html_instruction = step.get("html_instructions", "")
+            instruction = self._strip_html_tags(html_instruction)
+            
+            # Simple extraction of road names
             if "on " in instruction.lower():
                 parts = instruction.lower().split("on ")
                 if len(parts) > 1:
@@ -205,6 +283,82 @@ class MobilityTool:
             return f"via {', '.join(unique_roads)}"
         else:
             return "Most direct route available"
+    
+    def _calculate_fuel_consumption(self, distance_miles: float) -> float:
+        """Calculate estimated fuel consumption in gallons based on distance."""
+        if distance_miles <= 0:
+            return 0.0
+        
+        # Use average fuel economy for typical passenger vehicles
+        # EPA average for all passenger vehicles is around 25-28 mpg
+        # We'll use 26 mpg as a reasonable middle estimate
+        average_mpg = 26.0
+        
+        estimated_gallons = distance_miles / average_mpg
+        
+        # Round to 2 decimal places for display
+        return round(estimated_gallons, 2)
+    
+    def _generate_clean_route_summary(self, origin: str, destination: str) -> str:
+        """Generate a clean origin → destination route summary."""
+        # Clean up and abbreviate location names
+        clean_origin = self._clean_location_name(origin)
+        clean_destination = self._clean_location_name(destination)
+        
+        return f"{clean_origin} → {clean_destination}"
+    
+    def _clean_location_name(self, location: str) -> str:
+        """Clean and abbreviate location names for route display."""
+        if not location:
+            return "Unknown"
+        
+        location_lower = location.lower()
+        
+        # Handle common home/work patterns
+        if any(term in location_lower for term in ['south san francisco', 's san francisco', 'ssf']):
+            return "South SF"
+        elif 'san francisco' in location_lower and 'south' not in location_lower:
+            return "San Francisco" 
+        elif any(term in location_lower for term in ['mountain view', 'mv']):
+            return "Mountain View"
+        elif 'linkedin' in location_lower:
+            return "LinkedIn"
+        elif 'palo alto' in location_lower:
+            return "Palo Alto"
+        elif 'redwood city' in location_lower:
+            return "Redwood City"
+        elif 'san mateo' in location_lower:
+            return "San Mateo"
+        elif 'sunnyvale' in location_lower:
+            return "Sunnyvale"
+        elif 'san jose' in location_lower:
+            return "San Jose"
+        elif 'fremont' in location_lower:
+            return "Fremont"
+        elif 'oakland' in location_lower:
+            return "Oakland"
+        elif 'berkeley' in location_lower:
+            return "Berkeley"
+        elif 'daly city' in location_lower:
+            return "Daly City"
+        elif 'san bruno' in location_lower:
+            return "San Bruno"
+        else:
+            # For other locations, try to extract city name or use first few words
+            parts = location.split(',')
+            if len(parts) >= 2:
+                # Take the first part (usually the city) and clean it up
+                city_part = parts[0].strip()
+                # Remove common address prefixes
+                city_part = re.sub(r'^\d+\s+', '', city_part)  # Remove house numbers
+                if len(city_part) > 20:
+                    city_part = city_part[:17] + "..."
+                return city_part
+            else:
+                # Fallback: just use the location as-is but limit length
+                if len(location) > 20:
+                    return location[:17] + "..."
+                return location
     
     def _determine_traffic_status(self, leg: Dict[str, Any], mode: TransportMode) -> str:
         """Determine traffic status based on duration data."""
@@ -401,7 +555,7 @@ class MobilityTool:
                 direction = "outbound"
             
             start_hour, end_hour = MVConnectorSchedule.get_service_hours(direction)
-            service_hours = f"{start_hour} - {end_hour}"
+            service_hours = f"{start_hour} - {end_hour} (Mon-Fri only)"
             frequency = MVConnectorSchedule.get_frequency(direction)
             
             result = ShuttleScheduleOutput(
@@ -445,13 +599,20 @@ class MobilityTool:
         # Calculate departure and arrival times
         arrival_time = departure_time + timedelta(minutes=driving_data.duration_minutes)
         
+        # Calculate estimated fuel consumption
+        estimated_fuel = self._calculate_fuel_consumption(driving_data.distance_miles)
+        
+        # Generate clean origin → destination route summary  
+        route_summary = self._generate_clean_route_summary(origin, destination)
+        
         return DrivingOption(
             duration_minutes=driving_data.duration_minutes,
             distance_miles=driving_data.distance_miles,
-            route_summary=driving_data.route_summary,
+            route_summary=route_summary,
             traffic_status=driving_data.traffic_status,
             departure_time=departure_time.strftime("%I:%M %p"),
-            arrival_time=arrival_time.strftime("%I:%M %p")
+            arrival_time=arrival_time.strftime("%I:%M %p"),
+            estimated_fuel_gallons=estimated_fuel
         )
     
     async def _get_transit_option(

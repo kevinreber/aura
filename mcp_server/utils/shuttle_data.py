@@ -96,6 +96,10 @@ class MVConnectorSchedule:
         if after_time is None:
             after_time = datetime.now()
             
+        # Check if it's a weekend - MV Connector only runs Monday-Friday
+        if after_time.weekday() >= 5:  # Saturday = 5, Sunday = 6
+            return []  # No service on weekends
+            
         # Determine direction and schedule
         if origin == "Mountain View Caltrain" and destination in ["LinkedIn Transit Center", "LinkedIn 950|1000"]:
             schedule = cls.INBOUND_SCHEDULE

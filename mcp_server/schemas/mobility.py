@@ -114,6 +114,7 @@ class DrivingOption(BaseModel):
     traffic_status: str = Field(description="Current traffic conditions")
     departure_time: str = Field(description="Recommended departure time")
     arrival_time: str = Field(description="Estimated arrival time")
+    estimated_fuel_gallons: float = Field(description="Estimated fuel consumption in gallons")
 
 
 class CommuteOutput(BaseModel):
