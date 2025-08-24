@@ -72,14 +72,14 @@ def create_app() -> Flask:
 📅 **Calendar**: Multi-calendar events via Google Calendar API  
 💰 **Financial**: Live stock/crypto prices via Alpha Vantage & CoinGecko  
 🚗 **Basic Mobility**: Real-time commute times via Google Maps  
-🚗🚂 **Commute Intelligence**: Complete analysis with driving + transit options  
-🚌 **Shuttle Schedules**: MV Connector timetables with real-time queries  
+🚗🚂 **Commute Intelligence**: Complete analysis with driving + transit options + fuel estimates  
+🚌 **Shuttle Schedules**: MV Connector timetables with real-time queries (Mon-Fri only)  
 ✅ **Todo**: Task management with smart filtering  
 
 **✨ Write Operations**:
 📅+ **Calendar CRUD**: Create, update, delete events with conflict detection
 
-**🎯 Features**: Live traffic data, official transit schedules, personalized routing, AI recommendations, production deployment
+**🎯 Features**: Live traffic data, official transit schedules, fuel consumption estimates, city-based routing, AI recommendations, production deployment
 **⚡ Quick Start**: All endpoints require POST with JSON body. Try `/docs` for interactive testing!""",
             "contact": {
                 "responsibleOrganization": "Personal Learning Project",
@@ -471,12 +471,16 @@ def create_app() -> Flask:
                       description: "Total driving distance"
                     route_summary:
                       type: string
-                      example: "via Del Monte Dr, California 237"
-                      description: "Main roads and highways"
+                      example: "South SF → LinkedIn"
+                      description: "Clean origin to destination route"
                     traffic_status:
                       type: string
                       example: "Light traffic"
                       description: "Current traffic conditions"
+                    estimated_fuel_gallons:
+                      type: number
+                      example: 1.54
+                      description: "Estimated fuel consumption in gallons (26 MPG average)"
                     departure_time:
                       type: string
                       example: "8:00 AM"

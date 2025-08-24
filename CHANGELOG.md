@@ -23,6 +23,8 @@ A complete transformation of the mobility system with real-time traffic data, li
 
 - **`mobility.get_commute_options`** - Complete morning/evening commute intelligence
   - Real-time driving conditions with traffic analysis
+  - ⛽ **NEW**: EPA-based fuel consumption estimates (26 MPG average)
+  - 🗺️ **NEW**: Clean route format ("South SF → LinkedIn" vs highway names)
   - Live Caltrain schedules with next departures
   - MV Connector shuttle connections and timing
   - AI recommendations comparing all options
@@ -34,6 +36,7 @@ A complete transformation of the mobility system with real-time traffic data, li
   - Complete timetables for all 3 stops (MV Caltrain ↔ LinkedIn Transit Center ↔ LinkedIn 950|1000)
   - Real-time next departure calculations
   - Service hours validation (morning 6:50 AM - 10:58 AM, evening 3:16 PM - 6:42 PM)
+  - 📅 **NEW**: Weekend detection (Monday-Friday service only)
   - Travel time matrix between all stops
 
 #### **🏠 Personal Address Configuration**

@@ -65,7 +65,9 @@ Get basic commute information between any two locations.
 - **Output**: Complete commute analysis with AI recommendations
 - **Features**:
   - 🏠 **Personal Addresses** - Uses configured home/work locations
-  - 🚗 **Real-Time Driving** - Live traffic with Google Maps API
+  - 🚗 **Real-Time Driving** - Live traffic with Google Maps API + fuel consumption estimates
+  - ⛽ **Fuel Estimates** - EPA-based calculations (26 MPG average) for cost planning
+  - 🗺️ **Clean Route Display** - "South SF → LinkedIn" format instead of highway names
   - 🚂 **Live Caltrain Data** - Official GTFS schedules with real train numbers
   - 🚌 **MV Connector Shuttles** - Complete timetables and connections
   - ⏰ **Smart Timing** - Coordinated departure and transfer times
@@ -84,6 +86,7 @@ Get basic commute information between any two locations.
   - ⏰ **Real-Time Queries** - Next available shuttles from current time
   - 📍 **All 3 Stops** - Mountain View Caltrain, LinkedIn Transit Center, LinkedIn 950|1000
   - 🕐 **Service Hours** - Morning (6:50 AM - 10:58 AM), Evening (3:16 PM - 6:42 PM)
+  - 📅 **Weekday Only** - Monday-Friday service (no weekend shuttles)
 - **Perfect For**: _"When's the next shuttle to LinkedIn?"_, _"What time does the shuttle leave MV Caltrain?"_
 - **Data Source**: ✅ Official MV Connector timetables
 
