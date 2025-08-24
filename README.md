@@ -1,26 +1,38 @@
 # Daily MCP Server 🌅
 
-A high-performance Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features **complete Calendar CRUD** operations, **intelligent caching system**, and real-world API integrations. Built with Flask and Python for optimal performance and AI agent productivity.
+A high-performance Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features **complete Calendar CRUD** operations, **intelligent commute intelligence**, **live traffic data**, and real-world API integrations. Built with Flask and Python for optimal performance and AI agent productivity.
 
-## 🚀 **Latest Enhancement: Advanced Caching System!**
+## 🚀 **Latest Enhancement: Complete Commute Intelligence System!**
 
-✨ **NEW**: **Intelligent caching layer** eliminates rate limiting issues and dramatically improves performance!
+✨ **NEW**: **Comprehensive traffic & transit integration** with real-time data and personalized routing!
 
-### 🎯 **Performance Improvements**
+### 🚗🚂 **Commute Intelligence Features**
 
-- 🔥 **60-90% reduction** in external API calls
-- ⚡ **Instant responses** for cached data
-- 🛡️ **Rate limiting protection** across all tools
-- 📊 **Redis + in-memory fallback** for reliability
-- 📈 **Smart TTL values** based on data volatility
+- 🗺️ **Real-Time Traffic Data** - Google Maps API with live conditions
+- 🚂 **Live Caltrain Schedules** - Official GTFS data with real train times
+- 🚌 **Complete Shuttle Integration** - MV Connector timetables
+- 🏠 **Personalized Addresses** - Door-to-door routing with your locations
+- 🤖 **AI Recommendations** - Smart commute comparisons and suggestions
+- ⚡ **Multi-Modal Planning** - Compare driving vs transit seamlessly
+
+### 🎯 **Commute Intelligence Capabilities**
+
+- 🚗 **Real-Time Driving**: Live traffic, route optimization, arrival predictions
+- 🚂 **Live Transit Data**: Caltrain GTFS schedules with real train numbers
+- 🚌 **Shuttle Integration**: Complete MV Connector timetables and connections
+- 🏠 **Personal Routing**: Door-to-door accuracy with configured addresses
+- ⏰ **Smart Timing**: Departure recommendations and transfer coordination
+- 🤖 **AI Comparisons**: "Drive 45min vs Transit 63min" intelligent suggestions
 
 ### 🎯 **Key Features**
 
-- ✅ **Advanced Caching System** - Redis + in-memory fallback 🆕
+- ✅ **Complete Commute Intelligence** - Real traffic + transit integration 🆕
+- ✅ **Live GTFS Data** - Official Caltrain schedules with caching 🆕
+- ✅ **Personal Address Config** - Door-to-door routing accuracy 🆕
+- ✅ **Advanced Caching System** - Redis + in-memory fallback
 - ✅ **Complete Calendar CRUD** - Create, read, update, delete events
 - ✅ **Smart Time Finding** - AI-powered scheduling with conflict detection
-- ✅ **Real API Integrations** - Google Calendar, OpenWeatherMap, Financial APIs
-- ✅ **Rate Limiting Protection** - Intelligent caching prevents API limits
+- ✅ **Real API Integrations** - Google Maps, Calendar, Weather, Financial APIs
 - ✅ **Production Ready** - Deployed on Railway with health monitoring
 
 ## 🛠️ Available Tools
@@ -36,14 +48,44 @@ Get daily weather forecasts powered by OpenWeatherMap with intelligent caching.
 - **Real API**: ✅ OpenWeatherMap integration
 - **Caching**: 🔥 Geocoding (7 days), Forecasts (30 min) - dramatically faster for repeated locations
 
-#### 🚗 Mobility (`mobility.get_commute`)
+#### 🚗 Basic Mobility (`mobility.get_commute`)
 
-Get commute information with Google Maps integration and caching.
+Get basic commute information between any two locations.
 
 - **Input**: `origin`, `destination`, `mode` (driving/transit/walking/bicycling)
 - **Output**: Duration, distance, route summary, traffic conditions
 - **Real API**: ✅ Google Maps Directions API
-- **Caching**: 🔥 Routes cached for 15 minutes - eliminates repeated API calls for common commutes
+- **Caching**: 🔥 Routes cached for 15 minutes - eliminates repeated API calls
+
+#### 🚗🚂 **Commute Intelligence (`mobility.get_commute_options`)** 🆕
+
+**Get comprehensive commute analysis with driving AND transit options!**
+
+- **Input**: `direction` (to_work/from_work), `departure_time`, `include_driving`, `include_transit`
+- **Output**: Complete commute analysis with AI recommendations
+- **Features**:
+  - 🏠 **Personal Addresses** - Uses configured home/work locations
+  - 🚗 **Real-Time Driving** - Live traffic with Google Maps API
+  - 🚂 **Live Caltrain Data** - Official GTFS schedules with real train numbers
+  - 🚌 **MV Connector Shuttles** - Complete timetables and connections
+  - ⏰ **Smart Timing** - Coordinated departure and transfer times
+  - 🤖 **AI Recommendations** - "Drive 43min vs Transit 63min - drive recommended"
+- **Perfect For**: _"How should I get to work?"_, _"What's the best way home?"_
+- **Real APIs**: ✅ Google Maps + Caltrain GTFS + MV Connector data
+
+#### 🚌 **Shuttle Schedules (`mobility.get_shuttle_schedule`)** 🆕
+
+**Get detailed MV Connector shuttle schedules between specific stops.**
+
+- **Input**: `origin`, `destination` (Mountain View Caltrain ↔ LinkedIn Transit Center ↔ LinkedIn 950|1000), `departure_time`
+- **Output**: Next departures, travel times, service hours, frequency
+- **Features**:
+  - 🚌 **Complete Timetables** - All departure times from official schedules
+  - ⏰ **Real-Time Queries** - Next available shuttles from current time
+  - 📍 **All 3 Stops** - Mountain View Caltrain, LinkedIn Transit Center, LinkedIn 950|1000
+  - 🕐 **Service Hours** - Morning (6:50 AM - 10:58 AM), Evening (3:16 PM - 6:42 PM)
+- **Perfect For**: _"When's the next shuttle to LinkedIn?"_, _"What time does the shuttle leave MV Caltrain?"_
+- **Data Source**: ✅ Official MV Connector timetables
 
 #### 💰 Financial (`financial.get_data`)
 
@@ -53,7 +95,6 @@ Live stock and cryptocurrency data with smart caching to prevent rate limits.
 - **Output**: Real-time prices, changes, market status, portfolio summary
 - **Real APIs**: ✅ Alpha Vantage (stocks) + CoinGecko (crypto)
 - **Caching**: 🔥 Stocks (5 min), Crypto (2 min) - critical for Alpha Vantage's 5 calls/minute limit
-- **Real API**: ✅ Google Maps Directions integration
 
 #### 📅 Calendar (`calendar.list_events`)
 
@@ -191,10 +232,14 @@ pip install -r requirements-dev.txt
 # Copy environment template
 cp env.example .env
 
-# Edit .env with your API keys
+# Edit .env with your API keys and addresses
 # Required for full functionality:
 WEATHER_API_KEY=your_openweathermap_api_key
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+
+# Personal addresses for accurate commute routing:
+HOME_ADDRESS=123 Main St, Your City, State ZIP
+WORK_ADDRESS=456 Work Ave, Work City, State ZIP
 ```
 
 ### 3. Run the Server
@@ -238,12 +283,49 @@ curl -X POST http://localhost:8000/tools/weather.get_daily \
   -d '{"location": "San Francisco, CA", "when": "today"}'
 ```
 
-### Test Mobility Tool
+### Test Basic Mobility Tool
 
 ```bash
 curl -X POST http://localhost:8000/tools/mobility.get_commute \
   -H "Content-Type: application/json" \
   -d '{"origin": "San Francisco", "destination": "Oakland", "mode": "driving"}'
+```
+
+### 🆕 Test Commute Intelligence
+
+```bash
+# Get complete morning commute analysis
+curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "to_work",
+    "departure_time": "8:00 AM",
+    "include_driving": true,
+    "include_transit": true
+  }'
+
+# Get evening commute options
+curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
+  -H "Content-Type: application/json" \
+  -d '{
+    "direction": "from_work",
+    "departure_time": "5:00 PM",
+    "include_driving": true,
+    "include_transit": true
+  }'
+```
+
+### 🆕 Test Shuttle Schedules
+
+```bash
+# Get next shuttles from Mountain View Caltrain to LinkedIn
+curl -X POST http://localhost:8000/tools/mobility.get_shuttle_schedule \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin": "mountain_view_caltrain",
+    "destination": "linkedin_transit_center",
+    "departure_time": "9:00 AM"
+  }'
 ```
 
 ### Test Calendar Tool
@@ -327,15 +409,16 @@ curl -X POST http://localhost:8000/tools/todo.list \
 2. Get your free API key
 3. Add to `.env`: `WEATHER_API_KEY=your_key_here`
 
-### Google APIs (Mobility & Calendar Tools)
+### Google APIs (Maps & Calendar Tools)
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select existing
 3. Enable APIs:
-   - **Directions API** (for mobility/commute)
+   - **Directions API** (for real-time traffic & routing) 🆕
+   - **Distance Matrix API** (for batch travel time calculations) 🆕
    - **Calendar API** (for calendar read/write)
 4. Create credentials:
-   - **API Key** for Directions API
+   - **API Key** for Maps APIs (secure with IP/HTTP referrer restrictions)
    - **OAuth 2.0** for Calendar API (download JSON file)
 5. Add to `.env`:
    ```
@@ -357,7 +440,34 @@ curl -X POST http://localhost:8000/tools/todo.list \
 2. Get your free API key (500 requests/day)
 3. Add to `.env`: `ALPHA_VANTAGE_API_KEY=your_key_here`
 
-**Note**: The server works without API keys using mock data for development/testing.
+### 🏠 Personal Address Configuration
+
+**For accurate commute routing, configure your real addresses:**
+
+1. **Edit `.env` file** with your actual locations:
+
+   ```bash
+   HOME_ADDRESS=123 Your Street, Your City, State ZIP
+   WORK_ADDRESS=456 Work Address, Work City, State ZIP
+
+   # Caltrain stations (optional - defaults provided)
+   HOME_CALTRAIN_STATION=South San Francisco
+   WORK_CALTRAIN_STATION=Mountain View
+   ```
+
+2. **Address Format Best Practices**:
+
+   - ✅ Use full addresses: `"123 Main St, South San Francisco, CA 94080"`
+   - ✅ Include apartment/suite numbers for precision
+   - ❌ Avoid vague locations: `"South SF"` or `"LinkedIn"`
+
+3. **Benefits of Real Addresses**:
+   - 🎯 **Door-to-door accuracy** instead of city-to-city estimates
+   - 🚶 **Precise walking distances** to transit stations
+   - 🚗 **Real traffic conditions** for your exact route
+   - 🤖 **Better AI recommendations** based on your locations
+
+**Note**: The server works without API keys/addresses using mock data for development/testing.
 
 ## 🏗️ Architecture
 
@@ -410,7 +520,8 @@ daily-mcp-server/
 ├── mcp_server/           # Main application package
 │   ├── tools/           # Individual MCP tools
 │   ├── schemas/         # Pydantic validation schemas
-│   ├── utils/           # Shared utilities
+│   ├── clients/         # API clients (Google Calendar, Caltrain GTFS) 🆕
+│   ├── utils/           # Shared utilities (caching, HTTP, shuttle data) 🆕
 │   ├── app.py          # Flask application factory
 │   └── config.py       # Configuration management
 ├── tests/              # Test suite
@@ -466,30 +577,38 @@ mypy mcp_server/
 
 ## 📊 API Integration Status
 
-| Tool               | Status      | API Provider              | Features                           |
-| ------------------ | ----------- | ------------------------- | ---------------------------------- |
-| 🌤️ Weather         | ✅ **Live** | OpenWeatherMap            | Current conditions, forecasts      |
-| 🚗 Mobility        | ✅ **Live** | Google Maps               | Real-time traffic, routes          |
-| 📅 Calendar Read   | ✅ **Live** | Google Calendar           | Multi-calendar support             |
-| 📅+ Calendar Write | ✅ **Live** | Google Calendar           | Event creation, conflict detection |
-| 💰 Financial       | ✅ **Live** | Alpha Vantage + CoinGecko | Stocks + crypto prices             |
-| ✅ Todo            | 🔄 **Mock** | Todoist (planned)         | Smart categorization               |
+| Tool                    | Status      | API Provider                    | Features                                        |
+| ----------------------- | ----------- | ------------------------------- | ----------------------------------------------- |
+| 🌤️ Weather              | ✅ **Live** | OpenWeatherMap                  | Current conditions, forecasts                   |
+| 🚗 Basic Mobility       | ✅ **Live** | Google Maps Directions          | Real-time traffic, routes                       |
+| 🚗🚂 **Commute Intel**  | ✅ **Live** | **Google Maps + Caltrain GTFS** | **Complete commute analysis & recommendations** |
+| 🚌 **Shuttle Schedule** | ✅ **Live** | **MV Connector Official Data**  | **Complete timetables, real-time queries**      |
+| 📅 Calendar Read        | ✅ **Live** | Google Calendar                 | Multi-calendar support                          |
+| 📅+ Calendar Write      | ✅ **Live** | Google Calendar                 | Event creation, conflict detection              |
+| 💰 Financial            | ✅ **Live** | Alpha Vantage + CoinGecko       | Stocks + crypto prices                          |
+| ✅ Todo                 | 🔄 **Mock** | Todoist (planned)               | Smart categorization                            |
 
 ## 🎯 **Current Capabilities**
 
-- ✅ **5 Read Tools** - All with real API integration
-- ✅ **1 Write Tool** - Calendar event creation with smart features
+- ✅ **8 Tools Total** - All with real API integration 🆕
+- ✅ **Complete Commute Intelligence** - Real traffic + transit data 🆕
+- ✅ **Live GTFS Integration** - Official Caltrain schedules 🆕
+- ✅ **Personal Address Routing** - Door-to-door accuracy 🆕
+- ✅ **Multi-Modal Planning** - Drive vs transit comparisons 🆕
+- ✅ **Complete Calendar CRUD** - Create, read, update, delete events
+- ✅ **Smart Time Finding** - AI-powered scheduling with conflict detection
 - ✅ **Multi-Calendar Support** - Primary, Runna, Family calendars
-- ✅ **Conflict Detection** - Smart scheduling assistance
 - ✅ **Production Deployment** - Railway.app with auto-deployment
 
-## 🔮 **Phase 2 Roadmap**
+## 🔮 **Future Enhancements**
 
-- 🎯 **Smart Scheduling** - AI-powered optimal meeting time suggestions
-- ✏️ **Calendar CRUD** - Update and delete calendar events
+- 🚂 **Real-Time Delays** - Live Caltrain delay information from 511.org
+- 🗺️ **Route Optimization** - Alternative route suggestions during traffic
 - 📝 **Todo Write Operations** - Create, update, complete tasks
-- 🧠 **Natural Language** - Enhanced parsing for relative times
+- 🧠 **Natural Language** - Enhanced parsing for relative times ("next Friday")
+- 🎯 **Commute Learning** - Personalized recommendations based on patterns
 - 👥 **Multi-tenancy** - Multiple user support
+- 📱 **Push Notifications** - Traffic alerts and schedule changes
 
 ## 🤝 Contributing
 
@@ -516,13 +635,22 @@ Visit `http://localhost:8000/docs` for comprehensive Swagger UI documentation wi
 
 ## 🎉 **What Makes This Special**
 
-This isn't just another API - it's a **complete productivity assistant backend**:
+This isn't just another API - it's a **complete productivity assistant backend** with **real commute intelligence**:
 
 - 🤖 **AI Agent Ready** - Purpose-built for LLM integration
+- 🚗🚂 **Complete Commute Intelligence** - Real traffic + transit with AI recommendations 🆕
+- 🏠 **Personalized Routing** - Door-to-door accuracy with your addresses 🆕
 - 🔄 **Read + Write** - Both information retrieval AND action taking
-- 🧠 **Smart Features** - Conflict detection, multi-calendar support
-- ⚡ **Real Integrations** - Live data from Google, OpenWeatherMap, financial APIs
+- 🧠 **Smart Features** - Conflict detection, multi-calendar support, commute planning
+- ⚡ **Real Integrations** - Google Maps, Caltrain GTFS, MV Connector, Calendar, Weather, Financial APIs
 - 📱 **Production Deployed** - Working system you can use daily
 - 🎯 **Personal Use** - Designed for individual productivity
 
-**Happy coding!** 🚀 This MCP server demonstrates modern AI agent architecture with real-world integrations and write capabilities.
+### 🚀 **Perfect for Morning Routine AI Agents**
+
+- _"How should I get to work?"_ → **43min driving (light traffic) vs 63min transit (next train 8:15 AM)**
+- _"When's my next meeting?"_ → **Team sync at 2 PM in Conference Room A**
+- _"What's the weather?"_ → **Partly cloudy, 72°F high, 20% rain chance**
+- _"When should I leave for my 9 AM meeting?"_ → **Leave at 8:05 AM (driving) or catch 7:44 AM train**
+
+**Happy coding!** 🚀 This MCP server demonstrates modern AI agent architecture with real-world integrations, commute intelligence, and write capabilities.

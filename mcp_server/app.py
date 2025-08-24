@@ -13,7 +13,8 @@ from .utils.logging import setup_logging, get_logger
 from .utils.cache import get_cache_service
 from .server import get_mcp_server
 from .schemas import (
-    WeatherInput, MobilityInput, CalendarInput, TodoInput, FinancialInput
+    WeatherInput, MobilityInput, CommuteInput, ShuttleScheduleInput,
+    CalendarInput, TodoInput, FinancialInput
 )
 
 # Initialize logger
@@ -64,26 +65,28 @@ def create_app() -> Flask:
             "title": "Daily MCP Server API",
             "description": """🎉 **Phase 1.5 Complete** - Model Context Protocol server with both READ and WRITE operations!
 
-**🆕 NEW: Calendar Event Creation** - First write tool with smart conflict detection!
+**🆕 NEW: Commute Intelligence** - Real-time traffic + live Caltrain schedules + MV Connector shuttles!
 
 **📊 Read Operations**:
 🌤️ **Weather**: Real-time conditions via OpenWeatherMap  
 📅 **Calendar**: Multi-calendar events via Google Calendar API  
 💰 **Financial**: Live stock/crypto prices via Alpha Vantage & CoinGecko  
-🚗 **Mobility**: Real-time commute times via Google Maps  
+🚗 **Basic Mobility**: Real-time commute times via Google Maps  
+🚗🚂 **Commute Intelligence**: Complete analysis with driving + transit options  
+🚌 **Shuttle Schedules**: MV Connector timetables with real-time queries  
 ✅ **Todo**: Task management with smart filtering  
 
 **✨ Write Operations**:
-📅+ **Calendar Create**: Create events with conflict detection and multi-calendar support
+📅+ **Calendar CRUD**: Create, update, delete events with conflict detection
 
-**🎯 Features**: Real APIs, conflict detection, multi-calendar support, production deployment
+**🎯 Features**: Live traffic data, official transit schedules, personalized routing, AI recommendations, production deployment
 **⚡ Quick Start**: All endpoints require POST with JSON body. Try `/docs` for interactive testing!""",
             "contact": {
                 "responsibleOrganization": "Personal Learning Project",
                 "responsibleDeveloper": "Kevin Reber",
                 "email": "kevinreber1@gmail.com"
             },
-            "version": "0.2.0",
+            "version": "0.5.0",
             "license": {
                 "name": "MIT"
             }
@@ -99,7 +102,7 @@ def create_app() -> Flask:
             {"name": "Weather", "description": "🌤️ Real-time weather via OpenWeatherMap API"},
             {"name": "Calendar", "description": "📅 Google Calendar R/W - Events, creation, conflict detection"},
             {"name": "Financial", "description": "💰 Live stock and crypto market data"},
-            {"name": "Mobility", "description": "🚗 Real-time commute and traffic information"},
+            {"name": "Mobility", "description": "🚗🚂 Complete commute intelligence - Real traffic, live transit, AI recommendations"},
             {"name": "Todo", "description": "✅ Task management with smart filtering"}
         ]
     }
@@ -146,7 +149,7 @@ def create_app() -> Flask:
         """
         return jsonify({
             "status": "healthy",
-            "version": "0.1.0",
+            "version": "0.5.0",
             "environment": settings.environment
         })
     
@@ -406,6 +409,243 @@ def create_app() -> Flask:
             
         except Exception as e:
             logger.error(f"Error in mobility.get_commute: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Commute intelligence tool endpoint
+    @app.route('/tools/mobility.get_commute_options', methods=['POST'])
+    async def mobility_get_commute_options():
+        """Get comprehensive commute analysis with driving AND transit options including real-time traffic and live schedules.
+        ---
+        tags:
+          - Mobility
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - direction
+              properties:
+                direction:
+                  type: string
+                  enum: ['to_work', 'from_work']
+                  example: "to_work"
+                  description: "Direction of commute (morning or evening)"
+                departure_time:
+                  type: string
+                  example: "8:00 AM"
+                  description: "Preferred departure time (HH:MM AM/PM format, optional)"
+                include_driving:
+                  type: boolean
+                  default: true
+                  description: "Include driving option with real-time traffic"
+                include_transit:
+                  type: boolean
+                  default: true
+                  description: "Include transit option with Caltrain + shuttle schedules"
+        responses:
+          200:
+            description: Comprehensive commute analysis with AI recommendations
+            schema:
+              type: object
+              properties:
+                direction:
+                  type: string
+                  example: "to_work"
+                  description: "Direction of commute"
+                query_time:
+                  type: string
+                  example: "2024-01-15 08:00:00"
+                  description: "Time when analysis was generated"
+                driving:
+                  type: object
+                  properties:
+                    duration_minutes:
+                      type: integer
+                      example: 43
+                      description: "Driving time with current traffic"
+                    distance_miles:
+                      type: number
+                      example: 40.1
+                      description: "Total driving distance"
+                    route_summary:
+                      type: string
+                      example: "via Del Monte Dr, California 237"
+                      description: "Main roads and highways"
+                    traffic_status:
+                      type: string
+                      example: "Light traffic"
+                      description: "Current traffic conditions"
+                    departure_time:
+                      type: string
+                      example: "8:00 AM"
+                      description: "Recommended departure time"
+                    arrival_time:
+                      type: string
+                      example: "8:43 AM"
+                      description: "Estimated arrival time"
+                transit:
+                  type: object
+                  properties:
+                    total_duration_minutes:
+                      type: integer
+                      example: 63
+                      description: "Total transit time including all segments"
+                    caltrain_duration_minutes:
+                      type: integer
+                      example: 47
+                      description: "Time on Caltrain only"
+                    shuttle_duration_minutes:
+                      type: integer
+                      example: 8
+                      description: "Time on MV Connector shuttle"
+                    walking_duration_minutes:
+                      type: integer
+                      example: 3
+                      description: "Walking time to/from stations"
+                    next_departures:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          departure_time:
+                            type: string
+                            example: "8:15 AM"
+                          arrival_time:
+                            type: string
+                            example: "9:02 AM"
+                          train_number:
+                            type: string
+                            example: "150"
+                      description: "Next available Caltrain departures"
+                    shuttle_departures:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          departure_time:
+                            type: string
+                            example: "9:11 AM"
+                          stops:
+                            type: array
+                            items:
+                              type: string
+                            example: ["9:11 AM", "9:19 AM", "9:22 AM"]
+                      description: "Next available MV Connector shuttles"
+                recommendation:
+                  type: string
+                  example: "Drive - 43 minutes vs Transit - 63 minutes. Driving is 20 minutes faster with light traffic."
+                  description: "AI recommendation comparing all options"
+          400:
+            description: Invalid request format or missing direction
+          500:
+            description: Commute service error
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("mobility.get_commute_options", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in mobility.get_commute_options: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    # Shuttle schedule tool endpoint
+    @app.route('/tools/mobility.get_shuttle_schedule', methods=['POST'])
+    async def mobility_get_shuttle_schedule():
+        """Get detailed MV Connector shuttle schedules between Mountain View Caltrain, LinkedIn Transit Center, and LinkedIn 950|1000.
+        ---
+        tags:
+          - Mobility
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - origin
+                - destination
+              properties:
+                origin:
+                  type: string
+                  enum: ['mountain_view_caltrain', 'linkedin_transit_center', 'linkedin_950_1000']
+                  example: "mountain_view_caltrain"
+                  description: "Starting shuttle stop"
+                destination:
+                  type: string
+                  enum: ['mountain_view_caltrain', 'linkedin_transit_center', 'linkedin_950_1000']
+                  example: "linkedin_transit_center"
+                  description: "Destination shuttle stop"
+                departure_time:
+                  type: string
+                  example: "9:00 AM"
+                  description: "Preferred departure time (HH:MM AM/PM format, optional)"
+        responses:
+          200:
+            description: MV Connector shuttle schedule information
+            schema:
+              type: object
+              properties:
+                origin:
+                  type: string
+                  example: "mountain_view_caltrain"
+                  description: "Starting shuttle stop"
+                destination:
+                  type: string
+                  example: "linkedin_transit_center"
+                  description: "Destination shuttle stop"
+                duration_minutes:
+                  type: integer
+                  example: 8
+                  description: "Travel time between stops in minutes"
+                next_departures:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      departure_time:
+                        type: string
+                        example: "9:11 AM"
+                        description: "Departure time from origin"
+                      stops:
+                        type: array
+                        items:
+                          type: string
+                        example: ["9:11 AM", "9:19 AM", "9:22 AM"]
+                        description: "All stop times for this departure"
+                  description: "Next available shuttle departures"
+                service_hours:
+                  type: string
+                  example: "6:50 AM - 10:58 AM"
+                  description: "Operating hours for this route"
+                frequency_minutes:
+                  type: string
+                  example: "13-17 minutes"
+                  description: "Typical frequency between shuttles"
+          400:
+            description: Invalid request format or missing origin/destination
+          500:
+            description: Shuttle service error
+        """
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({"error": "JSON body required"}), 400
+            
+            # Call the tool via MCP server
+            result = await mcp_server.call_tool("mobility.get_shuttle_schedule", data)
+            
+            return jsonify(result)
+            
+        except Exception as e:
+            logger.error(f"Error in mobility.get_shuttle_schedule: {e}")
             return jsonify({"error": str(e)}), 500
     
     # Calendar tool endpoint

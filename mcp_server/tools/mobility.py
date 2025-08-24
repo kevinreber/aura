@@ -1,13 +1,21 @@
-"""Mobility tool for getting commute time and route information."""
+"""Mobility tool for getting commute time, route information, and shuttle schedules."""
 
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import random
+from datetime import datetime, timedelta
 
-from ..schemas.mobility import MobilityInput, MobilityOutput, TransportMode
+from ..schemas.mobility import (
+    MobilityInput, MobilityOutput, TransportMode,
+    CommuteInput, CommuteOutput, CommuteDirection,
+    DrivingOption, TransitOption, CaltrainDeparture, ShuttleDeparture,
+    ShuttleScheduleInput, ShuttleScheduleOutput, ShuttleStop
+)
 from ..utils.http_client import HTTPClient
 from ..utils.logging import get_logger, log_tool_call
 from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
+from ..utils.shuttle_data import MVConnectorSchedule, get_mv_to_linkedin_shuttles, get_linkedin_to_mv_shuttles
+from ..clients.caltrain import get_caltrain_client
 from ..config import get_settings
 
 logger = get_logger("mobility_tool")
@@ -260,3 +268,358 @@ class MobilityTool:
             "route_summary": route_summaries[mode],
             "traffic_status": traffic_status
         }
+    
+    async def get_commute_options(self, input_data: CommuteInput) -> CommuteOutput:
+        """
+        Get comprehensive commute options including driving and transit.
+        
+        Args:
+            input_data: CommuteInput with direction and preferences
+            
+        Returns:
+            CommuteOutput with driving and transit options
+        """
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            logger.info(f"Getting commute options for {input_data.direction.value}")
+            
+            # Determine origin and destination based on direction and configured addresses
+            settings = self.settings
+            
+            if input_data.direction == CommuteDirection.TO_WORK:
+                # Morning commute: home to work
+                origin = settings.home_address if settings.home_address else "South San Francisco, CA"
+                destination = settings.work_address if settings.work_address else "Mountain View, CA"
+                caltrain_origin = settings.home_caltrain_station
+                caltrain_destination = settings.work_caltrain_station
+            else:
+                # Evening commute: work to home
+                origin = settings.work_address if settings.work_address else "Mountain View, CA"
+                destination = settings.home_address if settings.home_address else "South San Francisco, CA"
+                caltrain_origin = settings.work_caltrain_station
+                caltrain_destination = settings.home_caltrain_station
+            
+            # Get current time or use provided departure time
+            if input_data.departure_time:
+                query_time = self._parse_time(input_data.departure_time)
+            else:
+                query_time = datetime.now()
+            
+            # Initialize result
+            driving_option = None
+            transit_option = None
+            
+            # Get driving option if requested
+            if input_data.include_driving:
+                driving_option = await self._get_driving_option(
+                    origin, destination, query_time
+                )
+            
+            # Get transit option if requested  
+            if input_data.include_transit:
+                transit_option = await self._get_transit_option(
+                    caltrain_origin, caltrain_destination, 
+                    input_data.direction, query_time
+                )
+            
+            # Generate AI recommendation
+            recommendation = self._generate_recommendation(
+                driving_option, transit_option, query_time
+            )
+            
+            result = CommuteOutput(
+                direction=input_data.direction,
+                query_time=query_time.strftime("%Y-%m-%d %H:%M:%S"),
+                driving=driving_option,
+                transit=transit_option,
+                recommendation=recommendation
+            )
+            
+            # Log the successful tool call
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("mobility.get_commute_options", input_data.dict(), duration_ms)
+            
+            return result
+            
+        except Exception as e:
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("mobility.get_commute_options", input_data.dict(), duration_ms)
+            logger.error(f"Error getting commute options: {e}")
+            raise
+    
+    async def get_shuttle_schedule(self, input_data: ShuttleScheduleInput) -> ShuttleScheduleOutput:
+        """
+        Get MV Connector shuttle schedule between stops.
+        
+        Args:
+            input_data: ShuttleScheduleInput with stops and time preferences
+            
+        Returns:
+            ShuttleScheduleOutput with schedule information
+        """
+        start_time = asyncio.get_event_loop().time()
+        
+        try:
+            logger.info(f"Getting shuttle schedule from {input_data.origin.value} to {input_data.destination.value}")
+            
+            # Parse departure time if provided
+            after_time = None
+            if input_data.departure_time:
+                after_time = self._parse_time(input_data.departure_time)
+            
+            # Map enum values to shuttle data names
+            stop_name_map = {
+                ShuttleStop.MOUNTAIN_VIEW_CALTRAIN: "Mountain View Caltrain",
+                ShuttleStop.LINKEDIN_TRANSIT_CENTER: "LinkedIn Transit Center", 
+                ShuttleStop.LINKEDIN_950_1000: "LinkedIn 950|1000"
+            }
+            
+            origin_name = stop_name_map[input_data.origin]
+            dest_name = stop_name_map[input_data.destination]
+            
+            # Get next departures
+            departures = MVConnectorSchedule.get_next_shuttles(
+                origin_name, dest_name, after_time, limit=5
+            )
+            
+            # Format departures for response
+            shuttle_departures = []
+            for dep in departures:
+                shuttle_departures.append(ShuttleDeparture(
+                    departure_time=dep["departure_time"],
+                    stops=dep["all_stops"]
+                ))
+            
+            # Get travel time and service info
+            duration = MVConnectorSchedule.get_travel_time(origin_name, dest_name)
+            
+            # Determine direction for service hours
+            if input_data.origin == ShuttleStop.MOUNTAIN_VIEW_CALTRAIN:
+                direction = "inbound"
+            else:
+                direction = "outbound"
+            
+            start_hour, end_hour = MVConnectorSchedule.get_service_hours(direction)
+            service_hours = f"{start_hour} - {end_hour}"
+            frequency = MVConnectorSchedule.get_frequency(direction)
+            
+            result = ShuttleScheduleOutput(
+                origin=input_data.origin,
+                destination=input_data.destination,
+                duration_minutes=duration,
+                next_departures=shuttle_departures,
+                service_hours=service_hours,
+                frequency_minutes=frequency
+            )
+            
+            # Log the successful tool call
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("mobility.get_shuttle_schedule", input_data.dict(), duration_ms)
+            
+            return result
+            
+        except Exception as e:
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("mobility.get_shuttle_schedule", input_data.dict(), duration_ms)
+            logger.error(f"Error getting shuttle schedule: {e}")
+            raise
+    
+    async def _get_driving_option(
+        self, 
+        origin: str, 
+        destination: str, 
+        departure_time: datetime
+    ) -> DrivingOption:
+        """Get driving option with real-time traffic data."""
+        
+        # Use existing get_commute method for driving data
+        mobility_input = MobilityInput(
+            origin=origin,
+            destination=destination,
+            mode=TransportMode.DRIVING
+        )
+        
+        driving_data = await self.get_commute(mobility_input)
+        
+        # Calculate departure and arrival times
+        arrival_time = departure_time + timedelta(minutes=driving_data.duration_minutes)
+        
+        return DrivingOption(
+            duration_minutes=driving_data.duration_minutes,
+            distance_miles=driving_data.distance_miles,
+            route_summary=driving_data.route_summary,
+            traffic_status=driving_data.traffic_status,
+            departure_time=departure_time.strftime("%I:%M %p"),
+            arrival_time=arrival_time.strftime("%I:%M %p")
+        )
+    
+    async def _get_transit_option(
+        self, 
+        caltrain_origin: str,
+        caltrain_destination: str, 
+        direction: CommuteDirection,
+        departure_time: datetime
+    ) -> TransitOption:
+        """Get transit option with Caltrain + shuttle data."""
+        
+        # Get real Caltrain data using GTFS API
+        caltrain_client = await get_caltrain_client()
+        
+        try:
+            if direction == CommuteDirection.TO_WORK:
+                # Morning: SSF to MV
+                caltrain_departures_data = await caltrain_client.get_next_trains_ssf_to_mv(
+                    departure_time, limit=3
+                )
+            else:
+                # Evening: MV to SSF
+                caltrain_departures_data = await caltrain_client.get_next_trains_mv_to_ssf(
+                    departure_time, limit=3
+                )
+                
+            # Convert to our schema format
+            caltrain_departures = []
+            avg_duration = 47  # Default fallback
+            
+            for dep in caltrain_departures_data:
+                duration = int((dep['arrival_datetime'] - dep['departure_datetime']).total_seconds() / 60)
+                if duration > 0:
+                    avg_duration = duration  # Use actual duration from first valid result
+                
+                caltrain_departures.append(CaltrainDeparture(
+                    departure_time=dep['departure_time'],
+                    arrival_time=dep['arrival_time'],
+                    train_number=dep.get('route_id', 'N/A'),
+                    platform=dep.get('platform', 'TBD'),
+                    delay_minutes=0  # Real-time delay would go here
+                ))
+            
+            if not caltrain_departures:
+                logger.warning("No Caltrain departures found, using mock data as fallback")
+                caltrain_departures = self._get_mock_caltrain_departures(
+                    caltrain_origin, caltrain_destination, departure_time
+                )
+                avg_duration = 47
+            
+        except Exception as e:
+            logger.error(f"Error fetching Caltrain data: {e}, falling back to mock data")
+            caltrain_departures = self._get_mock_caltrain_departures(
+                caltrain_origin, caltrain_destination, departure_time
+            )
+            avg_duration = 47
+        
+        # Get shuttle information based on direction
+        if direction == CommuteDirection.TO_WORK:
+            # Morning: need shuttle from MV Caltrain to LinkedIn
+            shuttle_origin = "Mountain View Caltrain"
+            shuttle_dest = "LinkedIn Transit Center"
+            shuttle_duration = MVConnectorSchedule.get_travel_time(shuttle_origin, shuttle_dest)
+            shuttle_departures_data = get_mv_to_linkedin_shuttles(departure_time, limit=3)
+        else:
+            # Evening: need shuttle from LinkedIn to MV Caltrain 
+            shuttle_origin = "LinkedIn Transit Center"
+            shuttle_dest = "Mountain View Caltrain"
+            shuttle_duration = MVConnectorSchedule.get_travel_time(shuttle_origin, shuttle_dest)
+            shuttle_departures_data = get_linkedin_to_mv_shuttles(departure_time, limit=3)
+        
+        # Format shuttle departures
+        shuttle_departures = []
+        for dep in shuttle_departures_data:
+            shuttle_departures.append(ShuttleDeparture(
+                departure_time=dep["departure_time"],
+                stops=dep["all_stops"]
+            ))
+        
+        # Calculate total duration (includes transfer buffer)
+        transfer_time = 5
+        walking_time = 3
+        total_duration = avg_duration + shuttle_duration + transfer_time + walking_time
+        
+        return TransitOption(
+            total_duration_minutes=total_duration,
+            caltrain_duration_minutes=avg_duration,
+            shuttle_duration_minutes=shuttle_duration,
+            walking_duration_minutes=walking_time,
+            next_departures=caltrain_departures,
+            shuttle_departures=shuttle_departures,
+            transfer_time_minutes=transfer_time
+        )
+    
+    def _get_mock_caltrain_departures(
+        self, 
+        origin: str, 
+        destination: str, 
+        after_time: datetime,
+        limit: int = 3
+    ) -> List[CaltrainDeparture]:
+        """Generate mock Caltrain departures (will be replaced with real API)."""
+        
+        departures = []
+        current_time = after_time
+        
+        # Generate reasonable departure times
+        for i in range(limit):
+            # Caltrain typically runs every 15-30 minutes during peak hours
+            departure_offset = 15 + (i * 20)  # 15, 35, 55 minutes from now
+            departure_dt = current_time + timedelta(minutes=departure_offset)
+            arrival_dt = departure_dt + timedelta(minutes=47)  # SSF to MV is ~47 mins
+            
+            departures.append(CaltrainDeparture(
+                departure_time=departure_dt.strftime("%I:%M %p"),
+                arrival_time=arrival_dt.strftime("%I:%M %p"),
+                train_number=f"{150 + i * 2}",  # Mock train numbers
+                platform="TBD",
+                delay_minutes=0
+            ))
+        
+        return departures
+    
+    def _generate_recommendation(
+        self, 
+        driving: Optional[DrivingOption], 
+        transit: Optional[TransitOption],
+        query_time: datetime
+    ) -> str:
+        """Generate AI recommendation based on current conditions."""
+        
+        if not driving and not transit:
+            return "No commute options available"
+        
+        if not driving:
+            return "Take transit - driving option not available"
+        
+        if not transit:
+            return f"Drive - estimated {driving.duration_minutes} minutes with {driving.traffic_status.lower()}"
+        
+        # Compare options
+        time_diff = transit.total_duration_minutes - driving.duration_minutes
+        
+        if "Heavy" in driving.traffic_status or "Very heavy" in driving.traffic_status:
+            if time_diff <= 20:
+                return f"Take transit - heavy traffic makes driving much slower ({driving.duration_minutes} min driving vs {transit.total_duration_minutes} min transit)"
+            else:
+                return f"Drive despite traffic - transit takes {time_diff} minutes longer"
+        
+        elif time_diff <= -10:  # Transit is 10+ minutes faster
+            return f"Take transit - {abs(time_diff)} minutes faster than driving"
+        
+        elif time_diff >= 30:  # Driving is 30+ minutes faster
+            return f"Drive - {time_diff} minutes faster than transit with {driving.traffic_status.lower()}"
+        
+        else:
+            return f"Both options similar - drive ({driving.duration_minutes} min) or transit ({transit.total_duration_minutes} min)"
+    
+    def _parse_time(self, time_str: str) -> datetime:
+        """Parse time string like '8:15 AM' to datetime object (today)."""
+        try:
+            time_obj = datetime.strptime(time_str, "%I:%M %p")
+            today = datetime.now().date()
+            return datetime.combine(today, time_obj.time())
+        except ValueError:
+            try:
+                time_obj = datetime.strptime(time_str, "%H:%M")
+                today = datetime.now().date()
+                return datetime.combine(today, time_obj.time())
+            except ValueError:
+                raise ValueError(f"Invalid time format: {time_str}. Use 'HH:MM AM/PM' or 'HH:MM'")

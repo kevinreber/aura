@@ -11,7 +11,8 @@ from datetime import datetime
 from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool
 from .schemas import (
     WeatherInput, WeatherOutput,
-    MobilityInput, MobilityOutput, 
+    MobilityInput, MobilityOutput, CommuteInput, CommuteOutput,
+    ShuttleScheduleInput, ShuttleScheduleOutput,
     CalendarInput, CalendarOutput, CalendarRangeInput, CalendarRangeOutput,
     CalendarCreateInput, CalendarCreateOutput, CalendarUpdateInput, CalendarUpdateOutput,
     CalendarDeleteInput, CalendarDeleteOutput, CalendarFindFreeTimeInput, CalendarFindFreeTimeOutput,
@@ -47,6 +48,20 @@ class MCPServer:
                 "output_schema": MobilityOutput,
                 "description": "Get commute information between two locations",
                 "method": "get_commute"
+            },
+            "mobility.get_commute_options": {
+                "tool": MobilityTool(),
+                "input_schema": CommuteInput,
+                "output_schema": CommuteOutput,
+                "description": "Get comprehensive commute options with driving and transit (Caltrain + shuttle) for morning/evening commutes",
+                "method": "get_commute_options"
+            },
+            "mobility.get_shuttle_schedule": {
+                "tool": MobilityTool(),
+                "input_schema": ShuttleScheduleInput,
+                "output_schema": ShuttleScheduleOutput,
+                "description": "Get MV Connector shuttle schedule between Mountain View Caltrain, LinkedIn Transit Center, and LinkedIn 950|1000",
+                "method": "get_shuttle_schedule"
             },
             "calendar.list_events": {
                 "tool": CalendarTool(),

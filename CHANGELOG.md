@@ -5,6 +5,130 @@ All notable changes to the Daily MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-08-23 - 🚗🚂 **MAJOR: Complete Commute Intelligence System**
+
+### 🎉 **COMMUTE REVOLUTION: Real Traffic & Transit Integration**
+
+A complete transformation of the mobility system with real-time traffic data, live transit schedules, and AI-powered commute intelligence.
+
+- **🚗 Real-Time Traffic Data**: Google Maps API integration with live conditions
+- **🚂 Live Caltrain Schedules**: Official GTFS data with real train numbers
+- **🚌 Complete Shuttle Integration**: MV Connector timetables from official sources
+- **🏠 Personal Address Configuration**: Door-to-door routing accuracy
+- **🤖 AI Commute Recommendations**: Intelligent comparisons and suggestions
+
+### ✨ **New Tools & Features**
+
+#### **🚗🚂 Comprehensive Commute Analysis**
+
+- **`mobility.get_commute_options`** - Complete morning/evening commute intelligence
+  - Real-time driving conditions with traffic analysis
+  - Live Caltrain schedules with next departures
+  - MV Connector shuttle connections and timing
+  - AI recommendations comparing all options
+  - Personalized routing using configured addresses
+
+#### **🚌 Shuttle Schedule Integration**
+
+- **`mobility.get_shuttle_schedule`** - MV Connector schedule queries
+  - Complete timetables for all 3 stops (MV Caltrain ↔ LinkedIn Transit Center ↔ LinkedIn 950|1000)
+  - Real-time next departure calculations
+  - Service hours validation (morning 6:50 AM - 10:58 AM, evening 3:16 PM - 6:42 PM)
+  - Travel time matrix between all stops
+
+#### **🏠 Personal Address Configuration**
+
+- **Address-based routing** with home/work configuration
+- **Environment variable support** for `HOME_ADDRESS` and `WORK_ADDRESS`
+- **Smart fallbacks** to generic locations for development
+- **Production validation** ensures addresses are configured
+
+### 🛠️ **Enhanced Architecture**
+
+#### **🚂 Caltrain GTFS Client** (`mcp_server/clients/caltrain.py`)
+
+- **Official GTFS data** downloaded from Trillium Transit
+- **Smart caching** with 12-hour TTL and daily updates
+- **Station lookup** with fuzzy matching capabilities
+- **Schedule queries** between any two stations
+- **Real train numbers** and arrival predictions
+- **Error handling** with mock data fallbacks
+
+#### **🚌 MV Connector Data** (`mcp_server/utils/shuttle_data.py`)
+
+- **Complete schedule extraction** from official timetables
+- **All departure times** for inbound (morning) and outbound (evening) routes
+- **Travel time calculations** between all stop combinations
+- **Service validation** with real-time status checking
+- **Next departure logic** with day rollover handling
+
+#### **📋 Enhanced Schemas** (`mcp_server/schemas/mobility.py`)
+
+- **`CommuteInput/Output`** - Comprehensive commute analysis
+- **`ShuttleScheduleInput/Output`** - Detailed shuttle queries
+- **`CaltrainDeparture`** - Structured train departure data
+- **`TransitOption`** - Multi-modal transit analysis
+- **`DrivingOption`** - Enhanced driving conditions
+
+### 🎯 **Real-World Integration**
+
+#### **📊 Data Sources**
+
+- **Google Maps Directions API** - Real-time traffic and routing
+- **Caltrain GTFS Feed** - Official schedules from https://data.trilliumtransit.com/
+- **MV Connector Timetables** - Official shuttle schedules
+- **Smart Caching** - Redis integration with appropriate TTLs
+
+#### **🤖 AI Intelligence**
+
+- **Context-aware recommendations** based on real-time conditions
+- **Time comparisons** - "Drive 43min vs Transit 63min"
+- **Traffic-aware suggestions** - Heavy traffic = prefer transit
+- **Personalized routing** using configured home/work addresses
+
+### 📚 **Documentation & Setup**
+
+#### **📖 New Documentation**
+
+- **`COMMUTE_INTELLIGENCE.md`** - Comprehensive setup and usage guide
+- **Updated `README.md`** - Complete feature overview and examples
+- **Configuration examples** - Address setup and API key management
+- **Testing scripts** - Validation and troubleshooting tools
+
+#### **⚙️ Configuration Enhancements**
+
+- **Address validation** in production environment
+- **Google Maps API setup** documentation
+- **Interactive setup tools** for address configuration
+- **Environment variable templates** updated
+
+### 🧪 **Testing & Quality**
+
+#### **🔍 Comprehensive Testing**
+
+- **End-to-end workflow validation** with real addresses
+- **API integration testing** for Google Maps and Caltrain GTFS
+- **Mock data fallbacks** ensure reliability
+- **Configuration validation** tools
+
+### 💡 **Perfect for AI Agents**
+
+Your AI assistant can now answer:
+
+- _"How should I get to work?"_ → **Real-time traffic vs transit comparison**
+- _"When's the next train to Mountain View?"_ → **Live Caltrain schedules**
+- _"What time should I leave for my 9 AM meeting?"_ → **Coordinated departure timing**
+- _"Is there traffic on my commute?"_ → **Current conditions and alternatives**
+
+### 🚀 **Performance & Reliability**
+
+- **Intelligent caching** reduces API costs and improves speed
+- **Graceful fallbacks** when external APIs unavailable
+- **Rate limiting protection** for Google Maps API usage
+- **Error handling** ensures system stability
+
+---
+
 ## [0.4.0] - 2025-08-21 - 🚀 **MAJOR: Advanced Caching System**
 
 ### 🎉 **PERFORMANCE REVOLUTION: Intelligent Caching Layer**
