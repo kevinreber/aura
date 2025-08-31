@@ -276,25 +276,65 @@ class TodoTool:
             logger.info("Fetching all todos from all Todoist projects")
             
             # Get all projects first for efficient bucket mapping
-            projects = self.api.get_projects()
-            project_map = {project.id: project.name.lower() for project in projects}
-            logger.info(f"Found {len(projects)} projects: {list(project_map.values())}")
+            try:
+                projects = self.api.get_projects()
+                logger.debug(f"Raw projects from API: {len(projects) if projects else 'None'}")
+            except Exception as e:
+                logger.error(f"Error getting projects from Todoist API: {e}")
+                raise
+            
+            project_map = {}
+            project_names = []
+            for project in projects:
+                try:
+                    logger.debug(f"Processing project: {project}")
+                    if hasattr(project, 'id') and hasattr(project, 'name'):
+                        project_map[project.id] = project.name.lower()
+                        project_names.append(project.name.lower())
+                    else:
+                        logger.warning(f"Project missing id or name attributes: {dir(project)}")
+                except AttributeError as e:
+                    logger.warning(f"Project missing expected attributes: {e}")
+                    logger.debug(f"Project object type: {type(project)}")
+                    logger.debug(f"Project object dir: {dir(project)}")
+                    continue
+                except Exception as e:
+                    logger.error(f"Unexpected error processing project: {e}")
+                    continue
+            logger.info(f"Found {len(projects)} projects: {project_names}")
             
             # Get all tasks (without project_id filter to get all tasks)
-            tasks = self.api.get_tasks()
-            logger.info(f"Retrieved {len(tasks)} total tasks from Todoist")
+            try:
+                tasks = self.api.get_tasks()
+                logger.info(f"Retrieved {len(tasks) if tasks else 0} total tasks from Todoist")
+                logger.debug(f"Tasks type: {type(tasks)}")
+            except Exception as e:
+                logger.error(f"Error getting tasks from Todoist API: {e}")
+                raise
             
             todos = []
             for task in tasks:
-                # Determine bucket from project ID using our map
-                bucket = self._map_project_to_bucket(task.project_id, project_map)
-                
-                # Convert Todoist task to our TodoItem
-                todo_item = self._convert_todoist_task(task, bucket)
-                
-                # Filter completed tasks if needed
-                if include_completed or not todo_item.completed:
-                    todos.append(todo_item)
+                try:
+                    # Check if task has required attributes
+                    if not hasattr(task, 'project_id'):
+                        logger.warning(f"Task missing project_id attribute, skipping")
+                        continue
+                        
+                    # Determine bucket from project ID using our map
+                    bucket = self._map_project_to_bucket(task.project_id, project_map)
+                    
+                    # Convert Todoist task to our TodoItem
+                    todo_item = self._convert_todoist_task(task, bucket)
+                    
+                    # Filter completed tasks if needed
+                    if include_completed or not todo_item.completed:
+                        todos.append(todo_item)
+                except AttributeError as e:
+                    logger.warning(f"Task object missing expected attributes: {e}")
+                    continue
+                except Exception as e:
+                    logger.warning(f"Error processing task: {e}")
+                    continue
             
             logger.info(f"Processed {len(todos)} todos from all projects")
             
@@ -304,9 +344,23 @@ class TodoTool:
             
             return todos
             
+        except KeyError as e:
+            if 'can_assign_tasks' in str(e):
+                logger.warning("Todoist API response missing 'can_assign_tasks' field - this is a known API inconsistency, falling back to mock data")
+            else:
+                logger.error(f"Todoist API KeyError: {e}")
+            # Fall back to mock todos
+            todos = []
+            for bucket in TodoBucket:
+                bucket_todos = await self._get_mock_todos(bucket, include_completed)
+                todos.extend(bucket_todos)
+            return todos
         except Exception as e:
             logger.error(f"Error getting all Todoist todos: {e}")
+            logger.debug(f"Error type: {type(e).__name__}")
+            
             # Fall back to getting mock todos from all buckets
+            logger.info("Falling back to mock todos due to Todoist API error")
             todos = []
             for bucket in TodoBucket:
                 bucket_todos = await self._get_mock_todos(bucket, include_completed)
@@ -455,10 +509,15 @@ class TodoTool:
             project_name = bucket.value.title()
             logger.info(f"Looking for project named: {project_name}")
             for project in projects:
-                if project.name.lower() == project_name.lower():
-                    logger.info(f"Found existing project: {project.name} (ID: {project.id})")
-                    self._projects[bucket.value] = project.id
-                    return project.id
+                try:
+                    if hasattr(project, 'name') and hasattr(project, 'id'):
+                        if project.name.lower() == project_name.lower():
+                            logger.info(f"Found existing project: {project.name} (ID: {project.id})")
+                            self._projects[bucket.value] = project.id
+                            return project.id
+                except AttributeError as e:
+                    logger.warning(f"Project object missing expected attributes: {e}")
+                    continue
             
             # Create new project
             logger.info(f"Creating new project: {project_name}")

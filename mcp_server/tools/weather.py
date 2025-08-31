@@ -166,6 +166,8 @@ class WeatherTool:
             return WeatherOutput(
                 temp_hi=weather_data.get("temp_hi", 72.0),
                 temp_lo=weather_data.get("temp_lo", 58.0),
+                current_temp=weather_data.get("current_temp", 65.0),
+                condition=weather_data.get("condition", "Partly Cloudy"),
                 precip_chance=weather_data.get("precip_chance", 20.0),
                 summary=weather_data.get("summary", "Partly cloudy"),
                 location=location_name,
@@ -180,7 +182,8 @@ class WeatherTool:
                 target_forecasts.append(forecast)
         
         if not target_forecasts:
-            raise ValueError(f"No weather forecast available for {target_date}")
+            logger.warning(f"No weather forecast data available for {target_date}, using fallback")
+            return self._get_fallback_weather_response(location_name, when)
         
         # Calculate daily high/low from all forecasts for the day
         temps = [f["main"]["temp"] for f in target_forecasts]
@@ -197,9 +200,28 @@ class WeatherTool:
         
         return WeatherOutput(
             temp_hi=round(temp_hi, 1),
-            temp_lo=round(temp_lo, 1), 
+            temp_lo=round(temp_lo, 1),
+            current_temp=round(midday_forecast["main"]["temp"], 1),
+            condition=summary,
             precip_chance=round(precip_chance, 1) if precip_chance else None,
             summary=summary,
+            location=location_name,
+            date=target_date.isoformat()
+        )
+    
+    def _get_fallback_weather_response(self, location_name: str, when: WhenEnum) -> WeatherOutput:
+        """Generate a fallback weather response when API data is unavailable."""
+        today = datetime.now().date()
+        target_date = today if when == WhenEnum.TODAY else today + timedelta(days=1)
+        
+        # Provide reasonable default weather data
+        return WeatherOutput(
+            temp_hi=72.0,
+            temp_lo=58.0,
+            current_temp=65.0,
+            condition="Partly Cloudy",
+            precip_chance=20.0,
+            summary="Weather data temporarily unavailable",
             location=location_name,
             date=target_date.isoformat()
         )
@@ -210,6 +232,8 @@ class WeatherTool:
         return {
             "temp_hi": base_temp + 5,
             "temp_lo": base_temp - 10,
+            "current_temp": base_temp,
+            "condition": "Partly Cloudy",
             "precip_chance": 25.0,
             "summary": "Partly cloudy with light winds"
         }

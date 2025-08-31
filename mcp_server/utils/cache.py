@@ -48,11 +48,20 @@ class CacheService:
             self._connected = False
             return False
     
+    def _is_event_loop_closed(self) -> bool:
+        """Check if the current event loop is closed or unavailable."""
+        try:
+            loop = asyncio.get_running_loop()
+            return loop.is_closed()
+        except RuntimeError:
+            # No running event loop
+            return True
+    
     async def get(self, key: str) -> Optional[Any]:
         """Get value from cache."""
         try:
-            # Try Redis first
-            if self._connected and self._redis_client:
+            # Try Redis first (only if properly connected and event loop is active)
+            if self._connected and self._redis_client and not self._is_event_loop_closed():
                 try:
                     value = await self._redis_client.get(key)
                     if value:
@@ -66,6 +75,9 @@ class CacheService:
                             await self._redis_client.delete(key)
                 except Exception as e:
                     logger.warning(f"Redis get error: {e}")
+                    # Mark as disconnected if it's a connection-related error
+                    if "Event loop is closed" in str(e) or "Connection closed" in str(e):
+                        self._connected = False
                     
             # Fallback to in-memory cache
             if key in self._in_memory_cache:
@@ -97,8 +109,8 @@ class CacheService:
                 'created_at': time.time()
             }
             
-            # Try Redis first
-            if self._connected and self._redis_client:
+            # Try Redis first (only if properly connected and event loop is active)
+            if self._connected and self._redis_client and not self._is_event_loop_closed():
                 try:
                     await self._redis_client.setex(
                         key, 
@@ -109,6 +121,9 @@ class CacheService:
                     return True
                 except Exception as e:
                     logger.warning(f"Redis set error: {e}")
+                    # Mark as disconnected if it's a connection-related error
+                    if "Event loop is closed" in str(e) or "Connection closed" in str(e):
+                        self._connected = False
                     
             # Fallback to in-memory cache
             self._in_memory_cache[key] = cache_data

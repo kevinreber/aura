@@ -29,6 +29,14 @@ class WeatherOutput(BaseModel):
     
     temp_hi: float = Field(description="High temperature in Fahrenheit")
     temp_lo: float = Field(description="Low temperature in Fahrenheit")
+    current_temp: Optional[float] = Field(
+        default=None,
+        description="Current temperature in Fahrenheit"
+    )
+    condition: Optional[str] = Field(
+        default=None,
+        description="Weather condition (e.g., 'Partly Cloudy', 'Rain')"
+    )
     precip_chance: Optional[float] = Field(
         default=None,
         description="Precipitation chance as percentage (0-100)"
@@ -42,6 +50,8 @@ class WeatherOutput(BaseModel):
             "example": {
                 "temp_hi": 72.5,
                 "temp_lo": 58.2,
+                "current_temp": 65.0,
+                "condition": "Partly Cloudy",
                 "precip_chance": 20.0,
                 "summary": "Partly cloudy with light winds",
                 "location": "San Francisco, CA",
