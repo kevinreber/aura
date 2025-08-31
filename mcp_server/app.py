@@ -986,6 +986,40 @@ def create_app() -> Flask:
             logger.error(f"Error in todo.list: {e}")
             return jsonify({"error": str(e)}), 500
     
+    # Frontend compatibility endpoint for todos
+    @app.route('/tools/todos', methods=['GET'])
+    async def todos_get():
+        """GET endpoint for todos - frontend compatibility."""
+        try:
+            # Get bucket from query parameters
+            bucket = request.args.get('bucket')
+            include_completed = request.args.get('include_completed', 'false').lower() == 'true'
+            
+            # Create TodoInput data
+            data = {'include_completed': include_completed}
+            if bucket:
+                data['bucket'] = bucket
+            
+            # Create TodoInput instance
+            input_data = TodoInput(**data)
+            
+            # Call the todo tool directly
+            from .tools.todo import TodoTool
+            todo_tool = TodoTool()
+            result = await todo_tool.list_todos(input_data)
+            
+            # Convert to dict if needed
+            if hasattr(result, 'dict'):
+                result_dict = result.dict()
+            else:
+                result_dict = result
+                
+            return jsonify(result_dict)
+            
+        except Exception as e:
+            logger.error(f"Error in todos GET endpoint: {e}")
+            return jsonify({"error": str(e)}), 500
+    
     # Todo create tool endpoint
     @app.route('/tools/todo.create', methods=['POST'])
     async def todo_create():
