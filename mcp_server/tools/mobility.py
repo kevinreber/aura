@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 import random
 import re
 from datetime import datetime, timedelta
+import pytz
 
 from ..schemas.mobility import (
     MobilityInput, MobilityOutput, TransportMode,
@@ -80,12 +81,16 @@ class MobilityTool:
         """Get directions from Google Maps Directions API with caching."""
         cache = await get_cache_service()
         
-        # Create cache key based on origin, destination, and mode
+        # Create cache key based on origin, destination, mode, and time period
         # For driving mode, we use shorter TTL due to traffic changes
+        # Include hour to differentiate traffic conditions at different times
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        current_hour = datetime.now(pacific_tz).hour
         cache_key = generate_cache_key("mobility_directions", 
                                      origin.lower(), 
                                      destination.lower(), 
-                                     mode.value)
+                                     mode.value,
+                                     f"hour_{current_hour}")
         
         # Check cache first
         cached_directions = await cache.get(cache_key)
@@ -458,7 +463,7 @@ class MobilityTool:
             if input_data.departure_time:
                 query_time = self._parse_time(input_data.departure_time)
             else:
-                query_time = datetime.now()
+                query_time = self._get_realistic_commute_time(input_data.direction)
             
             # Initialize result
             driving_option = None
@@ -784,3 +789,48 @@ class MobilityTool:
                 return datetime.combine(today, time_obj.time())
             except ValueError:
                 raise ValueError(f"Invalid time format: {time_str}. Use 'HH:MM AM/PM' or 'HH:MM'")
+    
+    def _get_realistic_commute_time(self, direction: CommuteDirection) -> datetime:
+        """Get realistic commute time based on current time and direction."""
+        # Use Pacific timezone for consistent time calculations
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        now = datetime.now(pacific_tz)
+        current_hour = now.hour
+        
+        if direction == CommuteDirection.TO_WORK:
+            # Morning commute logic
+            if current_hour < 6:
+                # Very early morning - show 7:30 AM departure
+                target_time = now.replace(hour=7, minute=30, second=0, microsecond=0)
+            elif current_hour < 10:
+                # Morning - show current time or reasonable morning time
+                if current_hour < 7:
+                    target_time = now.replace(hour=7, minute=30, second=0, microsecond=0)
+                else:
+                    target_time = now
+            elif current_hour < 22:
+                # Daytime/evening - show next day morning commute
+                tomorrow = now.date() + timedelta(days=1)
+                target_time = pacific_tz.localize(datetime.combine(tomorrow, datetime.strptime("7:30 AM", "%I:%M %p").time()))
+            else:
+                # Late night - show next day morning commute  
+                tomorrow = now.date() + timedelta(days=1)
+                target_time = pacific_tz.localize(datetime.combine(tomorrow, datetime.strptime("7:30 AM", "%I:%M %p").time()))
+        else:
+            # Evening commute (from work)
+            if current_hour < 12:
+                # Morning - show typical evening departure (5:30 PM)
+                target_time = now.replace(hour=17, minute=30, second=0, microsecond=0)
+            elif current_hour < 22:
+                # Afternoon/evening - show current time or reasonable evening time
+                if current_hour < 16:
+                    target_time = now.replace(hour=17, minute=30, second=0, microsecond=0)
+                else:
+                    target_time = now
+            else:
+                # Late night - show next day evening commute
+                tomorrow = now.date() + timedelta(days=1)
+                target_time = pacific_tz.localize(datetime.combine(tomorrow, datetime.strptime("5:30 PM", "%I:%M %p").time()))
+        
+        logger.debug(f"Realistic commute time for {direction.value} at {now.strftime('%I:%M %p')}: {target_time.strftime('%I:%M %p')}")
+        return target_time
