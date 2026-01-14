@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import ReactMarkdown from "react-markdown";
+import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   apiClient,
   type WeatherData,
@@ -8,9 +8,18 @@ import {
   type TodoData,
   type CommuteOptionsData,
   type TodoBucket,
-} from "../lib/api";
-import Clock from "./Clock";
-import { CommuteDashboard } from "./CommuteDashboard";
+} from '../lib/api';
+import {
+  saveChatHistory,
+  loadChatHistory,
+  clearChatHistory,
+  loadTodoCompletions,
+  toggleTodoCompletion,
+  saveSelectedBucket,
+  loadSelectedBucket,
+} from '../lib/storage';
+import Clock from './Clock';
+import { CommuteDashboard } from './CommuteDashboard';
 
 interface DashboardProps {
   userName?: string;
@@ -30,7 +39,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({
-  userName = "Kevin",
+  userName = 'Kevin',
   initialWeather,
   initialFinancial,
   initialCalendar,
@@ -38,21 +47,21 @@ export default function Dashboard({
   initialCommute,
   serverErrors,
 }: DashboardProps) {
-  const [weather, setWeather] = useState<WeatherData | null>(
-    initialWeather || null
-  );
-  const [financial, setFinancial] = useState<FinancialData | null>(
-    initialFinancial || null
-  );
-  const [calendar, setCalendar] = useState<CalendarData | null>(
-    initialCalendar || null
-  );
+  const [weather, setWeather] = useState<WeatherData | null>(initialWeather || null);
+  const [financial, setFinancial] = useState<FinancialData | null>(initialFinancial || null);
+  const [calendar, setCalendar] = useState<CalendarData | null>(initialCalendar || null);
   const [todos, setTodos] = useState<TodoData | null>(initialTodos || null);
-  const [selectedBucket, setSelectedBucket] = useState<TodoBucket | "all">("all");
-  const [chatMessage, setChatMessage] = useState("");
+  const [selectedBucket, setSelectedBucket] = useState<TodoBucket | 'all'>(() => {
+    const saved = loadSelectedBucket();
+    return (saved as TodoBucket | 'all') || 'all';
+  });
+  const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<
-    Array<{ type: "user" | "ai"; message: string; timestamp: string }>
-  >([]);
+    Array<{ type: 'user' | 'ai'; message: string; timestamp: string }>
+  >(() => loadChatHistory());
+  const [todoCompletions, setTodoCompletions] = useState<Record<string, boolean>>(() =>
+    loadTodoCompletions()
+  );
   const [loading, setLoading] = useState(
     !initialWeather && !initialFinancial && !initialCalendar && !initialTodos
   );
@@ -63,62 +72,59 @@ export default function Dashboard({
   // Slash command registry
   const slashCommands = [
     {
-      command: "/summary",
-      aliases: ["/briefing"],
-      description: "Get your daily morning briefing",
-      icon: "📊",
-      action:
-        "Give me a comprehensive morning briefing with weather, finance, calendar, and tasks",
+      command: '/summary',
+      aliases: ['/briefing'],
+      description: 'Get your daily morning briefing',
+      icon: '📊',
+      action: 'Give me a comprehensive morning briefing with weather, finance, calendar, and tasks',
     },
     {
-      command: "/weather",
-      aliases: ["/forecast"],
-      description: "Get current weather information",
-      icon: "🌤️",
+      command: '/weather',
+      aliases: ['/forecast'],
+      description: 'Get current weather information',
+      icon: '🌤️',
       action: "What's the current weather and forecast?",
     },
     {
-      command: "/finance",
-      aliases: ["/stocks", "/market"],
-      description: "Check your financial portfolio",
-      icon: "💰",
-      action: "How are my stocks and crypto investments doing?",
+      command: '/finance',
+      aliases: ['/stocks', '/market'],
+      description: 'Check your financial portfolio',
+      icon: '💰',
+      action: 'How are my stocks and crypto investments doing?',
     },
     {
-      command: "/calendar",
-      aliases: ["/schedule", "/events"],
+      command: '/calendar',
+      aliases: ['/schedule', '/events'],
       description: "View today's calendar events",
-      icon: "📅",
-      action: "What events do I have scheduled for today?",
+      icon: '📅',
+      action: 'What events do I have scheduled for today?',
     },
     {
-      command: "/tasks",
-      aliases: ["/todos", "/todo"],
-      description: "Show your task list (try /tasks work or /tasks all)",
-      icon: "✅",
-      action: "What tasks do I have to complete today?",
+      command: '/tasks',
+      aliases: ['/todos', '/todo'],
+      description: 'Show your task list (try /tasks work or /tasks all)',
+      icon: '✅',
+      action: 'What tasks do I have to complete today?',
     },
     {
-      command: "/commute",
-      aliases: ["/traffic"],
-      description: "Check traffic and commute info",
-      icon: "🚗",
-      action: "How does traffic to work look right now?",
+      command: '/commute',
+      aliases: ['/traffic'],
+      description: 'Check traffic and commute info',
+      icon: '🚗',
+      action: 'How does traffic to work look right now?',
     },
     {
-      command: "/help",
-      aliases: ["/commands"],
-      description: "Show available slash commands",
-      icon: "❓",
-      action: "help", // Special case - handled locally
+      command: '/help',
+      aliases: ['/commands'],
+      description: 'Show available slash commands',
+      icon: '❓',
+      action: 'help', // Special case - handled locally
     },
   ];
 
-  const [collapsedWidgets, setCollapsedWidgets] = useState<
-    Record<string, boolean>
-  >(() => {
+  const [collapsedWidgets, setCollapsedWidgets] = useState<Record<string, boolean>>(() => {
     // On mobile, collapse some widgets by default for better UX
-    const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
     return {
       weather: false,
       financial: isMobile,
@@ -137,12 +143,43 @@ export default function Dashboard({
     }
   }, [chatHistory]);
 
+  // Persist chat history to localStorage
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      saveChatHistory(chatHistory);
+    }
+  }, [chatHistory]);
+
+  // Persist selected bucket to localStorage
+  useEffect(() => {
+    saveSelectedBucket(selectedBucket);
+  }, [selectedBucket]);
+
+  // Handle clearing chat history
+  const handleClearChatHistory = () => {
+    clearChatHistory();
+    setChatHistory([
+      {
+        type: 'ai',
+        message: 'Chat history cleared. How can I help you today?',
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  // Handle todo completion toggle with persistence
+  const handleTodoToggle = (todoId: string, currentCompleted: boolean) => {
+    const newCompleted = !currentCompleted;
+    const updated = toggleTodoCompletion(todoId, newCompleted);
+    setTodoCompletions(updated);
+  };
+
   // Process slash commands
   const processSlashCommand = (input: string): string | null => {
     const trimmedInput = input.trim();
-    if (!trimmedInput.startsWith("/")) return null;
+    if (!trimmedInput.startsWith('/')) return null;
 
-    const commandPart = trimmedInput.split(" ")[0].toLowerCase();
+    const commandPart = trimmedInput.split(' ')[0].toLowerCase();
 
     // Find matching command
     const matchedCommand = slashCommands.find(
@@ -152,24 +189,24 @@ export default function Dashboard({
     if (!matchedCommand) return null;
 
     // Handle special commands locally
-    if (matchedCommand.action === "help") {
+    if (matchedCommand.action === 'help') {
       const helpMessage = `**Available Slash Commands:**\n\n${slashCommands
-        .filter((cmd) => cmd.action !== "help")
+        .filter((cmd) => cmd.action !== 'help')
         .map(
           (cmd) =>
-            `${cmd.icon} **${cmd.command}** ${cmd.aliases.length > 0 ? `(${cmd.aliases.join(", ")})` : ""}\n${cmd.description}`
+            `${cmd.icon} **${cmd.command}** ${cmd.aliases.length > 0 ? `(${cmd.aliases.join(', ')})` : ''}\n${cmd.description}`
         )
-        .join("\n\n")}`;
+        .join('\n\n')}`;
 
       setChatHistory((prev) => [
         ...prev,
         {
-          type: "ai",
+          type: 'ai',
           message: helpMessage,
           timestamp: new Date().toISOString(),
         },
       ]);
-      return "help_processed";
+      return 'help_processed';
     }
 
     return matchedCommand.action;
@@ -177,7 +214,7 @@ export default function Dashboard({
 
   // Get filtered command suggestions
   const getCommandSuggestions = (input: string) => {
-    if (!input.startsWith("/") || input.includes(" ")) return [];
+    if (!input.startsWith('/') || input.includes(' ')) return [];
 
     const searchTerm = input.toLowerCase();
     return slashCommands.filter(
@@ -190,10 +227,10 @@ export default function Dashboard({
   // Send chat message to proxy API (no CORS issues!)
   const sendChatMessage = async (message: string) => {
     try {
-      const response = await fetch("/api/v1/chat", {
-        method: "POST",
+      const response = await fetch('/api/v1/chat', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({ message }),
       });
@@ -205,7 +242,7 @@ export default function Dashboard({
         setChatHistory((prev) => [
           ...prev,
           {
-            type: "ai",
+            type: 'ai',
             message: data.response,
             timestamp: data.timestamp,
           },
@@ -215,18 +252,18 @@ export default function Dashboard({
         setChatHistory((prev) => [
           ...prev,
           {
-            type: "ai",
-            message: data.error || "Something went wrong",
+            type: 'ai',
+            message: data.error || 'Something went wrong',
             timestamp: data.timestamp || new Date().toISOString(),
           },
         ]);
       }
     } catch (error) {
-      console.error("Chat error:", error);
+      console.error('Chat error:', error);
       setChatHistory((prev) => [
         ...prev,
         {
-          type: "ai",
+          type: 'ai',
           message:
             "Sorry, I'm having trouble connecting to the AI service right now. Please try again later.",
           timestamp: new Date().toISOString(),
@@ -247,18 +284,15 @@ export default function Dashboard({
     const fetchMissingData = async () => {
       // Only fetch data that wasn't loaded server-side
       const needsClientFetch =
-        !initialWeather ||
-        !initialFinancial ||
-        !initialCalendar ||
-        !initialTodos;
+        !initialWeather || !initialFinancial || !initialCalendar || !initialTodos;
 
       if (!needsClientFetch) {
-        console.log("✅ Using server-side loaded data, skipping client fetch");
+        console.log('✅ Using server-side loaded data, skipping client fetch');
         setLoading(false);
         // Add initial AI greeting
         setChatHistory([
           {
-            type: "ai",
+            type: 'ai',
             message:
               "Good morning! I've gathered your daily briefing. Would you like me to explain anything in detail or help you plan your day?",
             timestamp: new Date().toISOString(),
@@ -267,9 +301,7 @@ export default function Dashboard({
         return;
       }
 
-      console.log(
-        "🔄 Some data missing from server-side load, fetching client-side..."
-      );
+      console.log('🔄 Some data missing from server-side load, fetching client-side...');
       setLoading(true);
 
       try {
@@ -290,24 +322,26 @@ export default function Dashboard({
         }
 
         if (!initialTodos) {
-          const todoData = await apiClient.getTodos(selectedBucket === "all" ? undefined : selectedBucket);
+          const todoData = await apiClient.getTodos(
+            selectedBucket === 'all' ? undefined : selectedBucket
+          );
           setTodos(todoData);
         }
 
         // Add initial AI greeting
         setChatHistory([
           {
-            type: "ai",
+            type: 'ai',
             message:
               "Good morning! I've gathered your daily briefing. Would you like me to explain anything in detail or help you plan your day?",
             timestamp: new Date().toISOString(),
           },
         ]);
       } catch (error) {
-        console.error("Error fetching missing dashboard data:", error);
+        console.error('Error fetching missing dashboard data:', error);
         // Display server errors if available
         if (serverErrors) {
-          console.log("Server-side fetch errors:", serverErrors);
+          console.log('Server-side fetch errors:', serverErrors);
         }
       } finally {
         setLoading(false);
@@ -325,20 +359,20 @@ export default function Dashboard({
   ]);
 
   // Refresh todos when bucket selection changes
-  const refreshTodos = async (bucket: TodoBucket | "all") => {
+  const refreshTodos = async (bucket: TodoBucket | 'all') => {
     try {
       setLoading(true);
-      const todoData = await apiClient.getTodos(bucket === "all" ? undefined : bucket);
+      const todoData = await apiClient.getTodos(bucket === 'all' ? undefined : bucket);
       setTodos(todoData);
     } catch (error) {
-      console.error("Error refreshing todos:", error);
+      console.error('Error refreshing todos:', error);
     } finally {
       setLoading(false);
     }
   };
 
   // Handle bucket change
-  const handleBucketChange = async (bucket: TodoBucket | "all") => {
+  const handleBucketChange = async (bucket: TodoBucket | 'all') => {
     if (bucket !== selectedBucket) {
       setSelectedBucket(bucket);
       await refreshTodos(bucket);
@@ -349,13 +383,13 @@ export default function Dashboard({
     if (!chatMessage.trim() || isLoadingChat) return;
 
     const userInput = chatMessage.trim();
-    setChatMessage("");
+    setChatMessage('');
     setShowCommandSuggestions(false);
 
     // Check if it's a slash command
     const commandResult = processSlashCommand(userInput);
 
-    if (commandResult === "help_processed") {
+    if (commandResult === 'help_processed') {
       // Help command was processed locally, no need to send to AI
       return;
     }
@@ -368,7 +402,7 @@ export default function Dashboard({
     setChatHistory((prev) => [
       ...prev,
       {
-        type: "user",
+        type: 'user',
         message: userInput,
         timestamp: new Date().toISOString(),
       },
@@ -382,41 +416,33 @@ export default function Dashboard({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (
-      showCommandSuggestions &&
-      chatMessage.startsWith("/") &&
-      !chatMessage.includes(" ")
-    ) {
+    if (showCommandSuggestions && chatMessage.startsWith('/') && !chatMessage.includes(' ')) {
       const suggestions = getCommandSuggestions(chatMessage);
 
-      if (e.key === "ArrowDown") {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedCommandIndex((prev) =>
-          prev < suggestions.length - 1 ? prev + 1 : 0
-        );
+        setSelectedCommandIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : 0));
         return;
       }
 
-      if (e.key === "ArrowUp") {
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedCommandIndex((prev) =>
-          prev > 0 ? prev - 1 : suggestions.length - 1
-        );
+        setSelectedCommandIndex((prev) => (prev > 0 ? prev - 1 : suggestions.length - 1));
         return;
       }
 
-      if (e.key === "Tab" || (e.key === "Enter" && suggestions.length > 0)) {
+      if (e.key === 'Tab' || (e.key === 'Enter' && suggestions.length > 0)) {
         e.preventDefault();
         const selectedCommand = suggestions[selectedCommandIndex];
         if (selectedCommand) {
-          setChatMessage(selectedCommand.command + " ");
+          setChatMessage(selectedCommand.command + ' ');
           setShowCommandSuggestions(false);
           setSelectedCommandIndex(0);
         }
         return;
       }
 
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         e.preventDefault();
         setShowCommandSuggestions(false);
         setSelectedCommandIndex(0);
@@ -424,7 +450,7 @@ export default function Dashboard({
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -432,9 +458,9 @@ export default function Dashboard({
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
   };
 
   return (
@@ -479,18 +505,12 @@ export default function Dashboard({
                 className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
               >
                 <span className="hidden sm:inline">
-                  {Object.values(collapsedWidgets).every(
-                    (collapsed) => collapsed
-                  )
-                    ? "Expand All"
-                    : "Collapse All"}
+                  {Object.values(collapsedWidgets).every((collapsed) => collapsed)
+                    ? 'Expand All'
+                    : 'Collapse All'}
                 </span>
                 <span className="sm:hidden">
-                  {Object.values(collapsedWidgets).every(
-                    (collapsed) => collapsed
-                  )
-                    ? "↕️"
-                    : "⬇️"}
+                  {Object.values(collapsedWidgets).every((collapsed) => collapsed) ? '↕️' : '⬇️'}
                 </span>
               </button>
               <Clock userName={userName} className="font-mono" />
@@ -505,10 +525,10 @@ export default function Dashboard({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mb-4">
           {/* Weather Widget */}
           <div
-            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.weather ? "p-3" : "p-4 sm:p-6"}`}
+            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.weather ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
-              className={`flex items-center justify-between ${collapsedWidgets.weather ? "mb-0" : "mb-4"}`}
+              className={`flex items-center justify-between ${collapsedWidgets.weather ? 'mb-0' : 'mb-4'}`}
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 🌤️ Weather
@@ -520,19 +540,15 @@ export default function Dashboard({
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {weather?.data?.location || "Loading..."}
+                  {weather?.data?.location || 'Loading...'}
                 </span>
                 <button
-                  onClick={() => toggleWidget("weather")}
+                  onClick={() => toggleWidget('weather')}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  aria-label={
-                    collapsedWidgets.weather
-                      ? "Expand weather"
-                      : "Collapse weather"
-                  }
+                  aria-label={collapsedWidgets.weather ? 'Expand weather' : 'Collapse weather'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.weather ? "" : "rotate-180"}`}
+                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.weather ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -568,15 +584,12 @@ export default function Dashboard({
                       </span>
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      High: {weather.data.temp_hi}°F • Low:{" "}
-                      {weather.data.temp_lo}°F • Precipitation:{" "}
-                      {weather.data.precip_chance}%
+                      High: {weather.data.temp_hi}°F • Low: {weather.data.temp_lo}°F •
+                      Precipitation: {weather.data.precip_chance}%
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-red-500">
-                    Failed to load weather data
-                  </div>
+                  <div className="text-sm text-red-500">Failed to load weather data</div>
                 )}
               </>
             )}
@@ -584,10 +597,10 @@ export default function Dashboard({
 
           {/* Financial Widget */}
           <div
-            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.financial ? "p-3" : "p-4 sm:p-6"}`}
+            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.financial ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
-              className={`flex items-center justify-between ${collapsedWidgets.financial ? "mb-0" : "mb-4"}`}
+              className={`flex items-center justify-between ${collapsedWidgets.financial ? 'mb-0' : 'mb-4'}`}
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 💰 Markets
@@ -599,19 +612,15 @@ export default function Dashboard({
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {financial?.data?.market_status || "Loading..."}
+                  {financial?.data?.market_status || 'Loading...'}
                 </span>
                 <button
-                  onClick={() => toggleWidget("financial")}
+                  onClick={() => toggleWidget('financial')}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  aria-label={
-                    collapsedWidgets.financial
-                      ? "Expand markets"
-                      : "Collapse markets"
-                  }
+                  aria-label={collapsedWidgets.financial ? 'Expand markets' : 'Collapse markets'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.financial ? "" : "rotate-180"}`}
+                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.financial ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -631,10 +640,7 @@ export default function Dashboard({
                 {loading ? (
                   <div className="space-y-2 animate-pulse">
                     {[1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="flex justify-between items-center"
-                      >
+                      <div key={i} className="flex justify-between items-center">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
                         <div className="text-right space-y-1">
                           <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
@@ -646,10 +652,7 @@ export default function Dashboard({
                 ) : financial?.data?.data ? (
                   <div className="space-y-2">
                     {financial.data.data.slice(0, 3).map((item) => (
-                      <div
-                        key={item.symbol}
-                        className="flex justify-between items-center"
-                      >
+                      <div key={item.symbol} className="flex justify-between items-center">
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                           {item.symbol}
                         </span>
@@ -658,23 +661,17 @@ export default function Dashboard({
                             $
                             {item.price.toLocaleString(undefined, {
                               minimumFractionDigits:
-                                item.data_type === "crypto" && item.price > 1000
-                                  ? 0
-                                  : 2,
+                                item.data_type === 'crypto' && item.price > 1000 ? 0 : 2,
                               maximumFractionDigits:
-                                item.data_type === "crypto" && item.price > 1000
-                                  ? 0
-                                  : 2,
+                                item.data_type === 'crypto' && item.price > 1000 ? 0 : 2,
                             })}
                           </span>
                           <span
                             className={`text-xs ml-2 ${
-                              item.change_percent >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
+                              item.change_percent >= 0 ? 'text-green-600' : 'text-red-600'
                             }`}
                           >
-                            {item.change_percent >= 0 ? "+" : ""}
+                            {item.change_percent >= 0 ? '+' : ''}
                             {item.change_percent.toFixed(1)}%
                           </span>
                         </div>
@@ -682,9 +679,7 @@ export default function Dashboard({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-red-500">
-                    Failed to load financial data
-                  </div>
+                  <div className="text-sm text-red-500">Failed to load financial data</div>
                 )}
               </>
             )}
@@ -692,37 +687,32 @@ export default function Dashboard({
 
           {/* Calendar Widget */}
           <div
-            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.calendar ? "p-3" : "p-4 sm:p-6"}`}
+            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.calendar ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
-              className={`flex items-center justify-between ${collapsedWidgets.calendar ? "mb-0" : "mb-4"}`}
+              className={`flex items-center justify-between ${collapsedWidgets.calendar ? 'mb-0' : 'mb-4'}`}
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 📅 Today
-                {collapsedWidgets.calendar &&
-                  calendar?.data?.total_events !== undefined && (
-                    <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
-                      {calendar.data.total_events} events
-                    </span>
-                  )}
+                {collapsedWidgets.calendar && calendar?.data?.total_events !== undefined && (
+                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                    {calendar.data.total_events} events
+                  </span>
+                )}
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {calendar?.data?.total_events
                     ? `${calendar.data.total_events} events`
-                    : "Loading..."}
+                    : 'Loading...'}
                 </span>
                 <button
-                  onClick={() => toggleWidget("calendar")}
+                  onClick={() => toggleWidget('calendar')}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  aria-label={
-                    collapsedWidgets.calendar
-                      ? "Expand calendar"
-                      : "Collapse calendar"
-                  }
+                  aria-label={collapsedWidgets.calendar ? 'Expand calendar' : 'Collapse calendar'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.calendar ? "" : "rotate-180"}`}
+                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.calendar ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -752,16 +742,16 @@ export default function Dashboard({
                   <div className="space-y-3">
                     {calendar.data.events.map((event, index) => {
                       const colorMap: Record<string, string> = {
-                        blue: "border-blue-500",
-                        green: "border-green-500",
-                        orange: "border-orange-500",
-                        red: "border-red-500",
-                        purple: "border-purple-500",
+                        blue: 'border-blue-500',
+                        green: 'border-green-500',
+                        orange: 'border-orange-500',
+                        red: 'border-red-500',
+                        purple: 'border-purple-500',
                       };
                       return (
                         <div
                           key={index}
-                          className={`border-l-2 ${colorMap[event.color] || "border-gray-500"} pl-3`}
+                          className={`border-l-2 ${colorMap[event.color] || 'border-gray-500'} pl-3`}
                         >
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {event.title}
@@ -774,9 +764,7 @@ export default function Dashboard({
                     })}
                   </div>
                 ) : (
-                  <div className="text-sm text-red-500">
-                    Failed to load calendar data
-                  </div>
+                  <div className="text-sm text-red-500">Failed to load calendar data</div>
                 )}
               </>
             )}
@@ -784,35 +772,33 @@ export default function Dashboard({
 
           {/* Todo Widget */}
           <div
-            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.todos ? "p-3" : "p-4 sm:p-6"}`}
+            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.todos ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
-              className={`flex items-center justify-between ${collapsedWidgets.todos ? "mb-0" : "mb-4"}`}
+              className={`flex items-center justify-between ${collapsedWidgets.todos ? 'mb-0' : 'mb-4'}`}
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 ✅ Tasks
-                {collapsedWidgets.todos &&
-                  todos?.data?.total_pending !== undefined && (
-                    <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
-                      {todos.data.total_pending} pending ({selectedBucket === "all" ? "all" : selectedBucket})
-                    </span>
-                  )}
+                {collapsedWidgets.todos && todos?.data?.total_pending !== undefined && (
+                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                    {todos.data.total_pending} pending (
+                    {selectedBucket === 'all' ? 'all' : selectedBucket})
+                  </span>
+                )}
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {todos?.data?.total_pending !== undefined
-                    ? `${todos.data.total_pending} pending (${selectedBucket === "all" ? "all" : selectedBucket})`
-                    : "Loading..."}
+                    ? `${todos.data.total_pending} pending (${selectedBucket === 'all' ? 'all' : selectedBucket})`
+                    : 'Loading...'}
                 </span>
                 <button
-                  onClick={() => toggleWidget("todos")}
+                  onClick={() => toggleWidget('todos')}
                   className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  aria-label={
-                    collapsedWidgets.todos ? "Expand tasks" : "Collapse tasks"
-                  }
+                  aria-label={collapsedWidgets.todos ? 'Expand tasks' : 'Collapse tasks'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.todos ? "" : "rotate-180"}`}
+                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.todos ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -836,24 +822,26 @@ export default function Dashboard({
                       Bucket:
                     </span>
                     <button
-                      onClick={() => handleBucketChange("all")}
+                      onClick={() => handleBucketChange('all')}
                       className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
                     >
                       Refresh
                     </button>
                   </div>
                   <div className="grid grid-cols-5 gap-1">
-                    {(["all", "work", "home", "errands", "personal"] as const).map((bucket) => (
+                    {(['all', 'work', 'home', 'errands', 'personal'] as const).map((bucket) => (
                       <button
                         key={bucket}
                         onClick={() => handleBucketChange(bucket)}
                         className={`text-xs px-2 py-1 rounded-full transition-colors ${
                           selectedBucket === bucket
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                       >
-                        {bucket === "all" ? "All" : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
+                        {bucket === 'all'
+                          ? 'All'
+                          : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
                       </button>
                     ))}
                   </div>
@@ -870,37 +858,30 @@ export default function Dashboard({
                   </div>
                 ) : todos?.data?.items ? (
                   <div className="space-y-2">
-                    {todos.data.items.slice(0, 4).map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center space-x-2"
-                      >
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300"
-                          checked={item.completed}
-                          onChange={() => {
-                            // In a real app, this would update the todo via API
-                            console.log("Toggle todo:", item.id);
-                          }}
-                        />
-                        <span
-                          className={`text-sm ${item.completed ? "line-through text-gray-400" : "text-gray-700 dark:text-gray-300"}`}
-                        >
-                          {item.text}
-                        </span>
-                        {item.priority === "high" && (
-                          <span className="text-xs text-red-500 font-medium">
-                            !
+                    {todos.data.items.slice(0, 4).map((item) => {
+                      const isCompleted = todoCompletions[item.id] ?? item.completed;
+                      return (
+                        <div key={item.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 cursor-pointer"
+                            checked={isCompleted}
+                            onChange={() => handleTodoToggle(item.id, isCompleted)}
+                          />
+                          <span
+                            className={`text-sm ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}
+                          >
+                            {item.text}
                           </span>
-                        )}
-                      </div>
-                    ))}
+                          {item.priority === 'high' && (
+                            <span className="text-xs text-red-500 font-medium">!</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
-                  <div className="text-sm text-red-500">
-                    Failed to load todo data
-                  </div>
+                  <div className="text-sm text-red-500">Failed to load todo data</div>
                 )}
               </>
             )}
@@ -916,9 +897,7 @@ export default function Dashboard({
         {!collapsedWidgets.chat && (
           <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-all duration-300 ease-in-out"
-            onClick={() =>
-              setCollapsedWidgets((prev) => ({ ...prev, chat: true }))
-            }
+            onClick={() => setCollapsedWidgets((prev) => ({ ...prev, chat: true }))}
             aria-label="Close chat overlay"
           />
         )}
@@ -927,14 +906,12 @@ export default function Dashboard({
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl backdrop-blur-sm rounded-t-xl lg:rounded-t-none transition-all duration-300 ease-in-out">
           <div className="max-w-7xl mx-auto">
             <div
-              className={`flex flex-col transition-all duration-300 ease-in-out ${collapsedWidgets.chat ? "h-auto" : "max-h-[calc(100vh-120px)] lg:max-h-[calc(100vh-200px)] min-h-[200px]"}`}
+              className={`flex flex-col transition-all duration-300 ease-in-out ${collapsedWidgets.chat ? 'h-auto' : 'max-h-[calc(100vh-120px)] lg:max-h-[calc(100vh-200px)] min-h-[200px]'}`}
             >
               {/* Collapsible Header */}
               <div
                 className="p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                onClick={() =>
-                  setCollapsedWidgets((prev) => ({ ...prev, chat: !prev.chat }))
-                }
+                onClick={() => setCollapsedWidgets((prev) => ({ ...prev, chat: !prev.chat }))}
               >
                 {/* Mobile drag handle */}
                 <div className="flex justify-center mb-2 lg:hidden">
@@ -944,46 +921,56 @@ export default function Dashboard({
                   <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center">
                     🤖 AI Assistant
                   </h2>
-                  <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform duration-300 ease-in-out ${collapsedWidgets.chat ? "rotate-180" : ""}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
+                  <div className="flex items-center space-x-2">
+                    {chatHistory.length > 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearChatHistory();
+                        }}
+                        className="text-xs text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 transition-colors"
+                        title="Clear chat history"
+                      >
+                        Clear
+                      </button>
+                    )}
+                    <svg
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-300 ease-in-out ${collapsedWidgets.chat ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
                 </div>
               </div>
               {/* Messages Area - Only show when not collapsed */}
               <div
-                className={`flex flex-col flex-1 min-h-0 transition-all duration-300 ease-in-out overflow-hidden ${collapsedWidgets.chat ? "max-h-0 opacity-0" : "max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-280px)] opacity-100"}`}
+                className={`flex flex-col flex-1 min-h-0 transition-all duration-300 ease-in-out overflow-hidden ${collapsedWidgets.chat ? 'max-h-0 opacity-0' : 'max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-280px)] opacity-100'}`}
               >
-                <div
-                  ref={chatContainerRef}
-                  className="flex-1 overflow-y-auto p-3 space-y-2"
-                >
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-3 space-y-2">
                   {/* Show existing messages first */}
                   {chatHistory.map((message, index) => (
                     <div
                       key={index}
                       className={`${
-                        message.type === "user"
-                          ? "ml-6 bg-blue-500 text-white"
-                          : "mr-6 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                        message.type === 'user'
+                          ? 'ml-6 bg-blue-500 text-white'
+                          : 'mr-6 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                       } rounded-lg p-3 text-sm`}
                     >
-                      {message.type === "user" &&
-                      message.message.startsWith("/") ? (
+                      {message.type === 'user' && message.message.startsWith('/') ? (
                         // Special rendering for slash commands
                         <div>
                           {(() => {
                             const messageText = message.message;
-                            const spaceIndex = messageText.indexOf(" ");
+                            const spaceIndex = messageText.indexOf(' ');
 
                             if (spaceIndex === -1) {
                               // Just the command, no additional text
@@ -994,10 +981,7 @@ export default function Dashboard({
                               );
                             } else {
                               // Command + additional text
-                              const command = messageText.substring(
-                                0,
-                                spaceIndex
-                              );
+                              const command = messageText.substring(0, spaceIndex);
                               const rest = messageText.substring(spaceIndex);
                               return (
                                 <>
@@ -1014,26 +998,16 @@ export default function Dashboard({
                         // Regular markdown rendering for non-slash-command messages
                         <ReactMarkdown
                           components={{
-                            p: ({ children }) => (
-                              <p className="mb-2 last:mb-0">{children}</p>
-                            ),
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                             ul: ({ children }) => (
-                              <ul className="list-disc pl-4 mb-2">
-                                {children}
-                              </ul>
+                              <ul className="list-disc pl-4 mb-2">{children}</ul>
                             ),
                             ol: ({ children }) => (
-                              <ol className="list-decimal pl-4 mb-2">
-                                {children}
-                              </ol>
+                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
                             ),
-                            li: ({ children }) => (
-                              <li className="mb-1">{children}</li>
-                            ),
+                            li: ({ children }) => <li className="mb-1">{children}</li>,
                             strong: ({ children }) => (
-                              <strong className="font-semibold">
-                                {children}
-                              </strong>
+                              <strong className="font-semibold">{children}</strong>
                             ),
                             code: ({ children }) => (
                               <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
@@ -1069,12 +1043,12 @@ export default function Dashboard({
                       {/* Quick Prompt Buttons */}
                       <div className="grid grid-cols-1 gap-2">
                         {[
-                          { text: "/summary", icon: "📊", isCommand: true },
-                          { text: "/weather", icon: "🌤️", isCommand: true },
-                          { text: "/finance", icon: "💰", isCommand: true },
-                          { text: "How does my day look?", icon: "📅" },
-                          { text: "What tasks do I have today?", icon: "✅" },
-                          { text: "/help", icon: "❓", isCommand: true },
+                          { text: '/summary', icon: '📊', isCommand: true },
+                          { text: '/weather', icon: '🌤️', isCommand: true },
+                          { text: '/finance', icon: '💰', isCommand: true },
+                          { text: 'How does my day look?', icon: '📅' },
+                          { text: 'What tasks do I have today?', icon: '✅' },
+                          { text: '/help', icon: '❓', isCommand: true },
                         ].map((prompt, index) => (
                           <button
                             key={index}
@@ -1088,7 +1062,7 @@ export default function Dashboard({
                               setChatHistory((prev) => [
                                 ...prev,
                                 {
-                                  type: "user",
+                                  type: 'user',
                                   message: userMessage,
                                   timestamp: new Date().toISOString(),
                                 },
@@ -1103,8 +1077,8 @@ export default function Dashboard({
                             disabled={isLoadingChat}
                             className={`flex items-center space-x-2 p-3 text-sm text-left rounded-lg border transition-colors duration-200 group disabled:opacity-50 disabled:cursor-not-allowed ${
                               prompt.isCommand
-                                ? "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800"
-                                : "bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600"
+                                ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800'
+                                : 'bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border-gray-200 dark:border-gray-600'
                             }`}
                           >
                             <span className="text-base">
@@ -1118,8 +1092,8 @@ export default function Dashboard({
                               <span
                                 className={`${
                                   prompt.isCommand
-                                    ? "text-blue-700 dark:text-blue-300 group-hover:text-blue-900 dark:group-hover:text-blue-100"
-                                    : "text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white"
+                                    ? 'text-blue-700 dark:text-blue-300 group-hover:text-blue-900 dark:group-hover:text-blue-100'
+                                    : 'text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white'
                                 }`}
                               >
                                 {prompt.text}
@@ -1146,8 +1120,8 @@ export default function Dashboard({
               <div className="relative border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
                 {/* Command Suggestions - Floating above input */}
                 {showCommandSuggestions &&
-                  chatMessage.startsWith("/") &&
-                  !chatMessage.includes(" ") && (
+                  chatMessage.startsWith('/') &&
+                  !chatMessage.includes(' ') && (
                     <div className="absolute bottom-full left-0 right-0 mb-1 z-10">
                       <div className="mx-3 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm border border-gray-200/60 dark:border-gray-700/60 rounded-lg shadow-lg">
                         <div className="px-3 py-1 border-b border-gray-200/60 dark:border-gray-700/60">
@@ -1157,44 +1131,42 @@ export default function Dashboard({
                           </div>
                         </div>
                         <div className="p-2 space-y-1 max-h-48 overflow-y-auto">
-                          {getCommandSuggestions(chatMessage).map(
-                            (cmd, index) => (
-                              <button
-                                key={index}
-                                onClick={() => {
-                                  setChatMessage(cmd.command + " ");
-                                  setShowCommandSuggestions(false);
-                                  setSelectedCommandIndex(0);
-                                }}
-                                className={`w-full flex items-center space-x-2 p-2 text-left rounded-md transition-colors text-sm group ${
-                                  index === selectedCommandIndex
-                                    ? "bg-blue-100/80 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100"
-                                    : "hover:bg-gray-100/80 dark:hover:bg-gray-700/80"
-                                }`}
-                              >
-                                <span className="text-sm">{cmd.icon}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-gray-900 dark:text-white text-sm">
-                                    {cmd.command}
-                                    {cmd.aliases.length > 0 && (
-                                      <span className="text-gray-500 dark:text-gray-400 font-normal text-xs ml-1">
-                                        ({cmd.aliases.join(", ")})
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-gray-500 dark:text-gray-400 text-xs truncate">
-                                    {cmd.description}
-                                  </div>
+                          {getCommandSuggestions(chatMessage).map((cmd, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                setChatMessage(cmd.command + ' ');
+                                setShowCommandSuggestions(false);
+                                setSelectedCommandIndex(0);
+                              }}
+                              className={`w-full flex items-center space-x-2 p-2 text-left rounded-md transition-colors text-sm group ${
+                                index === selectedCommandIndex
+                                  ? 'bg-blue-100/80 dark:bg-blue-900/50 text-blue-900 dark:text-blue-100'
+                                  : 'hover:bg-gray-100/80 dark:hover:bg-gray-700/80'
+                              }`}
+                            >
+                              <span className="text-sm">{cmd.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                  {cmd.command}
+                                  {cmd.aliases.length > 0 && (
+                                    <span className="text-gray-500 dark:text-gray-400 font-normal text-xs ml-1">
+                                      ({cmd.aliases.join(', ')})
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="text-xs text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  ↵
+                                <div className="text-gray-500 dark:text-gray-400 text-xs truncate">
+                                  {cmd.description}
                                 </div>
-                              </button>
-                            )
-                          )}
+                              </div>
+                              <div className="text-xs text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                ↵
+                              </div>
+                            </button>
+                          ))}
                           {getCommandSuggestions(chatMessage).length === 0 && (
                             <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-3">
-                              No commands found. Try{" "}
+                              No commands found. Try{' '}
                               <code className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-xs">
                                 /help
                               </code>
@@ -1214,11 +1186,7 @@ export default function Dashboard({
                       setChatMessage(value);
 
                       // Show command suggestions only when actively typing a command (no space yet)
-                      if (
-                        value.startsWith("/") &&
-                        value.length > 0 &&
-                        !value.includes(" ")
-                      ) {
+                      if (value.startsWith('/') && value.length > 0 && !value.includes(' ')) {
                         setShowCommandSuggestions(true);
                         setSelectedCommandIndex(0); // Reset selection
                       } else {
@@ -1229,9 +1197,9 @@ export default function Dashboard({
                     onKeyDown={handleKeyDown}
                     disabled={isLoadingChat}
                     className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-50 transition-all text-sm ${
-                      chatMessage.startsWith("/")
-                        ? "text-blue-600 dark:text-blue-300 font-medium border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/20"
-                        : ""
+                      chatMessage.startsWith('/')
+                        ? 'text-blue-600 dark:text-blue-300 font-medium border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
+                        : ''
                     }`}
                     autoComplete="off"
                   />
@@ -1243,7 +1211,7 @@ export default function Dashboard({
                     {isLoadingChat ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     ) : (
-                      "Send"
+                      'Send'
                     )}
                   </button>
                 </div>
