@@ -1,0 +1,60 @@
+services:
+  # MCP Server - Python Flask backend for tools
+  - type: web
+    name: aura-server
+    runtime: docker
+    dockerfilePath: ./docker/server.Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: REDIS_URL
+        sync: false  # Set manually from Upstash
+      - key: WEATHER_API_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: TODOIST_API_KEY
+        sync: false
+      - key: HOME_ADDRESS
+        sync: false
+      - key: WORK_ADDRESS
+        sync: false
+      - key: HOME_CALTRAIN_STATION
+        value: South San Francisco
+      - key: WORK_CALTRAIN_STATION
+        value: Mountain View
+    healthCheckPath: /health
+
+  # AI Agent - LangChain orchestrator
+  - type: web
+    name: aura-agent
+    runtime: docker
+    dockerfilePath: ./docker/agent.Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: false
+      - key: REDIS_URL
+        sync: false  # Set manually from Upstash
+      - key: MCP_SERVER_URL
+        sync: false  # Will be the aura-server URL
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEFAULT_LLM
+        value: openai
+      - key: USER_NAME
+        value: Kevin
+      - key: USER_LOCATION
+        value: San Francisco
+    healthCheckPath: /health
