@@ -15,10 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV PATH="/root/.local/bin:$PATH"
 
-COPY packages/agent/pyproject.toml ./
-RUN uv pip install --system .
-
 COPY packages/agent/ .
+RUN uv pip install --system .
 ENV PYTHONPATH=/app/src
 RUN chown -R appuser:appuser /app
 
