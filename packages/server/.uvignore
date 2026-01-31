@@ -1,0 +1,42 @@
+# UV ignore file - files to exclude from uv operations
+
+# Development and testing
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+.tox/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (not needed for local uv operations)
+docker/
+Dockerfile*
+docker-compose*.yml
+
+# Documentation (not needed for package installation)
+README.md
+*.md
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+env.example
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

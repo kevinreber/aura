@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "daily-mcp-server"
+version = "0.1.0"
+description = "A Model Context Protocol (MCP) server providing morning routine tools for AI agents"
+authors = [
+    {name = "Kevin Reber"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = [
+    "flasgger==0.9.7.1",
+    "flask-cors==4.0.0",
+    "flask-limiter==3.5.0",
+    "flask[async]==3.0.0",
+    "google-api-python-client>=2.140.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.2.0",
+    "httpx>=0.28.1",
+    "loguru>=0.7.3",
+    "pydantic>=2.11.7",
+    "pydantic-settings>=2.10.1",
+    "python-dateutil>=2.9.0.post0",
+    "python-dotenv>=1.1.1",
+    "pytz==2025.2",
+    "redis[hiredis]==5.0.1",
+    "requests>=2.32.4",
+    "todoist-api-python==2.1.4",
+]
+
+# Tell hatchling where our package is located
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest==7.4.3",
+    "pytest-cov==4.1.0",
+    "pytest-asyncio==0.21.1",
+    "pytest-mock==3.12.0",
+    
+    # Code formatting and linting
+    "black==23.11.0",
+    "flake8==6.1.0",
+    "mypy==1.7.1",
+    
+    # Development tools
+    "ipython==8.17.2",
+]
+
+[project.scripts]
+mcp-server = "run:main"
+
+[project.urls]
+Homepage = "https://github.com/kevinreber/daily-mcp-server"
+Repository = "https://github.com/kevinreber/daily-mcp-server"
+Issues = "https://github.com/kevinreber/daily-mcp-server/issues"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short", 
+    "--strict-markers",
+    "--disable-warnings"
+]
+markers = [
+    "asyncio: marks tests as async",
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow"
+]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
