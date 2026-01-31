@@ -1,0 +1,364 @@
+# Daily Agent UI - Cursor AI Rules
+
+## Project Overview
+
+You are working on a modern, interactive web interface for the Daily AI Assistant. This is a React Router v7 application with server-side rendering, real-time dashboards, conversational AI chat, and lightning-fast performance through intelligent caching. Built with TypeScript, Tailwind CSS, and deployed on Vercel.
+
+## 🏗️ Architecture & Structure
+
+### Core Components
+
+- **React Router v7** (`app/`) - Modern full-stack React framework with SSR
+- **Dashboard** (`app/components/Dashboard.tsx`) - Main productivity dashboard with widgets
+- **Chat Interface** (`app/routes/api.v1.chat.ts`) - Conversational AI API endpoint
+- **API Client** (`app/lib/api.ts`) - HTTP client for backend services
+- **Responsive Layout** (`app/root.tsx`) - Mobile-first application shell
+- **Live Components** (`app/components/Clock.tsx`) - Real-time updating widgets
+
+### Key Features
+
+1. **Conversational AI Interface**: Natural language chat with calendar creation
+2. **Live Data Dashboards**: Real-time widgets with intelligent caching
+3. **Mobile-First Design**: Responsive layout optimized for all devices
+4. **Server-Side Rendering**: Fast initial page loads with SEO benefits
+5. **Progressive Enhancement**: Core functionality without JavaScript
+
+## 🎯 Development Guidelines
+
+### Code Style & Quality
+
+- **Framework**: React Router v7 with TypeScript
+- **Styling**: Tailwind CSS v4 for utility-first styling
+- **Build Tool**: Vite for fast development and production builds
+- **Package Manager**: npm (follow existing patterns)
+- **Type Safety**: Strict TypeScript throughout application
+- **SSR**: Server-side rendering for performance and SEO
+
+### Key Patterns to Follow
+
+#### 1. Route Component Pattern
+
+```typescript
+// app/routes/page-name.tsx
+import type { LoaderFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
+
+export const loader: LoaderFunction = async () => {
+  const data = await fetchData();
+  return json({ data });
+};
+
+export default function PageName() {
+  const { data } = useLoaderData<typeof loader>();
+  return <div>Page content</div>;
+}
+```
+
+#### 2. API Route Pattern
+
+```typescript
+// app/routes/api.v1.endpoint.ts
+import type { ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
+
+export async function action({ request }: ActionFunctionArgs) {
+  try {
+    const body = await request.json();
+    const result = await processRequest(body);
+    return json({ success: true, data: result });
+  } catch (error) {
+    return json({ error: error.message }, { status: 500 });
+  }
+}
+```
+
+#### 3. Dashboard Widget Pattern
+
+```typescript
+// Reusable widget components with loading states
+interface WidgetProps {
+  title: string;
+  loading?: boolean;
+  error?: string;
+  className?: string;
+}
+
+function Widget({ title, loading, error, children, className }: WidgetProps) {
+  return (
+    <div className={`bg-white rounded-lg shadow-sm border p-4 ${className}`}>
+      <h3 className="font-semibold text-gray-800 mb-3">{title}</h3>
+      {loading && <WidgetSkeleton />}
+      {error && <ErrorMessage message={error} />}
+      {!loading && !error && children}
+    </div>
+  );
+}
+```
+
+#### 4. API Client Pattern
+
+```typescript
+// Centralized API client with error handling
+class APIClient {
+  private baseURL: string;
+
+  async post<T>(endpoint: string, data: unknown): Promise<T> {
+    const response = await fetch(`${this.baseURL}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
+}
+```
+
+### UI/UX Best Practices
+
+#### Responsive Design
+
+- **Mobile-First**: Design for mobile, enhance for larger screens
+- **Touch-Friendly**: Large touch targets (44px minimum)
+- **Adaptive Layout**: Widgets reorganize based on screen size
+- **Consistent Spacing**: Use Tailwind spacing scale consistently
+
+#### Performance Optimization
+
+- **SSR**: Server-side render for fast initial page loads
+- **Progressive Enhancement**: Core features work without JavaScript
+- **Loading States**: Skeleton loading for better perceived performance
+- **Error Boundaries**: Graceful error handling with recovery options
+
+#### Accessibility
+
+- **Semantic HTML**: Use proper HTML elements and ARIA labels
+- **Keyboard Navigation**: All interactive elements accessible via keyboard
+- **Color Contrast**: Meet WCAG AA contrast requirements
+- **Screen Reader Support**: Meaningful alt text and descriptions
+
+## 🚀 Development Commands
+
+### Setup & Dependencies
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev  # Runs on http://localhost:3000
+
+# Type checking
+npm run typecheck
+```
+
+### Build & Deploy
+
+```bash
+# Production build
+npm run build
+
+# Preview production build locally
+npm run preview
+
+# Vercel deployment (automatic on push to main)
+git push origin main
+```
+
+## 🛠️ Adding New Features
+
+### Adding a New Dashboard Widget
+
+1. Create component in `app/components/`
+2. Add data fetching to loader function
+3. Include in `Dashboard.tsx` layout
+4. Ensure mobile responsiveness
+5. Add loading and error states
+
+### Adding New API Endpoints
+
+1. Create route in `app/routes/api.v1.{name}.ts`
+2. Implement proper error handling
+3. Add TypeScript types for request/response
+4. Update API client if needed
+5. Test with different scenarios
+
+### Adding New Pages
+
+1. Create route file in `app/routes/`
+2. Implement loader for data fetching
+3. Add to navigation if needed
+4. Ensure mobile-friendly layout
+5. Add proper meta tags for SEO
+
+## 🎨 Design System
+
+### Color Palette
+
+- **Primary**: Blue tones for actions and links
+- **Success**: Green for confirmations and positive states
+- **Warning**: Yellow/orange for caution and alerts
+- **Error**: Red for errors and destructive actions
+- **Neutral**: Grays for text and backgrounds
+
+### Typography Scale
+
+```css
+/* Tailwind classes for consistent typography */
+.text-xs     /* 12px - Small labels */
+.text-sm     /* 14px - Body text secondary */
+.text-base   /* 16px - Body text primary */
+.text-lg     /* 18px - Emphasized text */
+.text-xl     /* 20px - Small headings */
+.text-2xl    /* 24px - Medium headings */
+.text-3xl    /* 30px - Large headings */
+```
+
+### Component Spacing
+
+- **Padding**: Use consistent p-2, p-4, p-6 for internal spacing
+- **Margins**: Use mb-2, mb-4, mb-6 for vertical rhythm
+- **Gaps**: Use gap-2, gap-4, gap-6 in flex/grid layouts
+
+## 📱 Mobile-First Development
+
+### Responsive Breakpoints
+
+```css
+/* Tailwind responsive prefixes */
+sm:   /* @media (min-width: 640px)  */
+md:   /* @media (min-width: 768px)  */
+lg:   /* @media (min-width: 1024px) */
+xl:   /* @media (min-width: 1280px) */
+```
+
+### Widget Behavior
+
+- **Mobile**: Single column, collapsible sections
+- **Tablet**: Two columns, abbreviated content
+- **Desktop**: Full grid layout, detailed information
+
+### Chat Interface
+
+- **Mobile**: Full-screen chat with slide-up animation
+- **Desktop**: Sidebar or overlay with persistent visibility
+- **Touch**: Large input areas and buttons
+
+## 🔧 Integration & Configuration
+
+### Environment Variables
+
+```bash
+# API Endpoints
+AI_AGENT_URL=http://localhost:8001
+MCP_SERVER_URL=http://localhost:8000
+
+# Feature Flags
+ENABLE_CHAT=true
+ENABLE_DASHBOARD=true
+ENABLE_NOTIFICATIONS=false
+
+# Development
+NODE_ENV=development
+```
+
+### Backend Integration
+
+#### Current Backend Services
+
+- **AI Agent**: Chat API, briefing endpoints (port 8001)
+- **MCP Server**: Direct tool access for some widgets (port 8000)
+
+#### Integration Best Practices
+
+- **Error Handling**: Graceful degradation when services unavailable
+- **Caching**: Client-side caching for frequently accessed data
+- **Fallback UI**: Always provide meaningful fallback states
+- **Loading States**: Show progress indicators during API calls
+
+#### Adding New Backend Services
+
+When integrating new APIs or services:
+
+1. **Environment Variables**: Use .env for endpoint configuration
+2. **Error Boundaries**: Wrap components with error recovery
+3. **TypeScript Types**: Create interfaces for API responses
+4. **Caching Strategy**: Consider SWR or React Query for data fetching
+5. **Mock Data**: Provide fallback data for development/testing
+
+## 🎯 Common Features
+
+### Dashboard Widgets
+
+- **📅 Calendar**: Today's events with quick add functionality
+- **🌤️ Weather**: Current conditions and forecast
+- **💰 Financial**: Portfolio and market updates
+- **✅ Tasks**: Todo list with priority indicators
+- **🕐 Clock**: Live time with timezone support
+
+### Chat Interface Features
+
+- **Natural Language**: "Schedule lunch with John tomorrow at 1pm"
+- **Slash Commands**: `/weather`, `/calendar`, `/tasks` for quick access
+- **Context Memory**: Remembers conversation history
+- **Error Recovery**: Helpful error messages and suggestions
+
+### Real-Time Updates
+
+- **Clock**: Updates every second
+- **Data Refresh**: Configurable intervals per widget
+- **WebSocket**: Future support for real-time notifications
+- **Background Sync**: Update data when tab gains focus
+
+## 🚨 Important Guidelines
+
+### Performance Considerations
+
+- **Bundle Size**: Keep JavaScript bundles small with code splitting
+- **Images**: Optimize all images and use appropriate formats
+- **Fonts**: Minimize font loading impact on performance
+- **Third-Party**: Carefully evaluate external dependencies
+
+### SEO & Accessibility
+
+- **Meta Tags**: Proper title, description, and Open Graph tags
+- **Structured Data**: Schema.org markup for rich snippets
+- **Alt Text**: Meaningful descriptions for all images
+- **Focus Management**: Proper focus flow for keyboard users
+
+### Error Handling
+
+- **Network Errors**: Show helpful messages with retry options
+- **Loading States**: Always provide visual feedback during operations
+- **Form Validation**: Client-side and server-side validation
+- **Fallback UI**: Graceful degradation when features fail
+
+### Security Considerations
+
+- **Input Sanitization**: Sanitize all user inputs
+- **XSS Prevention**: Use proper escaping in templates
+- **CSRF Protection**: Include CSRF tokens in forms
+- **Content Security Policy**: Configure CSP headers
+
+## 🔮 Feature Development Priorities
+
+### Current Phase: Enhanced Interactions
+
+- Drag & drop calendar interface for event management
+- Advanced theming with dark/light mode
+- Browser notifications for reminders and updates
+- Voice input for hands-free interaction
+
+### Next Phase: Advanced Features
+
+- Multi-user support with authentication
+- Customizable dashboard layouts
+- Real-time collaboration features
+- Progressive Web App capabilities
+
+This frontend demonstrates modern React patterns with server-side rendering, conversational AI integration, and production-ready performance optimization.
