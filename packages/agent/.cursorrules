@@ -1,0 +1,304 @@
+# Daily AI Agent - Cursor AI Rules
+
+## Project Overview
+
+You are working on an intelligent AI agent that acts as a personal productivity assistant, orchestrating tools from the MCP server through conversational AI. This is a Python application using LangChain + OpenAI for AI orchestration, with both CLI and REST API interfaces for maximum flexibility.
+
+## 🏗️ Architecture & Structure
+
+### Core Components
+
+- **CLI Interface** (`src/daily_ai_agent/main.py`) - Typer-based command line interface
+- **API Server** (`src/daily_ai_agent/api_server.py`) - Flask REST API for frontend integration
+- **Agent Orchestrator** (`src/daily_ai_agent/agent/orchestrator.py`) - LangChain-based tool orchestration
+- **MCP Client** (`src/daily_ai_agent/services/mcp_client.py`) - HTTP client for MCP server integration
+- **LLM Service** (`src/daily_ai_agent/services/llm.py`) - OpenAI integration and conversation management
+- **Configuration** (`src/daily_ai_agent/models/config.py`) - Pydantic settings with environment variables
+
+### Key Features
+
+1. **Conversational AI**: Natural language processing with GPT-4o-mini
+2. **Tool Orchestration**: Intelligent selection and execution of MCP tools
+3. **Multi-Interface**: Both CLI commands and REST API endpoints
+4. **Smart Scheduling**: AI-powered calendar event creation with conflict detection
+5. **Context Management**: Conversation memory and user preferences
+
+## 🎯 Development Guidelines
+
+### Code Style & Quality
+
+- **Python Version**: 3.13+ required
+- **Dependency Manager**: UV preferred (`uv sync`, `uv run`) over pip
+- **AI Framework**: LangChain for tool orchestration and conversation management
+- **HTTP Client**: HTTPX for async MCP server communication
+- **CLI Framework**: Typer with Rich for beautiful terminal output
+- **Data Validation**: Pydantic models for all data structures
+- **API Framework**: Flask with async support for REST endpoints
+
+### Key Patterns to Follow
+
+#### 1. CLI Command Pattern
+
+```python
+# Use Typer for CLI commands with Rich output
+import typer
+from rich.console import Console
+
+@app.command()
+def command_name(param: str = typer.Option("default", help="Description")):
+    """Command description for help text."""
+    console = Console()
+    # Implementation with Rich formatting
+    console.print("[bold green]Success![/bold green]")
+```
+
+#### 2. Agent Orchestration Pattern
+
+```python
+# LangChain agent with tool selection
+class MCPAgent:
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4o-mini")
+        self.tools = self._load_mcp_tools()
+        self.agent = create_tool_calling_agent(self.llm, self.tools)
+
+    async def process_query(self, query: str) -> AgentResponse:
+        # Natural language processing with tool orchestration
+        return await self.agent.ainvoke({"input": query})
+```
+
+#### 3. MCP Client Pattern
+
+```python
+# Async HTTP client for MCP server communication
+class MCPClient:
+    def __init__(self, base_url: str):
+        self.client = httpx.AsyncClient(base_url=base_url)
+
+    async def call_tool(self, tool_name: str, input_data: dict) -> dict:
+        # Error handling, retries, validation
+        response = await self.client.post(f"/tools/{tool_name}", json=input_data)
+        return response.json()
+```
+
+#### 4. Configuration Management
+
+```python
+# Pydantic settings for environment-based configuration
+class Settings(BaseSettings):
+    openai_api_key: str
+    mcp_server_url: str = "http://localhost:8000"
+    user_name: str = "User"
+    user_location: str = "San Francisco"
+
+    class Config:
+        env_file = ".env"
+```
+
+### AI Integration Best Practices
+
+#### LangChain Usage
+
+- **Current Setup**: `ChatOpenAI` with `gpt-4o-mini` for cost-effective performance
+- **Alternatives**: Easy to swap models (GPT-4, Claude, local models) via LangChain
+- Implement tool calling agents for structured tool selection
+- Use conversation memory for context retention
+- Handle streaming responses for better UX
+
+#### Evaluating New LLM Providers
+
+When considering alternative LLM providers:
+
+1. **Cost Analysis**: Compare pricing per token and performance
+2. **Tool Calling Support**: Ensure structured function calling capabilities
+3. **Context Length**: Verify sufficient context for conversation memory
+4. **LangChain Support**: Check for native integration
+5. **Rate Limits**: Plan for production usage patterns
+
+#### Tool Orchestration
+
+- Parse natural language into structured tool calls
+- Handle multiple tool calls in parallel when possible
+- Provide intelligent error recovery and fallbacks
+- Cache conversation context for follow-up queries
+
+#### Natural Language Processing
+
+- Support relative time expressions ("tomorrow", "next week")
+- Parse appointment details from conversational text
+- Detect user intent (scheduling, querying, updating)
+- Provide helpful suggestions and confirmations
+
+## 🚀 Development Commands
+
+### Setup & Dependencies
+
+```bash
+# Recommended: Use UV for faster dependency management
+uv sync
+uv run daily-ai-agent health
+
+# Traditional fallback
+pip install -e .
+daily-ai-agent health
+```
+
+### CLI Commands
+
+```bash
+# Individual tool commands
+uv run daily-ai-agent weather
+uv run daily-ai-agent todos work
+uv run daily-ai-agent commute
+
+# AI-powered commands
+uv run daily-ai-agent smart-briefing
+uv run daily-ai-agent chat -m "Schedule lunch with John tomorrow"
+uv run daily-ai-agent chat  # Interactive mode
+
+# API server
+uv run daily-ai-agent-api  # Starts Flask server on port 8001
+```
+
+### Testing & Development
+
+```bash
+# Run tests
+uv run pytest
+
+# Check types
+uv run mypy src/
+
+# Format code
+uv run black src/
+uv run isort src/
+```
+
+## 🛠️ Adding New Features
+
+### Adding a New CLI Command
+
+1. Add command function to `src/daily_ai_agent/main.py`
+2. Use Typer decorators and Rich for output formatting
+3. Integrate with MCP client for data access
+4. Add help text and parameter validation
+
+### Adding New Agent Capabilities
+
+1. Extend agent prompts in `src/daily_ai_agent/agent/orchestrator.py`
+2. Add new tool integrations to `src/daily_ai_agent/agent/tools.py`
+3. Update conversation templates for new use cases
+4. Test with various natural language inputs
+
+### Adding API Endpoints
+
+1. Add route functions to `src/daily_ai_agent/api_server.py`
+2. Use Flask async patterns for non-blocking operations
+3. Include proper error handling and validation
+4. Document endpoints with Swagger/OpenAPI
+
+## 🔧 Configuration & Integration
+
+### Environment Variables
+
+```bash
+# Required
+OPENAI_API_KEY=your_openai_api_key_here
+
+# MCP Server Integration
+MCP_SERVER_URL=http://localhost:8000
+# Or production: https://web-production-66f9.up.railway.app
+
+# User Preferences
+USER_NAME=Kevin
+USER_LOCATION=San Francisco
+DEFAULT_COMMUTE_ORIGIN=Home
+DEFAULT_COMMUTE_DESTINATION=Office
+
+# API Server
+HOST=0.0.0.0
+PORT=8001
+DEBUG=false
+```
+
+### MCP Server Integration
+
+- Connects to MCP server for all tool operations
+- Handles tool discovery and schema validation
+- Implements retry logic for external API failures
+- Caches tool responses when appropriate
+
+## 🎯 Common Use Cases
+
+### Conversational Calendar Management
+
+```bash
+# Natural language examples the agent should handle:
+"What's on my calendar tomorrow?"
+"Schedule lunch with John tomorrow at 1pm"
+"Find me 60 minutes free tomorrow afternoon"
+"When can I schedule a 2-hour meeting this week?"
+"Do I have any conflicts at 3pm?"
+```
+
+### Smart Briefings
+
+```bash
+# AI-generated morning summaries
+uv run daily-ai-agent smart-briefing
+# Should provide personalized insights combining weather, calendar, todos, commute
+```
+
+### Multi-Tool Orchestration
+
+- Weather + Calendar: "Should I reschedule my outdoor meeting?"
+- Financial + Calendar: "Brief me on markets before my investor meeting"
+- Commute + Weather: "How's my commute looking with this weather?"
+
+## 🚨 Important Guidelines
+
+### AI Interaction Patterns
+
+- Always validate user input before making tool calls
+- Provide clear confirmations for write operations (calendar creation)
+- Handle ambiguous requests by asking clarifying questions
+- Use context from conversation history for better understanding
+
+### Error Handling
+
+- Graceful degradation when MCP server is unavailable
+- Meaningful error messages for users
+- Fallback responses when AI processing fails
+- Logging for debugging without exposing sensitive data
+
+### Performance Considerations
+
+- Use async/await for all external API calls
+- Implement conversation memory efficiently
+- Cache user preferences and common queries
+- Optimize LangChain agent configurations
+
+### Security & Privacy
+
+- Never log OpenAI API keys or user conversation content
+- Validate all inputs before sending to external services
+- Use environment variables for all sensitive configuration
+- Implement rate limiting for API endpoints
+
+## 🔮 Feature Development Priorities
+
+### Current Phase: Enhanced Intelligence
+
+- Smart scheduling with conflict detection
+- Natural language time parsing improvements
+- Conversation memory and context retention
+- Calendar update/delete operations
+
+### Next Phase: Advanced Features
+
+- Multi-tenancy and user management
+- Proactive notifications and suggestions
+- Voice integration capabilities
+- Team collaboration features
+
+This AI agent demonstrates modern conversational AI patterns with real-world tool integration and multi-interface design (CLI + API).

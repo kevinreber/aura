@@ -1,0 +1,100 @@
+[project]
+name = "daily-ai-agent"
+version = "0.1.0"
+description = "AI agent for morning routine briefings using MCP server tools"
+readme = "README.md"
+authors = [
+    { name = "Kevin Reber", email = "kevinreber1@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    # Core AI framework
+    # Pin langchain-core <0.3.70 to avoid Pydantic discriminator issues
+    "langchain>=0.3.0,<0.4.0",
+    "langchain-core>=0.3.0,<0.3.70",
+    "langchain-openai>=0.1.0",
+    "openai>=1.0.0",
+    
+    # HTTP client for MCP server
+    "httpx>=0.25.0",
+    
+    # Data validation and settings
+    # Pin pydantic <2.11 to avoid discriminator compatibility issues with langchain_core
+    "pydantic>=2.10.0,<2.11.0",
+    "pydantic-settings>=2.4.0",
+    
+    # CLI and output formatting
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+    
+    # Web API framework (same as MCP server)
+    "flask[async]==3.0.0",
+    "flask-cors==4.0.0",
+    "flask-limiter==3.5.0",
+    "flasgger==0.9.7.1",
+    
+    # Date/time handling
+    "python-dateutil>=2.8.0",
+    
+    # Environment variables
+    "python-dotenv>=1.0.0",
+    
+    # Logging
+    "loguru>=0.7.0",
+]
+
+[project.scripts]
+daily-ai-agent = "daily_ai_agent:main"
+daily-ai-agent-api = "daily_ai_agent.api_server:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "respx>=0.20.0",
+    "httpx>=0.25.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow-running tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/daily_ai_agent"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+fail_under = 70

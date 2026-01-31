@@ -1,0 +1,20 @@
+#!/bin/bash
+# Pre-push hook to run tests before pushing
+# This prevents pushing code that breaks CI
+
+set -e
+
+echo "Running pre-push checks..."
+
+# Run tests
+echo "Running tests..."
+if ! uv run python -m pytest tests/ -v --tb=short; then
+    echo ""
+    echo "Tests failed! Push aborted."
+    echo "Fix the failing tests before pushing."
+    exit 1
+fi
+
+echo ""
+echo "All checks passed! Proceeding with push."
+exit 0
