@@ -1,6 +1,6 @@
-import type { Route } from './+types/home';
 import Dashboard from '../components/Dashboard';
 import { serverApiClient } from '../lib/api';
+import type { Route } from './+types/home';
 
 export function meta({}: Route.MetaArgs) {
   return [

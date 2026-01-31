@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   apiClient,
+  type BasicCommuteData,
   type CommuteOptionsData,
   type ShuttleScheduleData,
-  type BasicCommuteData,
 } from '../lib/api';
 
 interface CommuteDashboardProps {

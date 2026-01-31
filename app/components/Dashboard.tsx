@@ -1,25 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useDarkMode } from '../hooks/useDarkMode';
+import { usePolling } from '../hooks/usePolling';
 import {
   apiClient,
-  type WeatherData,
-  type FinancialData,
   type CalendarData,
-  type TodoData,
   type CommuteOptionsData,
+  type FinancialData,
   type TodoBucket,
+  type TodoData,
+  type WeatherData,
 } from '../lib/api';
 import {
-  saveChatHistory,
-  loadChatHistory,
   clearChatHistory,
-  loadTodoCompletions,
-  toggleTodoCompletion,
-  saveSelectedBucket,
+  getCachedData,
+  loadChatHistory,
   loadSelectedBucket,
+  loadTodoCompletions,
+  saveChatHistory,
+  saveSelectedBucket,
+  setCachedData,
+  toggleTodoCompletion,
 } from '../lib/storage';
 import Clock from './Clock';
 import { CommuteDashboard } from './CommuteDashboard';
+import { HabitsWidget } from './HabitsWidget';
+import { NotesWidget } from './NotesWidget';
+import { PomodoroWidget } from './PomodoroWidget';
 
 interface DashboardProps {
   userName?: string;
@@ -68,6 +75,34 @@ export default function Dashboard({
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
+  // Dark mode
+  const { isDark, toggle: toggleDarkMode } = useDarkMode();
+
+  // Fetch financial data with caching
+  const fetchFinancialData = useCallback(async () => {
+    // Check cache first (5 minute TTL for financial data)
+    const cached = getCachedData<FinancialData>('financial');
+    if (cached) return cached;
+
+    const data = await apiClient.getFinancialData();
+    setCachedData('financial', data, 5 * 60 * 1000); // 5 minutes
+    return data;
+  }, []);
+
+  // Polling for real-time market updates (every 5 minutes)
+  const { data: polledFinancial, lastUpdated: financialLastUpdated } = usePolling({
+    fetcher: fetchFinancialData,
+    interval: 5 * 60 * 1000, // 5 minutes
+    enabled: !!initialFinancial, // Only poll if we have initial data
+  });
+
+  // Update financial data when polled data changes
+  useEffect(() => {
+    if (polledFinancial) {
+      setFinancial(polledFinancial);
+    }
+  }, [polledFinancial]);
 
   // Slash command registry
   const slashCommands = [
@@ -130,6 +165,9 @@ export default function Dashboard({
       financial: isMobile,
       calendar: isMobile,
       todos: isMobile,
+      notes: isMobile,
+      habits: isMobile,
+      pomodoro: isMobile,
       chat: false, // Chat starts expanded
     };
   });
@@ -499,6 +537,9 @@ export default function Dashboard({
                     financial: !allCollapsed,
                     calendar: !allCollapsed,
                     todos: !allCollapsed,
+                    notes: !allCollapsed,
+                    habits: !allCollapsed,
+                    pomodoro: !allCollapsed,
                     chat: !allCollapsed,
                   });
                 }}
@@ -512,6 +553,27 @@ export default function Dashboard({
                 <span className="sm:hidden">
                   {Object.values(collapsedWidgets).every((collapsed) => collapsed) ? '↕️' : '⬇️'}
                 </span>
+              </button>
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {isDark ? (
+                  <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                  </svg>
+                )}
               </button>
               <Clock userName={userName} className="font-mono" />
             </div>
@@ -886,6 +948,24 @@ export default function Dashboard({
               </>
             )}
           </div>
+
+          {/* Notes Widget */}
+          <NotesWidget
+            collapsed={collapsedWidgets.notes}
+            onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, notes: !prev.notes }))}
+          />
+
+          {/* Habits Widget */}
+          <HabitsWidget
+            collapsed={collapsedWidgets.habits}
+            onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, habits: !prev.habits }))}
+          />
+
+          {/* Pomodoro Widget */}
+          <PomodoroWidget
+            collapsed={collapsedWidgets.pomodoro}
+            onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, pomodoro: !prev.pomodoro }))}
+          />
         </div>
 
         {/* Commute Dashboard - Full Width */}
