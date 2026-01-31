@@ -1,0 +1,147 @@
+# Docker Compose configuration for E2E testing
+# This configuration is optimized for CI/CD and testing environments
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up -d
+#   docker compose -f docker-compose.e2e.yml run --rm e2e-tests
+#   docker compose -f docker-compose.e2e.yml down
+
+services:
+  # Redis - Required for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - e2e-network
+
+  # MCP Server - Core backend with mock-friendly config
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+      target: base
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=testing
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      # API keys from environment (can be empty for smoke tests)
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - TODOIST_API_KEY=${TODOIST_API_KEY:-}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      # Test addresses
+      - HOME_ADDRESS=${HOME_ADDRESS:-123 Test St, San Francisco, CA 94102}
+      - WORK_ADDRESS=${WORK_ADDRESS:-456 Office Blvd, Mountain View, CA 94043}
+    volumes:
+      - ./packages/server/mcp_server:/app/mcp_server:ro
+      - ./packages/server/run.py:/app/run.py:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - e2e-network
+
+  # AI Agent - Connects to MCP Server
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      target: base
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=testing
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8001
+      - MCP_SERVER_URL=http://server:8000
+      - MCP_SERVER_TIMEOUT=30
+      # AI keys from environment (optional for smoke tests)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Agent config
+      - DEFAULT_LLM=openai
+      - ENABLE_MEMORY=true
+      - USER_NAME=E2E Test User
+      - USER_LOCATION=San Francisco
+    volumes:
+      - ./packages/agent/src:/app/src:ro
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - e2e-network
+
+  # UI (Optional for full stack tests)
+  ui:
+    build:
+      context: .
+      dockerfile: docker/ui.Dockerfile
+      target: development
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_MCP_SERVER_URL=http://localhost:8000
+      - VITE_AGENT_URL=http://localhost:8001
+      - VITE_AI_AGENT_API_URL=http://agent:8001
+    volumes:
+      - ./packages/ui/app:/app/app:ro
+      - ./packages/ui/public:/app/public:ro
+    depends_on:
+      agent:
+        condition: service_healthy
+    networks:
+      - e2e-network
+    profiles:
+      - full-stack  # Only start when explicitly requested
+
+  # E2E Test Runner
+  e2e-tests:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    environment:
+      - E2E_AGENT_URL=http://agent:8001
+      - E2E_MCP_SERVER_URL=http://server:8000
+      - E2E_UI_URL=http://ui:5173
+      - E2E_HEALTH_CHECK_TIMEOUT=120
+      - E2E_REQUEST_TIMEOUT=60
+    depends_on:
+      agent:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    networks:
+      - e2e-network
+    # Run tests and exit
+    command: ["pytest", "-v", "--tb=short", "-m", "smoke or e2e"]
+
+networks:
+  e2e-network:
+    driver: bridge
