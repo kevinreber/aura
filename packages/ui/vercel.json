@@ -2,16 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
-  "rewrites": [
-    {
-      "source": "/api/v1/chat",
-      "destination": "${VITE_AI_AGENT_API_URL}/chat"
-    },
-    {
-      "source": "/api/v1/briefing",
-      "destination": "${VITE_AI_AGENT_API_URL}/briefing"
-    }
-  ]
+  "buildCommand": "npm run build"
 }
