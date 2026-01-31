@@ -1,0 +1,14 @@
+.env
+.env.local
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+node_modules/
+.next/
+.venv/
+venv/
+*.log
+.DS_Store
+credentials.json
+token.json

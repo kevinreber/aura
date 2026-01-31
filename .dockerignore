@@ -1,0 +1,8 @@
+.git
+**/__pycache__
+**/*.py[cod]
+**/node_modules
+**/.env
+**/tests
+**/*.md
+!**/README.md

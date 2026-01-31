@@ -1,0 +1,105 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+      target: base
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      - REDIS_URL=redis://redis:6379
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - TODOIST_API_KEY=${TODOIST_API_KEY:-}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+      - HOME_ADDRESS=${HOME_ADDRESS:-}
+      - WORK_ADDRESS=${WORK_ADDRESS:-}
+    volumes:
+      - ./packages/server/mcp_server:/app/mcp_server
+      - ./packages/server/run.py:/app/run.py
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - aura-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"\]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent.Dockerfile
+      target: base
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8001
+      - MCP_SERVER_URL=http://server:8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - ./packages/agent/src:/app/src
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - aura-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"\]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  ui:
+    build:
+      context: .
+      dockerfile: docker/ui.Dockerfile
+      target: development
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - VITE_MCP_SERVER_URL=http://localhost:8000
+      - VITE_AGENT_URL=http://localhost:8001
+    volumes:
+      - ./packages/ui/app:/app/app
+      - ./packages/ui/public:/app/public
+    depends_on:
+      - agent
+    networks:
+      - aura-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - aura-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis-data:
+
+networks:
+  aura-network:
+    driver: bridge
