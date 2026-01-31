@@ -16,6 +16,13 @@ Unified monorepo for the Aura productivity platform.
 | Agent | http://localhost:8001 | LangChain AI agent |
 | Server | http://localhost:8000 | MCP Server API |
 
+## Production URLs (Render)
+
+| Service | URL |
+|---------|-----|
+| Agent | https://aura-agent-yz8u.onrender.com |
+| MCP Server | https://aura-server-sxxd.onrender.com |
+
 ## Commands
 
     make dev    # Start all services

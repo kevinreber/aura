@@ -4,9 +4,13 @@
 
 Before deploying, ensure you have:
 
-- ✅ AI Agent API deployed (Railway/Vercel)
-- ✅ MCP Server deployed (Railway)
+- ✅ AI Agent API deployed (Render/Railway/Vercel)
+- ✅ MCP Server deployed (Render/Railway)
 - ✅ All API endpoints working in production
+
+**Current Production URLs (Render):**
+- AI Agent: https://aura-agent-yz8u.onrender.com
+- MCP Server: https://aura-server-sxxd.onrender.com
 
 ## 🌍 Environment Variables Setup
 
@@ -75,6 +79,18 @@ VITE_DEBUG=true
 ## 🔗 **AI Agent API URLs**
 
 Configure your environment variables based on where your AI Agent is deployed:
+
+### **Render Deployment (Current Production):**
+
+```
+AI Agent: https://aura-agent-yz8u.onrender.com
+MCP Server: https://aura-server-sxxd.onrender.com
+```
+
+Set your Vercel environment variable:
+```
+VITE_AI_AGENT_API_URL=https://aura-agent-yz8u.onrender.com
+```
 
 ### **Railway Deployment:**
 
