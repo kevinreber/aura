@@ -4,23 +4,19 @@ export class AIAgentAPI {
 
   constructor() {
     // Use environment variable if set, otherwise default to localhost
-    this.baseURL =
-      import.meta.env?.VITE_AI_AGENT_API_URL || "http://localhost:8001";
+    this.baseURL = import.meta.env?.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
 
-    if (import.meta.env?.VITE_DEBUG === "true") {
+    if (import.meta.env?.VITE_DEBUG === 'true') {
       console.log(`🔗 AI Agent API URL: ${this.baseURL}`);
       console.log(`🌍 Environment: ${import.meta.env?.VITE_ENVIRONMENT}`);
     }
   }
 
-  private async fetchAPI(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<any> {
+  private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseURL}${endpoint}`;
     const response = await fetch(url, {
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         ...options.headers,
       },
       ...options,
@@ -34,30 +30,30 @@ export class AIAgentAPI {
   }
 
   // Weather data
-  async getWeather(location: string = "San Francisco"): Promise<WeatherData> {
+  async getWeather(location: string = 'San Francisco'): Promise<WeatherData> {
     try {
-      const params = new URLSearchParams({ location, when: "today" });
+      const params = new URLSearchParams({ location, when: 'today' });
       return await this.fetchAPI(`/tools/weather?${params}`);
     } catch (error) {
-      console.warn("Failed to fetch weather data:", error);
+      console.warn('Failed to fetch weather data:', error);
       return this.getMockWeather();
     }
   }
 
   // Financial data
   async getFinancialData(
-    symbols: string[] = ["MSFT", "BTC", "ETH", "NVDA"]
+    symbols: string[] = ['MSFT', 'BTC', 'ETH', 'NVDA']
   ): Promise<FinancialData> {
     try {
-      return await this.fetchAPI("/tools/financial", {
-        method: "POST",
+      return await this.fetchAPI('/tools/financial', {
+        method: 'POST',
         body: JSON.stringify({
           symbols,
-          data_type: "mixed",
+          data_type: 'mixed',
         }),
       });
     } catch (error) {
-      console.warn("Failed to fetch financial data:", error);
+      console.warn('Failed to fetch financial data:', error);
       return this.getMockFinancial();
     }
   }
@@ -66,10 +62,10 @@ export class AIAgentAPI {
   async getCalendar(date?: string): Promise<CalendarData> {
     try {
       const params = new URLSearchParams();
-      if (date) params.append("date", date);
+      if (date) params.append('date', date);
       return await this.fetchAPI(`/tools/calendar?${params}`);
     } catch (error) {
-      console.warn("Failed to fetch calendar data:", error);
+      console.warn('Failed to fetch calendar data:', error);
       return this.getMockCalendar();
     }
   }
@@ -81,14 +77,12 @@ export class AIAgentAPI {
       if (bucket) {
         params.bucket = bucket;
       }
-      
-      const queryString = Object.keys(params).length > 0 
-        ? `?${new URLSearchParams(params)}`
-        : '';
-      
+
+      const queryString = Object.keys(params).length > 0 ? `?${new URLSearchParams(params)}` : '';
+
       return await this.fetchAPI(`/tools/todos${queryString}`);
     } catch (error) {
-      console.warn("Failed to fetch todo data:", error);
+      console.warn('Failed to fetch todo data:', error);
       return this.getMockTodos(bucket);
     }
   }
@@ -96,12 +90,12 @@ export class AIAgentAPI {
   // AI Chat
   async sendChatMessage(message: string): Promise<ChatResponse> {
     try {
-      return await this.fetchAPI("/chat", {
-        method: "POST",
+      return await this.fetchAPI('/chat', {
+        method: 'POST',
         body: JSON.stringify({ message }),
       });
     } catch (error) {
-      console.warn("Failed to send chat message:", error);
+      console.warn('Failed to send chat message:', error);
       throw error;
     }
   }
@@ -109,9 +103,9 @@ export class AIAgentAPI {
   // Get morning briefing
   async getMorningBriefing(): Promise<BriefingData> {
     try {
-      return await this.fetchAPI("/briefing?type=smart");
+      return await this.fetchAPI('/briefing?type=smart');
     } catch (error) {
-      console.warn("Failed to fetch morning briefing:", error);
+      console.warn('Failed to fetch morning briefing:', error);
       return this.getMockBriefing();
     }
   }
@@ -120,11 +114,11 @@ export class AIAgentAPI {
   async getBasicCommute(
     origin: string,
     destination: string,
-    mode: string = "driving"
+    mode: string = 'driving'
   ): Promise<BasicCommuteData> {
     try {
-      return await this.fetchAPI("/tools/commute", {
-        method: "POST",
+      return await this.fetchAPI('/tools/commute', {
+        method: 'POST',
         body: JSON.stringify({
           origin,
           destination,
@@ -132,7 +126,7 @@ export class AIAgentAPI {
         }),
       });
     } catch (error) {
-      console.warn("Failed to fetch basic commute data:", error);
+      console.warn('Failed to fetch basic commute data:', error);
       return this.getMockBasicCommute();
     }
   }
@@ -153,12 +147,12 @@ export class AIAgentAPI {
         body.departure_time = departureTime;
       }
 
-      return await this.fetchAPI("/tools/commute-options", {
-        method: "POST",
+      return await this.fetchAPI('/tools/commute-options', {
+        method: 'POST',
         body: JSON.stringify(body),
       });
     } catch (error) {
-      console.warn("Failed to fetch commute options:", error);
+      console.warn('Failed to fetch commute options:', error);
       return this.getMockCommuteOptions();
     }
   }
@@ -177,12 +171,12 @@ export class AIAgentAPI {
         body.departure_time = departureTime;
       }
 
-      return await this.fetchAPI("/tools/shuttle", {
-        method: "POST",
+      return await this.fetchAPI('/tools/shuttle', {
+        method: 'POST',
         body: JSON.stringify(body),
       });
     } catch (error) {
-      console.warn("Failed to fetch shuttle schedule:", error);
+      console.warn('Failed to fetch shuttle schedule:', error);
       return this.getMockShuttleSchedule();
     }
   }
@@ -190,15 +184,15 @@ export class AIAgentAPI {
   // Fallback mock data methods
   private getMockWeather(): WeatherData {
     return {
-      tool: "weather",
+      tool: 'weather',
       data: {
-        location: "San Francisco",
+        location: 'San Francisco',
         current_temp: 72,
-        condition: "Partly Cloudy",
+        condition: 'Partly Cloudy',
         temp_hi: 78,
         temp_lo: 65,
         precip_chance: 10,
-        summary: "Partly cloudy with comfortable temperatures",
+        summary: 'Partly cloudy with comfortable temperatures',
       },
       timestamp: new Date().toISOString(),
     };
@@ -206,48 +200,47 @@ export class AIAgentAPI {
 
   private getMockFinancial(): FinancialData {
     return {
-      tool: "financial",
+      tool: 'financial',
       data: {
-        summary:
-          "📊 4 instruments tracked | 📈 3 gaining | 🏆 Best: NVDA (+2.1%)",
+        summary: '📊 4 instruments tracked | 📈 3 gaining | 🏆 Best: NVDA (+2.1%)',
         total_items: 4,
-        market_status: "mixed",
+        market_status: 'mixed',
         data: [
           {
-            symbol: "MSFT",
-            name: "Microsoft Corporation",
+            symbol: 'MSFT',
+            name: 'Microsoft Corporation',
             price: 523.73,
             change: 6.23,
             change_percent: 1.2,
-            currency: "USD",
-            data_type: "stocks",
+            currency: 'USD',
+            data_type: 'stocks',
           },
           {
-            symbol: "BTC",
-            name: "Bitcoin",
+            symbol: 'BTC',
+            name: 'Bitcoin',
             price: 96847,
             change: -2284,
             change_percent: -2.3,
-            currency: "USD",
-            data_type: "crypto",
+            currency: 'USD',
+            data_type: 'crypto',
           },
           {
-            symbol: "ETH",
-            name: "Ethereum",
+            symbol: 'ETH',
+            name: 'Ethereum',
             price: 2847,
             change: 42,
             change_percent: 1.5,
-            currency: "USD",
-            data_type: "crypto",
+            currency: 'USD',
+            data_type: 'crypto',
           },
           {
-            symbol: "NVDA",
-            name: "NVIDIA Corporation",
+            symbol: 'NVDA',
+            name: 'NVIDIA Corporation',
             price: 875.12,
             change: 18.2,
             change_percent: 2.1,
-            currency: "USD",
-            data_type: "stocks",
+            currency: 'USD',
+            data_type: 'stocks',
           },
         ],
       },
@@ -257,12 +250,12 @@ export class AIAgentAPI {
 
   private getMockCalendar(): CalendarData {
     return {
-      tool: "calendar",
+      tool: 'calendar',
       data: {
         events: [
-          { title: "Team Standup", time: "9:00 AM", color: "blue" },
-          { title: "Code Review", time: "2:00 PM", color: "green" },
-          { title: "Gym Session", time: "6:00 PM", color: "orange" },
+          { title: 'Team Standup', time: '9:00 AM', color: 'blue' },
+          { title: 'Code Review', time: '2:00 PM', color: 'green' },
+          { title: 'Gym Session', time: '6:00 PM', color: 'orange' },
         ],
         total_events: 3,
       },
@@ -272,23 +265,51 @@ export class AIAgentAPI {
 
   private getMockTodos(bucket?: string): TodoData {
     const allTodos = [
-      { id: "1", text: "Review quarterly reports", completed: false, priority: "high", bucket: "work" },
-      { id: "2", text: "Update project timeline", completed: false, priority: "medium", bucket: "work" },
-      { id: "3", text: "Call insurance company", completed: false, priority: "low", bucket: "personal" },
-      { id: "4", text: "Book dentist appointment", completed: false, priority: "low", bucket: "personal" },
-      { id: "5", text: "Grocery shopping", completed: false, priority: "medium", bucket: "home" },
-      { id: "6", text: "Pick up dry cleaning", completed: false, priority: "low", bucket: "errands" },
+      {
+        id: '1',
+        text: 'Review quarterly reports',
+        completed: false,
+        priority: 'high',
+        bucket: 'work',
+      },
+      {
+        id: '2',
+        text: 'Update project timeline',
+        completed: false,
+        priority: 'medium',
+        bucket: 'work',
+      },
+      {
+        id: '3',
+        text: 'Call insurance company',
+        completed: false,
+        priority: 'low',
+        bucket: 'personal',
+      },
+      {
+        id: '4',
+        text: 'Book dentist appointment',
+        completed: false,
+        priority: 'low',
+        bucket: 'personal',
+      },
+      { id: '5', text: 'Grocery shopping', completed: false, priority: 'medium', bucket: 'home' },
+      {
+        id: '6',
+        text: 'Pick up dry cleaning',
+        completed: false,
+        priority: 'low',
+        bucket: 'errands',
+      },
     ];
 
-    const items = bucket 
-      ? allTodos.filter(todo => todo.bucket === bucket)
-      : allTodos;
+    const items = bucket ? allTodos.filter((todo) => todo.bucket === bucket) : allTodos;
 
     return {
-      tool: "todos",
+      tool: 'todos',
       data: {
         items: items.map(({ bucket, ...item }) => item), // Remove bucket from items for compatibility
-        total_pending: items.filter(item => !item.completed).length,
+        total_pending: items.filter((item) => !item.completed).length,
         bucket: bucket || null,
       },
       timestamp: new Date().toISOString(),
@@ -305,15 +326,15 @@ export class AIAgentAPI {
 
   private getMockBasicCommute(): BasicCommuteData {
     return {
-      tool: "commute",
+      tool: 'commute',
       data: {
         duration_minutes: 35,
         distance_miles: 18.2,
-        route_summary: "via US-101 S and I-880 S",
-        traffic_status: "Moderate traffic",
-        origin: "San Francisco, CA",
-        destination: "Mountain View, CA",
-        mode: "driving",
+        route_summary: 'via US-101 S and I-880 S',
+        traffic_status: 'Moderate traffic',
+        origin: 'San Francisco, CA',
+        destination: 'Mountain View, CA',
+        mode: 'driving',
       },
       timestamp: new Date().toISOString(),
     };
@@ -321,17 +342,17 @@ export class AIAgentAPI {
 
   private getMockCommuteOptions(): CommuteOptionsData {
     return {
-      tool: "commute_options",
+      tool: 'commute_options',
       data: {
-        direction: "to_work",
+        direction: 'to_work',
         query_time: new Date().toISOString(),
         driving: {
           duration_minutes: 42,
           distance_miles: 28.5,
-          route_summary: "South SF → LinkedIn",
-          traffic_status: "Heavy traffic",
-          departure_time: "8:00 AM",
-          arrival_time: "8:42 AM",
+          route_summary: 'South SF → LinkedIn',
+          traffic_status: 'Heavy traffic',
+          departure_time: '8:00 AM',
+          arrival_time: '8:42 AM',
           estimated_fuel_gallons: 1.1,
         },
         transit: {
@@ -341,34 +362,34 @@ export class AIAgentAPI {
           walking_duration_minutes: 3,
           next_departures: [
             {
-              departure_time: "8:15 AM",
-              arrival_time: "9:02 AM",
-              train_number: "152",
-              platform: "TBD",
+              departure_time: '8:15 AM',
+              arrival_time: '9:02 AM',
+              train_number: '152',
+              platform: 'TBD',
               delay_minutes: 0,
             },
             {
-              departure_time: "8:45 AM",
-              arrival_time: "9:32 AM",
-              train_number: "156",
-              platform: "TBD",
+              departure_time: '8:45 AM',
+              arrival_time: '9:32 AM',
+              train_number: '156',
+              platform: 'TBD',
               delay_minutes: 2,
             },
           ],
           shuttle_departures: [
             {
-              departure_time: "9:11 AM",
-              stops: ["9:11 AM", "9:19 AM", "9:22 AM"],
+              departure_time: '9:11 AM',
+              stops: ['9:11 AM', '9:19 AM', '9:22 AM'],
             },
             {
-              departure_time: "9:26 AM",
-              stops: ["9:26 AM", "9:34 AM", "9:37 AM"],
+              departure_time: '9:26 AM',
+              stops: ['9:26 AM', '9:34 AM', '9:37 AM'],
             },
           ],
           transfer_time_minutes: 5,
         },
         recommendation:
-          "Take Caltrain - heavy traffic makes driving significantly slower (42 min vs 85 min total)",
+          'Take Caltrain - heavy traffic makes driving significantly slower (42 min vs 85 min total)',
       },
       timestamp: new Date().toISOString(),
     };
@@ -376,27 +397,27 @@ export class AIAgentAPI {
 
   private getMockShuttleSchedule(): ShuttleScheduleData {
     return {
-      tool: "shuttle",
+      tool: 'shuttle',
       data: {
-        origin: "mountain_view_caltrain",
-        destination: "linkedin_transit_center",
+        origin: 'mountain_view_caltrain',
+        destination: 'linkedin_transit_center',
         duration_minutes: 11,
         next_departures: [
           {
-            departure_time: "9:11 AM",
-            stops: ["9:11 AM", "9:19 AM", "9:22 AM"],
+            departure_time: '9:11 AM',
+            stops: ['9:11 AM', '9:19 AM', '9:22 AM'],
           },
           {
-            departure_time: "9:26 AM",
-            stops: ["9:26 AM", "9:34 AM", "9:37 AM"],
+            departure_time: '9:26 AM',
+            stops: ['9:26 AM', '9:34 AM', '9:37 AM'],
           },
           {
-            departure_time: "9:41 AM",
-            stops: ["9:41 AM", "9:49 AM", "9:52 AM"],
+            departure_time: '9:41 AM',
+            stops: ['9:41 AM', '9:49 AM', '9:52 AM'],
           },
         ],
-        service_hours: "6:00 AM - 10:00 PM",
-        frequency_minutes: "15",
+        service_hours: '6:00 AM - 10:00 PM',
+        frequency_minutes: '15',
       },
       timestamp: new Date().toISOString(),
     };
@@ -466,7 +487,7 @@ export interface TodoData {
 }
 
 // Available todo buckets
-export type TodoBucket = "work" | "home" | "errands" | "personal";
+export type TodoBucket = 'work' | 'home' | 'errands' | 'personal';
 
 export interface ChatResponse {
   response: string;
@@ -561,27 +582,23 @@ export class ServerAIAgentAPI {
   constructor() {
     // Use Node.js environment variables for server-side
     // Only access process.env on server-side (Node.js environment)
-    if (typeof window === "undefined") {
-      this.baseURL =
-        process.env.VITE_AI_AGENT_API_URL || "http://localhost:8001";
+    if (typeof window === 'undefined') {
+      this.baseURL = process.env.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
 
-      if (process.env.VITE_DEBUG === "true") {
+      if (process.env.VITE_DEBUG === 'true') {
         console.log(`🔗 Server AI Agent API URL: ${this.baseURL}`);
       }
     } else {
       // Fallback for browser (shouldn't be used)
-      this.baseURL = "http://localhost:8001";
+      this.baseURL = 'http://localhost:8001';
     }
   }
 
-  private async fetchAPI(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<any> {
+  private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseURL}${endpoint}`;
     const response = await fetch(url, {
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
         ...options.headers,
       },
       ...options,
@@ -595,30 +612,30 @@ export class ServerAIAgentAPI {
   }
 
   // Weather data
-  async getWeather(location: string = "San Francisco"): Promise<WeatherData> {
+  async getWeather(location: string = 'San Francisco'): Promise<WeatherData> {
     try {
-      const params = new URLSearchParams({ location, when: "today" });
+      const params = new URLSearchParams({ location, when: 'today' });
       return await this.fetchAPI(`/tools/weather?${params}`);
     } catch (error) {
-      console.warn("Failed to fetch weather data:", error);
+      console.warn('Failed to fetch weather data:', error);
       throw error;
     }
   }
 
   // Financial data
   async getFinancialData(
-    symbols: string[] = ["MSFT", "BTC", "ETH", "NVDA"]
+    symbols: string[] = ['MSFT', 'BTC', 'ETH', 'NVDA']
   ): Promise<FinancialData> {
     try {
-      return await this.fetchAPI("/tools/financial", {
-        method: "POST",
+      return await this.fetchAPI('/tools/financial', {
+        method: 'POST',
         body: JSON.stringify({
           symbols,
-          data_type: "mixed",
+          data_type: 'mixed',
         }),
       });
     } catch (error) {
-      console.warn("Failed to fetch financial data:", error);
+      console.warn('Failed to fetch financial data:', error);
       throw error;
     }
   }
@@ -627,10 +644,10 @@ export class ServerAIAgentAPI {
   async getCalendar(date?: string): Promise<CalendarData> {
     try {
       const params = new URLSearchParams();
-      if (date) params.append("date", date);
+      if (date) params.append('date', date);
       return await this.fetchAPI(`/tools/calendar?${params}`);
     } catch (error) {
-      console.warn("Failed to fetch calendar data:", error);
+      console.warn('Failed to fetch calendar data:', error);
       throw error;
     }
   }
@@ -642,14 +659,12 @@ export class ServerAIAgentAPI {
       if (bucket) {
         params.bucket = bucket;
       }
-      
-      const queryString = Object.keys(params).length > 0 
-        ? `?${new URLSearchParams(params)}`
-        : '';
-      
+
+      const queryString = Object.keys(params).length > 0 ? `?${new URLSearchParams(params)}` : '';
+
       return await this.fetchAPI(`/tools/todos${queryString}`);
     } catch (error) {
-      console.warn("Failed to fetch todo data:", error);
+      console.warn('Failed to fetch todo data:', error);
       throw error;
     }
   }
@@ -657,12 +672,12 @@ export class ServerAIAgentAPI {
   // AI Chat (server-side)
   async sendChatMessage(message: string): Promise<ChatResponse> {
     try {
-      return await this.fetchAPI("/chat", {
-        method: "POST",
+      return await this.fetchAPI('/chat', {
+        method: 'POST',
         body: JSON.stringify({ message }),
       });
     } catch (error) {
-      console.warn("Failed to send chat message:", error);
+      console.warn('Failed to send chat message:', error);
       throw error;
     }
   }
@@ -671,11 +686,11 @@ export class ServerAIAgentAPI {
   async getBasicCommute(
     origin: string,
     destination: string,
-    mode: string = "driving"
+    mode: string = 'driving'
   ): Promise<BasicCommuteData> {
     try {
-      return await this.fetchAPI("/tools/commute", {
-        method: "POST",
+      return await this.fetchAPI('/tools/commute', {
+        method: 'POST',
         body: JSON.stringify({
           origin,
           destination,
@@ -683,7 +698,7 @@ export class ServerAIAgentAPI {
         }),
       });
     } catch (error) {
-      console.warn("Failed to fetch basic commute data:", error);
+      console.warn('Failed to fetch basic commute data:', error);
       throw error;
     }
   }
@@ -704,12 +719,12 @@ export class ServerAIAgentAPI {
         body.departure_time = departureTime;
       }
 
-      return await this.fetchAPI("/tools/commute-options", {
-        method: "POST",
+      return await this.fetchAPI('/tools/commute-options', {
+        method: 'POST',
         body: JSON.stringify(body),
       });
     } catch (error) {
-      console.warn("Failed to fetch commute options:", error);
+      console.warn('Failed to fetch commute options:', error);
       throw error;
     }
   }
@@ -728,12 +743,12 @@ export class ServerAIAgentAPI {
         body.departure_time = departureTime;
       }
 
-      return await this.fetchAPI("/tools/shuttle", {
-        method: "POST",
+      return await this.fetchAPI('/tools/shuttle', {
+        method: 'POST',
         body: JSON.stringify(body),
       });
     } catch (error) {
-      console.warn("Failed to fetch shuttle schedule:", error);
+      console.warn('Failed to fetch shuttle schedule:', error);
       throw error;
     }
   }
