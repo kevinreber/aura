@@ -1,3 +1,32 @@
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 1000, // 1 second
+  maxDelayMs: 8000, // 8 seconds
+};
+
+// Sleep utility for retry delays
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Calculate exponential backoff delay
+const getBackoffDelay = (attempt: number): number => {
+  const delay = RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt);
+  return Math.min(delay, RETRY_CONFIG.maxDelayMs);
+};
+
+// Check if error is retryable (network errors, 5xx, 429)
+const isRetryableError = (error: unknown, response?: Response): boolean => {
+  // Network errors are retryable
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return true;
+  }
+  // 5xx server errors and 429 rate limiting are retryable
+  if (response && (response.status >= 500 || response.status === 429)) {
+    return true;
+  }
+  return false;
+};
+
 // API client for communicating with the AI Agent
 export class AIAgentAPI {
   private baseURL: string;
@@ -14,19 +43,48 @@ export class AIAgentAPI {
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseURL}${endpoint}`;
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    });
+    let lastError: Error | null = null;
+    let lastResponse: Response | undefined;
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+          ...options,
+        });
+
+        lastResponse = response;
+
+        if (!response.ok) {
+          const error = new Error(`API Error: ${response.status} ${response.statusText}`);
+          if (isRetryableError(error, response) && attempt < RETRY_CONFIG.maxRetries) {
+            const delay = getBackoffDelay(attempt);
+            console.warn(`Request failed (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries + 1}), retrying in ${delay}ms...`);
+            await sleep(delay);
+            continue;
+          }
+          throw error;
+        }
+
+        return response.json();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (isRetryableError(error, lastResponse) && attempt < RETRY_CONFIG.maxRetries) {
+          const delay = getBackoffDelay(attempt);
+          console.warn(`Request failed (attempt ${attempt + 1}/${RETRY_CONFIG.maxRetries + 1}), retrying in ${delay}ms...`);
+          await sleep(delay);
+          continue;
+        }
+
+        throw lastError;
+      }
     }
 
-    return response.json();
+    throw lastError || new Error('Request failed after retries');
   }
 
   // Weather data

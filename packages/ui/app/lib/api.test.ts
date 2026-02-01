@@ -254,15 +254,152 @@ describe('AIAgentAPI', () => {
   });
 
   describe('API error handling', () => {
-    it('handles non-ok response', async () => {
+    it('handles non-ok response (non-retryable)', async () => {
+      // Use 400 which is not retryable
       vi.mocked(fetch).mockResolvedValueOnce({
         ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
+        status: 400,
+        statusText: 'Bad Request',
       } as Response);
 
       // sendChatMessage throws on error
-      await expect(api.sendChatMessage('test')).rejects.toThrow('API Error: 500');
+      await expect(api.sendChatMessage('test')).rejects.toThrow('API Error: 400');
+    });
+  });
+
+  describe('retry logic', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('retries on 500 server error with exponential backoff', async () => {
+      const mockResponse = { response: 'Success', timestamp: '2024-06-15T10:00:00Z' };
+
+      // First two calls fail with 500, third succeeds
+      vi.mocked(fetch)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse),
+        } as Response);
+
+      const promise = api.sendChatMessage('Hello');
+
+      // Advance through retries
+      await vi.advanceTimersByTimeAsync(1000); // First retry delay
+      await vi.advanceTimersByTimeAsync(2000); // Second retry delay
+
+      const result = await promise;
+
+      expect(result.response).toBe('Success');
+      expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries on 429 rate limit error', async () => {
+      const mockResponse = { response: 'Success', timestamp: '2024-06-15T10:00:00Z' };
+
+      vi.mocked(fetch)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+        } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse),
+        } as Response);
+
+      const promise = api.sendChatMessage('Hello');
+
+      await vi.advanceTimersByTimeAsync(1000);
+
+      const result = await promise;
+
+      expect(result.response).toBe('Success');
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry on 400 client error', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+      } as Response);
+
+      await expect(api.sendChatMessage('test')).rejects.toThrow('API Error: 400');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry on 401 unauthorized', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        statusText: 'Unauthorized',
+      } as Response);
+
+      await expect(api.sendChatMessage('test')).rejects.toThrow('API Error: 401');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('gives up after max retries', async () => {
+      // All calls fail with 500 - need to mock exactly 4 calls
+      vi.mocked(fetch)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' } as Response);
+
+      // Use promise.catch to handle the expected rejection
+      let error: Error | null = null;
+      const promise = api.sendChatMessage('Hello').catch((e) => {
+        error = e;
+      });
+
+      // Advance through all retries (1s + 2s + 4s) and run all pending timers
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(error).not.toBeNull();
+      expect(error?.message).toContain('API Error: 500');
+      // Initial + 3 retries = 4 calls
+      expect(fetch).toHaveBeenCalledTimes(4);
+    });
+
+    it('caps backoff delay at maxDelayMs', async () => {
+      const mockResponse = { response: 'Success', timestamp: '2024-06-15T10:00:00Z' };
+
+      // Fail 3 times, succeed on 4th
+      vi.mocked(fetch)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' } as Response)
+        .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Error' } as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockResponse),
+        } as Response);
+
+      const promise = api.sendChatMessage('Hello');
+
+      // Delays: 1s, 2s, 4s (capped at 8s but we only need 4s for attempt 3)
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+
+      const result = await promise;
+      expect(result.response).toBe('Success');
     });
   });
 });

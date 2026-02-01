@@ -73,8 +73,14 @@ export default function Dashboard({
     !initialWeather && !initialFinancial && !initialCalendar && !initialTodos
   );
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<string>('');
+  const [activeTools, setActiveTools] = useState<string[]>([]);
+  const [agentStatus, setAgentStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+
+  // Ref for aborting streaming requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Dark mode
   const { isDark, toggle: toggleDarkMode } = useDarkMode();
@@ -193,9 +199,39 @@ export default function Dashboard({
     saveSelectedBucket(selectedBucket);
   }, [selectedBucket]);
 
+  // Check agent health periodically
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch('/api/v1/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000), // 5 second timeout
+        });
+        setAgentStatus(response.ok ? 'online' : 'offline');
+      } catch {
+        setAgentStatus('offline');
+      }
+    };
+
+    // Check immediately on mount
+    checkHealth();
+
+    // Then check every 30 seconds
+    const interval = setInterval(checkHealth, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Handle clearing chat history
   const handleClearChatHistory = () => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     clearChatHistory();
+    setStreamingMessage('');
+    setActiveTools([]);
+    setIsLoadingChat(false);
     setChatHistory([
       {
         type: 'ai',
@@ -262,42 +298,130 @@ export default function Dashboard({
     );
   };
 
-  // Send chat message to proxy API (no CORS issues!)
+  // Send chat message with streaming response (SSE)
   const sendChatMessage = async (message: string) => {
+    // Cancel any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    // Reset tool tracking
+    setActiveTools([]);
+
     try {
-      const response = await fetch('/api/v1/chat', {
+      const response = await fetch('/api/v1/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ message }),
+        signal: abortControllerRef.current.signal,
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (data.success) {
-        // Add AI response to history
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let accumulatedMessage = '';
+
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode the chunk
+        const chunk = decoder.decode(value, { stream: true });
+
+        // Parse SSE format (data: content\n\n)
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6); // Remove 'data: ' prefix
+
+            // Check for completion or error signals
+            if (data === '[DONE]') {
+              // Stream complete - finalize the message
+              setChatHistory((prev) => [
+                ...prev,
+                {
+                  type: 'ai',
+                  message: accumulatedMessage,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setStreamingMessage('');
+              setActiveTools([]);
+              return;
+            }
+
+            if (data.startsWith('[ERROR]')) {
+              const errorMessage = data.slice(8); // Remove '[ERROR] ' prefix
+              setChatHistory((prev) => [
+                ...prev,
+                {
+                  type: 'ai',
+                  message: errorMessage || 'Something went wrong',
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setStreamingMessage('');
+              setActiveTools([]);
+              return;
+            }
+
+            // Check for tool events (JSON formatted)
+            if (data.startsWith('[TOOL_START]')) {
+              const toolName = data.slice(13); // Remove '[TOOL_START] ' prefix
+              setActiveTools((prev) => [...prev, toolName]);
+              continue;
+            }
+
+            if (data.startsWith('[TOOL_END]')) {
+              const toolName = data.slice(11); // Remove '[TOOL_END] ' prefix
+              setActiveTools((prev) => prev.filter((t) => t !== toolName));
+              continue;
+            }
+
+            // Accumulate the message and update streaming display
+            accumulatedMessage += data;
+            setStreamingMessage(accumulatedMessage);
+          }
+        }
+      }
+
+      // If we exit the loop without [DONE], still save what we have
+      if (accumulatedMessage) {
         setChatHistory((prev) => [
           ...prev,
           {
             type: 'ai',
-            message: data.response,
-            timestamp: data.timestamp,
+            message: accumulatedMessage,
+            timestamp: new Date().toISOString(),
           },
         ]);
-      } else {
-        // Add error message as AI response
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            type: 'ai',
-            message: data.error || 'Something went wrong',
-            timestamp: data.timestamp || new Date().toISOString(),
-          },
-        ]);
+        setStreamingMessage('');
+        setActiveTools([]);
       }
     } catch (error) {
+      // Ignore abort errors (user cancelled)
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Request cancelled');
+        return;
+      }
+
       console.error('Chat error:', error);
+      setStreamingMessage('');
+      setActiveTools([]);
       setChatHistory((prev) => [
         ...prev,
         {
@@ -998,8 +1122,19 @@ export default function Dashboard({
                   <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-200"></div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center">
+                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     🤖 AI Assistant
+                    {/* Connection status indicator */}
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        agentStatus === 'online'
+                          ? 'bg-green-500'
+                          : agentStatus === 'offline'
+                            ? 'bg-red-500'
+                            : 'bg-yellow-500 animate-pulse'
+                      }`}
+                      title={`Agent ${agentStatus}`}
+                    />
                   </h2>
                   <div className="flex items-center space-x-2">
                     {chatHistory.length > 1 && (
@@ -1102,12 +1237,57 @@ export default function Dashboard({
                     </div>
                   ))}
 
-                  {/* Loading indicator when AI is thinking */}
+                  {/* Streaming message or loading indicator */}
                   {isLoadingChat && (
                     <div className="mr-6 bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-sm">
-                      <span className="text-gray-600 dark:text-gray-300 animate-pulse">
-                        AI is thinking...
-                      </span>
+                      {/* Show active tools */}
+                      {activeTools.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {activeTools.map((tool) => (
+                            <span
+                              key={tool}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full"
+                            >
+                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                              {tool.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {streamingMessage ? (
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => (
+                              <ul className="list-disc pl-4 mb-2">{children}</ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
+                            ),
+                            li: ({ children }) => <li className="mb-1">{children}</li>,
+                            strong: ({ children }) => (
+                              <strong className="font-semibold">{children}</strong>
+                            ),
+                            code: ({ children }) => (
+                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
+                                {children}
+                              </code>
+                            ),
+                          }}
+                        >
+                          {streamingMessage}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-300 animate-pulse">
+                          {activeTools.length > 0
+                            ? `Using ${activeTools[activeTools.length - 1].replace(/_/g, ' ')}...`
+                            : 'AI is thinking...'}
+                        </span>
+                      )}
+                      {/* Blinking cursor for streaming effect */}
+                      {streamingMessage && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-gray-600 dark:bg-gray-300 animate-pulse" />
+                      )}
                     </div>
                   )}
 
