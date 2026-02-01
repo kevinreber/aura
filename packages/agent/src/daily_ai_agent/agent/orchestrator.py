@@ -243,7 +243,10 @@ Always maintain context from earlier in the conversation."""),
             user_input: Natural language input from user
 
         Yields:
-            Chunks of the AI assistant response as they're generated
+            Chunks of the AI assistant response as they're generated.
+            Also yields tool events in the format:
+            - [TOOL_START] tool_name
+            - [TOOL_END] tool_name
         """
         if not self.agent:
             yield "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
@@ -265,19 +268,27 @@ Always maintain context from earlier in the conversation."""),
             async for event in self.agent.astream_events(invoke_payload, version="v2"):
                 kind = event.get("event")
 
+                # Emit tool start events
+                if kind == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    logger.debug(f"Tool started: {tool_name}")
+                    yield f"[TOOL_START] {tool_name}"
+
                 # Stream tokens from the LLM
-                if kind == "on_chat_model_stream":
+                elif kind == "on_chat_model_stream":
                     content = event.get("data", {}).get("chunk", {})
                     if hasattr(content, "content") and content.content:
                         chunk = content.content
                         full_response += chunk
                         yield chunk
 
-                # Also capture tool outputs for context
+                # Emit tool end events
                 elif kind == "on_tool_end":
+                    tool_name = event.get("name", "unknown")
                     tool_output = event.get("data", {}).get("output")
                     if tool_output:
-                        logger.debug(f"Tool completed: {event.get('name')}")
+                        logger.debug(f"Tool completed: {tool_name}")
+                    yield f"[TOOL_END] {tool_name}"
 
             # Store the conversation in memory if enabled
             if self.enable_memory and full_response:
