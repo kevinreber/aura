@@ -253,3 +253,75 @@ curl -X POST http://localhost:8000/tools/calendar.list_events \
 - Production on Railway.app with auto-deploy
 - Environment variables in Railway dashboard
 - Health check at `/health` for monitoring
+
+## MCP Protocol Support
+
+The server supports the official Model Context Protocol (MCP) via SSE transport, enabling integration with Claude Desktop, Cursor, and other MCP-compatible clients.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/mcp/sse` | GET | SSE stream for MCP clients |
+| `/mcp/messages` | POST | JSON-RPC message endpoint |
+| `/mcp/health` | GET | MCP transport health check |
+
+### Connecting Claude Desktop
+
+Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "aura": {
+      "url": "http://localhost:8000/mcp/sse"
+    }
+  }
+}
+```
+
+For production:
+```json
+{
+  "mcpServers": {
+    "aura": {
+      "url": "https://your-server.railway.app/mcp/sse"
+    }
+  }
+}
+```
+
+### Connecting via stdio (Local Development)
+
+For local integrations where the MCP client can spawn the server as a subprocess:
+
+```json
+{
+  "mcpServers": {
+    "aura": {
+      "command": "python",
+      "args": ["-m", "mcp_server.mcp_protocol"],
+      "cwd": "/path/to/packages/server"
+    }
+  }
+}
+```
+
+### Testing MCP Connection
+
+```bash
+# Check MCP transport health
+curl http://localhost:8000/mcp/health
+
+# Response:
+# {"status": "healthy", "transport": "sse", "active_sessions": 0, "protocol_version": "2024-11-05"}
+```
+
+### Architecture
+
+The MCP implementation uses two layers:
+
+1. **mcp_protocol.py** - Wraps existing tools using the official MCP SDK
+2. **mcp_sse.py** - Implements SSE transport for Flask
+
+This allows the existing HTTP REST API to continue working while adding MCP protocol support for compatible clients.

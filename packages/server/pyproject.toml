@@ -17,6 +17,7 @@ dependencies = [
     "flask-cors==4.0.0",
     "flask-limiter==3.5.0",
     "flask[async]==3.0.0",
+    "mcp>=1.0.0",
     "google-api-python-client>=2.140.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.0",

@@ -12,6 +12,7 @@ from .config import get_settings
 from .utils.logging import setup_logging, get_logger
 from .utils.cache import get_cache_service
 from .server import get_mcp_server
+from .mcp_sse import get_mcp_sse_blueprint
 from .schemas import (
     WeatherInput, MobilityInput, CommuteInput, ShuttleScheduleInput,
     CalendarInput, TodoInput, FinancialInput
@@ -112,6 +113,9 @@ def create_app() -> Flask:
     
     # Initialize MCP server
     mcp_server = get_mcp_server()
+
+    # Register MCP SSE blueprint for official MCP protocol support
+    app.register_blueprint(get_mcp_sse_blueprint())
     
     # Initialize cache service
     async def init_cache():
