@@ -31,8 +31,14 @@ def create_app(testing: bool = False) -> Flask:
     app = Flask(__name__)
     settings = get_settings()
 
-    # Configure CORS
-    CORS(app, origins=settings.allowed_origins)
+    # Configure CORS with full preflight support
+    CORS(
+        app,
+        origins=settings.allowed_origins,
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+        supports_credentials=True,
+    )
 
     # Configure rate limiting
     limiter = Limiter(

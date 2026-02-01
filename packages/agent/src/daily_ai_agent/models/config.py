@@ -16,6 +16,7 @@ DEFAULT_CORS_ORIGINS = [
 # Default CORS origins for production (can be overridden via env)
 PRODUCTION_CORS_ORIGINS = [
     "https://daily-agent-ui.vercel.app",
+    "https://aura-six-sable.vercel.app",
     "https://web-production-66f9.up.railway.app",
     "https://web-production-f80730.up.railway.app",
 ]
