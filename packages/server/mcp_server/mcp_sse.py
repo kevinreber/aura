@@ -154,10 +154,34 @@ async def handle_jsonrpc_message(message: dict, session: SSESession) -> dict:
 
 @mcp_sse_bp.route("/sse", methods=["GET"])
 def sse_endpoint():
-    """SSE endpoint for MCP clients.
+    """SSE endpoint for MCP protocol clients (Claude Desktop, Cursor, etc.).
+    ---
+    tags:
+      - MCP Protocol
+    summary: Establish SSE connection for MCP protocol
+    description: |
+      Server-Sent Events endpoint for Model Context Protocol (MCP) clients.
 
-    Clients connect here to establish the SSE stream. The server
-    immediately sends the endpoint URL for posting messages.
+      **Protocol Flow:**
+      1. Client connects to this endpoint to establish SSE stream
+      2. Server sends `endpoint` event with URL for posting messages
+      3. Client sends JSON-RPC messages to the provided endpoint
+      4. Server responds via SSE `message` events
+
+      **Supported MCP Clients:**
+      - Claude Desktop
+      - Cursor
+      - Any MCP-compatible client
+
+      **Reference:** https://modelcontextprotocol.io/docs/concepts/transports#server-sent-events-sse
+    produces:
+      - text/event-stream
+    responses:
+      200:
+        description: SSE stream established successfully
+        schema:
+          type: string
+          example: "event: endpoint\\ndata: /mcp/messages?session_id=abc-123\\n\\n"
     """
     session = create_session()
 
@@ -198,10 +222,76 @@ def sse_endpoint():
 
 @mcp_sse_bp.route("/messages", methods=["POST"])
 async def messages_endpoint():
-    """Endpoint for receiving JSON-RPC messages from MCP clients.
+    """Receive JSON-RPC messages from MCP clients.
+    ---
+    tags:
+      - MCP Protocol
+    summary: Send JSON-RPC message to MCP server
+    description: |
+      Endpoint for receiving JSON-RPC 2.0 messages from MCP clients.
+      Responses are delivered via the SSE stream established at `/mcp/sse`.
 
-    Clients POST messages here, and responses are sent back via
-    the SSE stream.
+      **Supported Methods:**
+      - `initialize` - Initialize MCP session
+      - `tools/list` - List available tools
+      - `tools/call` - Call a tool with arguments
+      - `ping` - Health check
+
+      **Note:** This endpoint requires a valid session_id from an active SSE connection.
+    parameters:
+      - name: session_id
+        in: query
+        type: string
+        required: true
+        description: Session ID from the SSE connection
+        example: "abc-123-def-456"
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          required:
+            - jsonrpc
+            - method
+            - id
+          properties:
+            jsonrpc:
+              type: string
+              example: "2.0"
+              description: JSON-RPC version (must be "2.0")
+            method:
+              type: string
+              example: "tools/list"
+              description: MCP method to call
+            id:
+              type: integer
+              example: 1
+              description: Request ID for correlation
+            params:
+              type: object
+              description: Method-specific parameters
+              example: {"name": "weather.get_daily", "arguments": {"location": "San Francisco"}}
+    responses:
+      202:
+        description: Message accepted, response will be sent via SSE
+      400:
+        description: Invalid request (missing session_id or JSON body)
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "session_id required"
+      404:
+        description: Session not found or expired
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: "Invalid or expired session"
+      500:
+        description: Internal server error
     """
     session_id = request.args.get("session_id")
     if not session_id:
@@ -235,7 +325,37 @@ async def messages_endpoint():
 
 @mcp_sse_bp.route("/health", methods=["GET"])
 def mcp_health():
-    """Health check endpoint for MCP SSE transport."""
+    """Health check for MCP SSE transport.
+    ---
+    tags:
+      - MCP Protocol
+    summary: Check MCP protocol health status
+    description: |
+      Returns health status of the MCP SSE transport layer.
+      Use this to verify MCP protocol availability before connecting.
+    responses:
+      200:
+        description: MCP transport is healthy
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: "healthy"
+              description: Health status
+            transport:
+              type: string
+              example: "sse"
+              description: Transport type
+            active_sessions:
+              type: integer
+              example: 2
+              description: Number of active SSE sessions
+            protocol_version:
+              type: string
+              example: "2024-11-05"
+              description: MCP protocol version
+    """
     return jsonify({
         "status": "healthy",
         "transport": "sse",

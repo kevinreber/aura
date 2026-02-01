@@ -14,22 +14,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 ┌─────────────────────┐         ┌─────────────────────┐         ┌─────────────────────┐
-│   UI (Port 5173)    │  HTTP   │  Agent (Port 8001)  │  HTTP   │  Server (Port 8000) │
+│   UI (Port 5173)    │  HTTP   │  Agent (Port 8001)  │ MCP/SSE │  Server (Port 8000) │
 │   React Router v7   │────────▶│  LangChain + GPT    │────────▶│  MCP Server         │
 │   Tailwind CSS      │         │  Tool Orchestrator  │         │  External APIs      │
 │   Dashboard + Chat  │         │  Flask REST API     │         │  Redis Cache        │
 └─────────────────────┘         └─────────────────────┘         └─────────────────────┘
                                                                            │
-                                                                           ▼
-                                                                  ┌─────────────────────┐
-                                                                  │  External Services  │
-                                                                  │  • Google Calendar  │
-                                                                  │  • OpenWeatherMap   │
-                                                                  │  • Todoist API      │
-                                                                  │  • Google Maps      │
-                                                                  │  • Financial APIs   │
-                                                                  └─────────────────────┘
+                                        ┌──────────────────────────────────┤
+                                        │                                  │
+                                        ▼                                  ▼
+                               ┌─────────────────────┐         ┌─────────────────────┐
+                               │  MCP Clients        │         │  External Services  │
+                               │  • Claude Desktop   │         │  • Google Calendar  │
+                               │  • Cursor           │         │  • OpenWeatherMap   │
+                               │  • Other MCP Apps   │         │  • Todoist API      │
+                               └─────────────────────┘         │  • Google Maps      │
+                                                               │  • Financial APIs   │
+                                                               └─────────────────────┘
 ```
+
+The Agent communicates with the MCP Server using the official Model Context Protocol (MCP) SDK over SSE transport. External MCP clients (Claude Desktop, Cursor) can also connect directly to the server.
 
 ## Monorepo Structure
 
@@ -154,8 +158,9 @@ Development mode mounts source code for hot-reloading:
 ### Service Communication
 
 1. **UI → Agent**: HTTP requests to `/api/v1/*` endpoints
-2. **Agent → Server**: HTTP requests to `/tools/*` endpoints via MCP client
-3. **Server → External APIs**: Direct HTTP calls with caching
+2. **Agent → Server**: MCP protocol via SSE transport (`/mcp/sse`)
+3. **MCP Clients → Server**: Direct MCP/SSE connection for Claude Desktop, Cursor
+4. **Server → External APIs**: Direct HTTP calls with caching
 
 ### Data Flow Example
 
@@ -166,7 +171,7 @@ UI sends POST /api/v1/chat with message
   ↓
 Agent uses LangChain to select CalendarTool
   ↓
-Agent calls Server POST /tools/calendar.list_events
+Agent connects to Server via MCP/SSE and calls tools/call
   ↓
 Server calls Google Calendar API (or returns cached data)
   ↓

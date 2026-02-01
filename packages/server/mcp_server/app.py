@@ -101,6 +101,7 @@ def create_app() -> Flask:
         "tags": [
             {"name": "Health", "description": "System health and status monitoring"},
             {"name": "Tools", "description": "Available MCP tools and capabilities"},
+            {"name": "MCP Protocol", "description": "🔌 Official Model Context Protocol (MCP) endpoints for Claude Desktop, Cursor, and other MCP clients"},
             {"name": "Weather", "description": "🌤️ Real-time weather via OpenWeatherMap API"},
             {"name": "Calendar", "description": "📅 Google Calendar R/W - Events, creation, conflict detection"},
             {"name": "Financial", "description": "💰 Live stock and crypto market data"},

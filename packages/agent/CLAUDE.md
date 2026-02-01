@@ -4,7 +4,7 @@ This document provides essential context for AI assistants working on this codeb
 
 ## Project Overview
 
-**daily-ai-agent** is a production-ready Python AI agent that serves as a personal productivity assistant. It connects to an MCP (Model Context Protocol) server via HTTP to provide:
+**daily-ai-agent** is a production-ready Python AI agent that serves as a personal productivity assistant. It connects to an MCP (Model Context Protocol) server using the official MCP SDK with SSE transport to provide:
 
 - Natural language conversations powered by LangChain + GPT-4o-mini
 - Weather forecasts, calendar management, todo tracking, commute intelligence
@@ -45,7 +45,7 @@ daily-ai-agent/
 |------|---------|-------------|
 | `models/config.py` | All configuration via Pydantic BaseSettings | Yes |
 | `agent/tools.py` | 10 LangChain BaseTool implementations | Yes |
-| `services/mcp_client.py` | HTTP client for MCP server communication | Yes |
+| `services/mcp_client.py` | MCP SDK client with SSE transport | Yes |
 | `agent/orchestrator.py` | AgentOrchestrator class with LangChain agent | Yes |
 | `api.py` | Flask REST endpoints with Swagger | For API work |
 | `main.py` | Typer CLI commands | For CLI work |
@@ -139,15 +139,24 @@ class ExampleTool(BaseTool):
 
 ### 2. MCP Client Pattern (services/mcp_client.py)
 
+Uses the official MCP SDK with SSE transport:
+
 ```python
-async with httpx.AsyncClient(timeout=self.timeout) as client:
-    response = await client.post(
-        f"{self.base_url}/tools/{tool_name}",
-        json=input_data
-    )
-    response.raise_for_status()
-    return response.json()
+from mcp import ClientSession
+from mcp.client.sse import sse_client
+
+async with sse_client(self.sse_url) as (read_stream, write_stream):
+    async with ClientSession(read_stream, write_stream) as session:
+        await session.initialize()
+        result = await session.call_tool(tool_name, arguments)
+        # Parse JSON from TextContent response
+        return json.loads(result.content[0].text)
 ```
+
+**Key features:**
+- Dynamic tool discovery via `session.list_tools()`
+- Retry logic with exponential backoff
+- Automatic session management
 
 ### 3. CLI Command Pattern (main.py)
 
@@ -217,7 +226,7 @@ settings = get_settings()  # Singleton pattern
 
 ### Async/Await
 - All external API calls use `asyncio` and `await`
-- MCP client uses `httpx.AsyncClient`
+- MCP client uses official MCP SDK with SSE transport
 - CLI wraps async with `asyncio.run()`
 - Flask uses async route handlers
 
@@ -227,7 +236,7 @@ settings = get_settings()  # Singleton pattern
 
 ### Error Handling
 - Wrap external calls in try/except
-- Handle `httpx.HTTPStatusError` and `httpx.TimeoutException` specifically
+- Handle `MCPError` for MCP protocol errors
 - Return user-friendly error messages, log technical details
 
 ### Data Validation
@@ -307,7 +316,7 @@ def new_command(param: str = typer.Option(...)):
 
 ### Don't
 - Don't log API keys or sensitive user data
-- Don't make sync HTTP calls (use httpx.AsyncClient)
+- Don't make sync calls (use async/await with MCP SDK)
 - Don't hardcode URLs (use settings)
 - Don't skip error handling for external calls
 - Don't add new dependencies without updating pyproject.toml
@@ -319,7 +328,8 @@ def new_command(param: str = typer.Option(...)):
 | Language | Python 3.13+ |
 | Package Manager | UV (preferred), pip |
 | AI Framework | LangChain + OpenAI (GPT-4o-mini) |
-| HTTP Client | httpx (async) |
+| MCP Client | Official MCP SDK with SSE transport |
+| HTTP Client | httpx (for health checks) |
 | CLI Framework | Typer + Rich |
 | API Framework | Flask + Flask-CORS |
 | Data Validation | Pydantic |
