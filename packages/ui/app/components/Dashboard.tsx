@@ -73,6 +73,7 @@ export default function Dashboard({
     !initialWeather && !initialFinancial && !initialCalendar && !initialTodos
   );
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<string>('');
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
 
@@ -262,10 +263,10 @@ export default function Dashboard({
     );
   };
 
-  // Send chat message to proxy API (no CORS issues!)
+  // Send chat message with streaming response (SSE)
   const sendChatMessage = async (message: string) => {
     try {
-      const response = await fetch('/api/v1/chat', {
+      const response = await fetch('/api/v1/chat/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -273,31 +274,86 @@ export default function Dashboard({
         body: JSON.stringify({ message }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      if (data.success) {
-        // Add AI response to history
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      const decoder = new TextDecoder();
+      let accumulatedMessage = '';
+
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode the chunk
+        const chunk = decoder.decode(value, { stream: true });
+
+        // Parse SSE format (data: content\n\n)
+        const lines = chunk.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6); // Remove 'data: ' prefix
+
+            // Check for completion or error signals
+            if (data === '[DONE]') {
+              // Stream complete - finalize the message
+              setChatHistory((prev) => [
+                ...prev,
+                {
+                  type: 'ai',
+                  message: accumulatedMessage,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setStreamingMessage('');
+              return;
+            }
+
+            if (data.startsWith('[ERROR]')) {
+              const errorMessage = data.slice(8); // Remove '[ERROR] ' prefix
+              setChatHistory((prev) => [
+                ...prev,
+                {
+                  type: 'ai',
+                  message: errorMessage || 'Something went wrong',
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setStreamingMessage('');
+              return;
+            }
+
+            // Accumulate the message and update streaming display
+            accumulatedMessage += data;
+            setStreamingMessage(accumulatedMessage);
+          }
+        }
+      }
+
+      // If we exit the loop without [DONE], still save what we have
+      if (accumulatedMessage) {
         setChatHistory((prev) => [
           ...prev,
           {
             type: 'ai',
-            message: data.response,
-            timestamp: data.timestamp,
+            message: accumulatedMessage,
+            timestamp: new Date().toISOString(),
           },
         ]);
-      } else {
-        // Add error message as AI response
-        setChatHistory((prev) => [
-          ...prev,
-          {
-            type: 'ai',
-            message: data.error || 'Something went wrong',
-            timestamp: data.timestamp || new Date().toISOString(),
-          },
-        ]);
+        setStreamingMessage('');
       }
     } catch (error) {
       console.error('Chat error:', error);
+      setStreamingMessage('');
       setChatHistory((prev) => [
         ...prev,
         {
@@ -1102,12 +1158,41 @@ export default function Dashboard({
                     </div>
                   ))}
 
-                  {/* Loading indicator when AI is thinking */}
+                  {/* Streaming message or loading indicator */}
                   {isLoadingChat && (
                     <div className="mr-6 bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-sm">
-                      <span className="text-gray-600 dark:text-gray-300 animate-pulse">
-                        AI is thinking...
-                      </span>
+                      {streamingMessage ? (
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => (
+                              <ul className="list-disc pl-4 mb-2">{children}</ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
+                            ),
+                            li: ({ children }) => <li className="mb-1">{children}</li>,
+                            strong: ({ children }) => (
+                              <strong className="font-semibold">{children}</strong>
+                            ),
+                            code: ({ children }) => (
+                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
+                                {children}
+                              </code>
+                            ),
+                          }}
+                        >
+                          {streamingMessage}
+                        </ReactMarkdown>
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-300 animate-pulse">
+                          AI is thinking...
+                        </span>
+                      )}
+                      {/* Blinking cursor for streaming effect */}
+                      {streamingMessage && (
+                        <span className="inline-block w-2 h-4 ml-1 bg-gray-600 dark:bg-gray-300 animate-pulse" />
+                      )}
                     </div>
                   )}
 
