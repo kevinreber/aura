@@ -4,14 +4,14 @@ import asyncio
 import uuid
 import time
 from datetime import datetime
-from flask import Flask, request, jsonify, make_response, g
+from flask import Flask, request, jsonify, make_response, g, Response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flasgger import Swagger
 from werkzeug.exceptions import BadRequest, InternalServerError
 from loguru import logger
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, AsyncIterator
 
 from .agent.orchestrator import AgentOrchestrator
 from .services.mcp_client import MCPClient
@@ -167,6 +167,7 @@ def create_app(testing: bool = False) -> Flask:
                   type: string
                   example: "https://web-production-66f9.up.railway.app"
         """
+        llm_info = orchestrator.get_llm_info()
         return jsonify({
             "status": "healthy",
             "service": APP_NAME,
@@ -174,6 +175,7 @@ def create_app(testing: bool = False) -> Flask:
             "timestamp": datetime.now().isoformat(),
             "mcp_server": settings.mcp_server_url,
             "ai_enabled": orchestrator.is_conversational(),
+            "llm": llm_info,
             "request_id": g.get('request_id', 'unknown'),
         })
 
@@ -275,6 +277,107 @@ def create_app(testing: bool = False) -> Flask:
             raise e
         except Exception as e:
             logger.error(f"[{g.request_id}] Chat error: {e}")
+            return jsonify({
+                "error": str(e),
+                "request_id": g.get('request_id', 'unknown'),
+            }), 500
+
+    @app.route('/chat/stream', methods=['POST'])
+    @limiter.limit("10 per minute")
+    async def chat_stream():
+        """Natural language conversation with streaming response
+        ---
+        tags:
+          - AI Features
+        parameters:
+          - name: body
+            in: body
+            required: true
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  example: "What's my day looking like?"
+                  description: "Natural language query to the AI assistant"
+        responses:
+          200:
+            description: Streaming AI assistant response (Server-Sent Events)
+            content:
+              text/event-stream:
+                schema:
+                  type: string
+          400:
+            description: Invalid request format
+          503:
+            description: AI features not available (missing API key)
+        """
+        try:
+            data = request.get_json()
+            if not data or 'message' not in data:
+                raise BadRequest("Missing 'message' field in request body")
+
+            message = data['message'].strip()
+            if not message:
+                raise BadRequest("Message cannot be empty")
+
+            if not orchestrator.is_conversational():
+                return jsonify({
+                    "error": "Conversational AI not available",
+                    "message": "LLM API key required for chat functionality",
+                    "request_id": g.get('request_id', 'unknown'),
+                }), 503
+
+            logger.info(f"[{g.request_id}] Streaming chat request: {message[:100]}...")
+
+            async def generate():
+                """Generate SSE events from streaming response."""
+                try:
+                    async for chunk in orchestrator.chat_stream(message):
+                        # Format as Server-Sent Event
+                        yield f"data: {chunk}\n\n"
+                    # Send done event
+                    yield "data: [DONE]\n\n"
+                except Exception as e:
+                    logger.error(f"[{g.request_id}] Streaming error: {e}")
+                    yield f"data: [ERROR] {str(e)}\n\n"
+
+            # Run async generator in event loop
+            async def stream_wrapper():
+                async for item in generate():
+                    yield item
+
+            # Create synchronous generator for Flask
+            def sync_generator():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    gen = generate()
+                    while True:
+                        try:
+                            chunk = loop.run_until_complete(gen.__anext__())
+                            yield chunk
+                        except StopAsyncIteration:
+                            break
+                finally:
+                    loop.close()
+
+            return Response(
+                sync_generator(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Request-ID': g.get('request_id', 'unknown'),
+                }
+            )
+
+        except BadRequest as e:
+            raise e
+        except Exception as e:
+            logger.error(f"[{g.request_id}] Chat stream error: {e}")
             return jsonify({
                 "error": str(e),
                 "request_id": g.get('request_id', 'unknown'),
@@ -624,6 +727,12 @@ def create_app(testing: bool = False) -> Flask:
                     "endpoint": "/chat",
                     "method": "POST",
                     "description": "Natural language conversation",
+                    "body": {"message": "string"}
+                },
+                "chat_stream": {
+                    "endpoint": "/chat/stream",
+                    "method": "POST",
+                    "description": "Natural language conversation with streaming response (SSE)",
                     "body": {"message": "string"}
                 },
                 "briefing": {

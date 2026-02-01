@@ -3,15 +3,16 @@
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, BaseMessage
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, AsyncIterator
 from loguru import logger
 from datetime import datetime
 
 from .tools import get_all_tools
 from ..models.config import get_settings
 from ..services.llm import LLMService
-from ..utils.constants import DEFAULT_LLM_MODEL, DEFAULT_LLM_TEMPERATURE
+from ..utils.tracing import setup_langsmith_tracing, is_tracing_active
 
 # Module-level tool cache for performance
 _cached_tools: Optional[List] = None
@@ -45,6 +46,10 @@ class AgentOrchestrator:
             enable_memory: Whether to enable conversation memory (defaults to settings.enable_memory)
         """
         self.settings = get_settings()
+
+        # Set up LangSmith tracing if configured (must be done before LangChain imports)
+        self._setup_tracing()
+
         self.llm_service = LLMService()
 
         # Initialize conversation memory based on settings or override
@@ -62,22 +67,68 @@ class AgentOrchestrator:
         else:
             self.tools = get_all_tools()
 
-        # Initialize LangChain agent if OpenAI is available
-        if self.settings.openai_api_key:
+        # Determine which LLM provider to use
+        self.llm_provider = self.settings.effective_llm_provider
+
+        # Initialize LangChain agent if any LLM is available
+        if self._has_llm_credentials():
             self._init_langchain_agent()
         else:
             self.agent: Optional[AgentExecutor] = None
-            logger.warning("No OpenAI API key - conversational features disabled")
+            logger.warning("No LLM API key configured - conversational features disabled")
+
+    def _setup_tracing(self) -> None:
+        """Set up LangSmith tracing if configured."""
+        if self.settings.is_tracing_enabled:
+            setup_langsmith_tracing(
+                api_key=self.settings.langchain_api_key,
+                project=self.settings.langchain_project,
+                endpoint=self.settings.langchain_endpoint,
+                enabled=True,
+            )
+        else:
+            logger.debug("LangSmith tracing not configured")
+
+    def _has_llm_credentials(self) -> bool:
+        """Check if any LLM credentials are available."""
+        return bool(self.settings.openai_api_key) or bool(self.settings.anthropic_api_key)
+
+    def _create_llm(self, streaming: bool = False) -> BaseChatModel:
+        """
+        Create the appropriate LLM based on configuration.
+
+        Args:
+            streaming: Whether to enable streaming for this LLM instance
+
+        Returns:
+            Configured LLM instance (ChatOpenAI or ChatAnthropic)
+        """
+        if self.llm_provider == "anthropic":
+            # Import here to avoid requiring anthropic if not used
+            from langchain_anthropic import ChatAnthropic
+
+            logger.info(f"Using Anthropic model: {self.settings.anthropic_model}")
+            return ChatAnthropic(
+                api_key=self.settings.anthropic_api_key,
+                model=self.settings.anthropic_model,
+                temperature=self.settings.llm_temperature,
+                streaming=streaming,
+            )
+        else:
+            # Default to OpenAI
+            logger.info(f"Using OpenAI model: {self.settings.openai_model}")
+            return ChatOpenAI(
+                api_key=self.settings.openai_api_key,
+                model=self.settings.openai_model,
+                temperature=self.settings.llm_temperature,
+                streaming=streaming,
+            )
 
     def _init_langchain_agent(self) -> None:
         """Initialize the LangChain agent with tools."""
         try:
-            # Create the LLM
-            llm = ChatOpenAI(
-                api_key=self.settings.openai_api_key,
-                model=DEFAULT_LLM_MODEL,
-                temperature=DEFAULT_LLM_TEMPERATURE,
-            )
+            # Create the LLM using configured provider
+            llm = self._create_llm(streaming=False)
 
             # Create the prompt template with current date
             current_date = datetime.now().strftime("%Y-%m-%d")
@@ -135,7 +186,9 @@ Always maintain context from earlier in the conversation."""),
             agent = create_tool_calling_agent(llm, self.tools, prompt)
             self.agent = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
 
-            logger.info("LangChain agent initialized successfully")
+            # Log tracing status
+            tracing_status = "with LangSmith tracing" if is_tracing_active() else "without tracing"
+            logger.info(f"LangChain agent initialized successfully ({self.llm_provider}, {tracing_status})")
 
         except Exception as e:
             logger.error(f"Error initializing LangChain agent: {e}")
@@ -152,7 +205,7 @@ Always maintain context from earlier in the conversation."""),
             AI assistant response
         """
         if not self.agent:
-            return "I need an OpenAI API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
+            return "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
 
         try:
             logger.info(f"Processing user input: {user_input}")
@@ -181,6 +234,62 @@ Always maintain context from earlier in the conversation."""),
         except Exception as e:
             logger.error(f"Error in chat processing: {e}")
             return f"Sorry, I encountered an error: {str(e)}"
+
+    async def chat_stream(self, user_input: str) -> AsyncIterator[str]:
+        """
+        Handle a conversational input with streaming response.
+
+        Args:
+            user_input: Natural language input from user
+
+        Yields:
+            Chunks of the AI assistant response as they're generated
+        """
+        if not self.agent:
+            yield "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
+            return
+
+        try:
+            logger.info(f"Processing user input (streaming): {user_input}")
+
+            # Build the invoke payload
+            invoke_payload: Dict[str, Any] = {"input": user_input}
+
+            # Include chat history if memory is enabled
+            if self.enable_memory:
+                invoke_payload["chat_history"] = self.chat_history
+                logger.debug(f"Including {len(self.chat_history)} messages in chat history")
+
+            # Stream the response using astream_events
+            full_response = ""
+            async for event in self.agent.astream_events(invoke_payload, version="v2"):
+                kind = event.get("event")
+
+                # Stream tokens from the LLM
+                if kind == "on_chat_model_stream":
+                    content = event.get("data", {}).get("chunk", {})
+                    if hasattr(content, "content") and content.content:
+                        chunk = content.content
+                        full_response += chunk
+                        yield chunk
+
+                # Also capture tool outputs for context
+                elif kind == "on_tool_end":
+                    tool_output = event.get("data", {}).get("output")
+                    if tool_output:
+                        logger.debug(f"Tool completed: {event.get('name')}")
+
+            # Store the conversation in memory if enabled
+            if self.enable_memory and full_response:
+                self.chat_history.append(HumanMessage(content=user_input))
+                self.chat_history.append(AIMessage(content=full_response))
+                logger.debug(f"Chat history now has {len(self.chat_history)} messages")
+
+            logger.info("Successfully generated streaming response")
+
+        except Exception as e:
+            logger.error(f"Error in streaming chat processing: {e}")
+            yield f"Sorry, I encountered an error: {str(e)}"
 
     async def get_smart_briefing(self) -> str:
         """
@@ -230,3 +339,16 @@ Always maintain context from earlier in the conversation."""),
     def has_memory(self) -> bool:
         """Check if memory is enabled and has messages stored."""
         return self.enable_memory and len(self.chat_history) > 0
+
+    def get_llm_info(self) -> Dict[str, Any]:
+        """Get information about the current LLM configuration."""
+        return {
+            "provider": self.llm_provider,
+            "model": (
+                self.settings.anthropic_model
+                if self.llm_provider == "anthropic"
+                else self.settings.openai_model
+            ),
+            "tracing_enabled": is_tracing_active(),
+            "tracing_project": self.settings.langchain_project if is_tracing_active() else None,
+        }

@@ -27,7 +27,16 @@ class Settings(BaseSettings):
     # AI Model Configuration
     openai_api_key: str = ""
     anthropic_api_key: Optional[str] = None
-    default_llm: str = "openai"
+    llm_provider: str = "openai"  # "openai" or "anthropic"
+    openai_model: str = "gpt-4o-mini"
+    anthropic_model: str = "claude-3-5-sonnet-20241022"
+    llm_temperature: float = 0.1
+
+    # LangSmith Tracing (optional)
+    langchain_tracing_v2: bool = False
+    langchain_api_key: Optional[str] = None
+    langchain_project: str = "aura"
+    langchain_endpoint: str = "https://api.smith.langchain.com"
 
     # MCP Server Connection
     mcp_server_url: str = "http://localhost:8000"
@@ -99,6 +108,23 @@ class Settings(BaseSettings):
         """Check if running in testing environment."""
         return self.environment == "testing"
 
+    @property
+    def is_tracing_enabled(self) -> bool:
+        """Check if LangSmith tracing is enabled and configured."""
+        return self.langchain_tracing_v2 and bool(self.langchain_api_key)
+
+    @property
+    def effective_llm_provider(self) -> str:
+        """Get the effective LLM provider based on config and available API keys."""
+        # If anthropic is requested but no key, fall back to openai
+        if self.llm_provider == "anthropic" and not self.anthropic_api_key:
+            return "openai"
+        # If openai is requested but no key, try anthropic
+        if self.llm_provider == "openai" and not self.openai_api_key:
+            if self.anthropic_api_key:
+                return "anthropic"
+        return self.llm_provider
+
     def __init__(self, **kwargs):
         # Handle environment variables for debug and environment
         if "debug" not in kwargs:
@@ -116,9 +142,9 @@ class Settings(BaseSettings):
 
         # Validate required API keys in production
         if self.is_production:
-            if self.default_llm == "openai" and not self.openai_api_key:
+            if self.llm_provider == "openai" and not self.openai_api_key:
                 raise ValueError("OPENAI_API_KEY is required when using OpenAI in production")
-            if self.default_llm == "anthropic" and not self.anthropic_api_key:
+            if self.llm_provider == "anthropic" and not self.anthropic_api_key:
                 raise ValueError("ANTHROPIC_API_KEY is required when using Anthropic in production")
 
 

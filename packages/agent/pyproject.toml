@@ -41,6 +41,12 @@ dependencies = [
     
     # Logging
     "loguru>=0.7.0",
+
+    # LangSmith tracing (optional)
+    "langsmith>=0.1.0",
+
+    # Anthropic Claude support (optional)
+    "langchain-anthropic>=0.1.0",
 ]
 
 [project.scripts]
