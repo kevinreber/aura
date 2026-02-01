@@ -52,6 +52,13 @@ An intelligent AI agent that acts as your **personal productivity assistant**, o
 - **Context Awareness** - Remembers conversation flow
 - **Error Recovery** - Graceful handling of API failures
 
+### 🔧 **Developer Features**
+
+- **Multi-LLM Support** - Switch between OpenAI and Anthropic Claude
+- **LangSmith Tracing** - Full observability into agent behavior
+- **Streaming Responses** - Real-time token streaming via SSE
+- **Configurable Models** - Choose specific models and temperature
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -81,8 +88,12 @@ cp .env.example .env
 Create a `.env` file based on `.env.example`:
 
 ```bash
-# Required for conversational AI
+# Required for conversational AI (at least one LLM provider)
 OPENAI_API_KEY=your_openai_api_key_here
+
+# Optional: Anthropic Claude support (alternative LLM)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Only needed if using Claude
+LLM_PROVIDER=openai  # "openai" (default) or "anthropic"
 
 # MCP Server (already configured for your deployment)
 MCP_SERVER_URL=https://web-production-66f9.up.railway.app
@@ -92,6 +103,12 @@ USER_NAME=Kevin
 USER_LOCATION=San Francisco
 DEFAULT_COMMUTE_ORIGIN=Home
 DEFAULT_COMMUTE_DESTINATION=Office
+
+# Optional: LangSmith Tracing (for debugging and monitoring)
+# Sign up at https://smith.langchain.com for free
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls_your_api_key_here
+LANGCHAIN_PROJECT=aura
 ```
 
 ### Usage Options
@@ -137,7 +154,8 @@ The server will start and show available endpoints:
 🚀 Starting AI Agent API Server
 📊 Environment: development
 🔧 Debug mode: true
-🤖 AI Features: ✅ Enabled
+🤖 AI Features: ✅ Enabled (openai, gpt-4o-mini)
+🔍 LangSmith: ✅ Enabled (project: aura)
 🌐 MCP Server: http://localhost:8000
 
 Available endpoints:
@@ -145,6 +163,7 @@ Available endpoints:
   📚 Swagger UI:       http://localhost:8001/docs
   🗂️  List tools:       http://localhost:8001/tools
   💬 Chat API:         POST http://localhost:8001/chat
+  💬 Chat Stream API:  POST http://localhost:8001/chat/stream (SSE)
   📅 Briefing API:     http://localhost:8001/briefing
   🌤️  Weather API:      http://localhost:8001/tools/weather
   ✅ Todos API:        http://localhost:8001/tools/todos
@@ -170,6 +189,11 @@ curl "http://localhost:8001/tools/calendar?date=2025-01-15"
 
 # Chat with AI (requires OpenAI API key)
 curl -X POST http://localhost:8001/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What's my day looking like?"}'
+
+# Chat with streaming response (Server-Sent Events)
+curl -X POST http://localhost:8001/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"message": "What's my day looking like?"}'
 
@@ -571,12 +595,24 @@ The **daily-agent-ui** project integrates via:
 **For API Server:**
 
 ```bash
-# Required for AI features
+# LLM Configuration (at least one required)
 OPENAI_API_KEY=your_openai_key_here
+ANTHROPIC_API_KEY=your_anthropic_key_here  # Optional
+
+# LLM Provider Selection
+LLM_PROVIDER=openai              # "openai" (default) or "anthropic"
+OPENAI_MODEL=gpt-4o-mini         # OpenAI model (default: gpt-4o-mini)
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022  # Anthropic model
+LLM_TEMPERATURE=0.1              # Response temperature (0.0-1.0)
+
+# LangSmith Tracing (optional - for debugging)
+LANGCHAIN_TRACING_V2=true        # Enable tracing
+LANGCHAIN_API_KEY=ls_xxx         # Your LangSmith API key
+LANGCHAIN_PROJECT=aura           # Project name in LangSmith
 
 # Server configuration
-HOST=0.0.0.0                    # Default: 0.0.0.0 (all interfaces)
-PORT=8001                       # Default: 8001
+HOST=0.0.0.0                     # Default: 0.0.0.0 (all interfaces)
+PORT=8001                        # Default: 8001
 ENVIRONMENT=development          # development | production
 
 # MCP Server connection
@@ -723,6 +759,85 @@ async def my_tool_endpoint():
         return jsonify({"tool": "my_tool", "data": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+```
+
+## 📊 LangSmith Tracing
+
+LangSmith provides full observability into your AI agent's behavior. When enabled, you can see:
+
+- **Traces**: Full timeline of every LLM call, tool call, and decision
+- **Latency**: How long each step took
+- **Token Usage**: Tokens consumed per request (tied to cost)
+- **Tool Calls**: Which tools the agent chose and why
+- **Errors**: Where and why things failed
+
+### Setup
+
+1. Sign up at [smith.langchain.com](https://smith.langchain.com) (free tier: 5K traces/month)
+2. Create a project (e.g., "aura")
+3. Generate an API key
+4. Add to your `.env`:
+
+```bash
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls_your_key_here
+LANGCHAIN_PROJECT=aura
+```
+
+### Viewing Traces
+
+After making requests, visit your LangSmith dashboard to see:
+
+```
+📍 User: "What's my day look like?"
+   ├── 🤖 LLM Call (GPT-4o-mini) - 245ms, 150 tokens
+   │   └── Decision: Call [CalendarTool, WeatherTool, TodoTool]
+   ├── 🔧 CalendarTool - 320ms
+   │   └── Result: 3 meetings found
+   ├── 🔧 WeatherTool - 180ms
+   │   └── Result: 72°F, sunny
+   ├── 🔧 TodoTool - 210ms
+   │   └── Result: 5 tasks
+   ├── 🤖 LLM Call (GPT-4o-mini) - 890ms, 520 tokens
+   │   └── Generated final response
+   └── ✅ Total: 1.85s, 670 tokens, ~$0.002
+```
+
+## 🔀 Multi-LLM Support
+
+The agent supports both OpenAI and Anthropic Claude models. By default, it uses OpenAI.
+
+### Switching LLM Providers
+
+```bash
+# Use OpenAI (default)
+LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-xxx
+
+# Use Anthropic Claude
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-xxx
+```
+
+### Automatic Fallback
+
+If your preferred LLM provider isn't configured, the agent automatically falls back:
+- If `LLM_PROVIDER=anthropic` but no `ANTHROPIC_API_KEY` → uses OpenAI
+- If `LLM_PROVIDER=openai` but no `OPENAI_API_KEY` → uses Anthropic (if available)
+
+### Model Configuration
+
+```bash
+# OpenAI models
+OPENAI_MODEL=gpt-4o-mini          # Default, cost-effective
+OPENAI_MODEL=gpt-4o               # More capable, higher cost
+
+# Anthropic models
+ANTHROPIC_MODEL=claude-3-5-sonnet-20241022  # Default
+ANTHROPIC_MODEL=claude-3-opus-20240229      # Most capable
+
+# Temperature (0.0 = deterministic, 1.0 = creative)
+LLM_TEMPERATURE=0.1               # Default, consistent responses
 ```
 
 ## ❓ Troubleshooting
