@@ -8,6 +8,18 @@ Unified monorepo for the Aura productivity platform.
     # Edit .env with your API keys
     make dev
 
+## 🤖 Claude Code Integration
+
+This project includes custom Claude Code skills and hooks for enhanced development:
+
+```bash
+# Setup Claude Code features
+./.claude/setup.sh
+```
+
+**Available Skills**: `/health-check`, `/test-all`, `/service-logs`, `/add-tool`, and more
+**Documentation**: See [.claude/README.md](.claude/README.md) and [.claude/QUICKSTART.md](.claude/QUICKSTART.md)
+
 ## Services
 
 | Service | URL | Description |
@@ -35,3 +47,10 @@ Unified monorepo for the Aura productivity platform.
 - packages/server - MCP Server (Python/Flask)
 - packages/agent - AI Agent (Python/LangChain)
 - packages/ui - Web UI (React/TypeScript)
+
+## Documentation
+
+- **CLAUDE.md** - Architecture guide for AI assistants
+- **.claude/README.md** - Custom Claude Code skills and hooks
+- **.claude/QUICKSTART.md** - Quick start guide for Claude Code
+- **packages/*/README.md** - Package-specific documentation

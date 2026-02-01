@@ -1,0 +1,5 @@
+{
+  "name": "test-all",
+  "description": "Run tests for all packages in the monorepo",
+  "instructions": "Run the test suites for all three packages (server, agent, ui) and provide a summary of results.\n\n1. Run server tests: cd packages/server && uv run pytest --cov=mcp_server --cov-report=term-missing\n2. Run agent tests: cd packages/agent && uv run pytest --cov=daily_ai_agent --cov-report=term-missing\n3. Run UI type checking: cd packages/ui && npm run typecheck\n4. Summarize all results, highlighting any failures\n5. If any tests fail, provide suggestions for fixes"
+}

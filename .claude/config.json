@@ -1,0 +1,55 @@
+{
+  "project_name": "Aura",
+  "project_type": "monorepo",
+  "description": "Personal AI productivity platform with React UI, Python AI Agent, and MCP Server",
+  "skills_directory": ".claude/skills",
+  "hooks_directory": ".claude/hooks",
+  "default_shell": "bash",
+  "packages": [
+    {
+      "name": "server",
+      "path": "packages/server",
+      "type": "python",
+      "version": "3.11+",
+      "package_manager": "uv",
+      "test_command": "uv run pytest --cov=mcp_server",
+      "lint_command": "uv run black . && uv run flake8 . && uv run mypy .",
+      "dev_server": "uv run python run.py",
+      "port": 8000
+    },
+    {
+      "name": "agent",
+      "path": "packages/agent",
+      "type": "python",
+      "version": "3.13+",
+      "package_manager": "uv",
+      "test_command": "uv run pytest --cov=daily_ai_agent",
+      "lint_command": "uv run black . && uv run isort . && uv run mypy .",
+      "dev_server": "uv run daily-ai-agent-api",
+      "port": 8001
+    },
+    {
+      "name": "ui",
+      "path": "packages/ui",
+      "type": "typescript",
+      "framework": "react-router-v7",
+      "package_manager": "npm",
+      "test_command": "npm run typecheck",
+      "lint_command": "npm run typecheck",
+      "dev_server": "npm run dev",
+      "port": 5173
+    }
+  ],
+  "docker": {
+    "enabled": true,
+    "compose_file": "docker-compose.yml",
+    "services": ["server", "agent", "ui", "redis"]
+  },
+  "recommended_workflow": [
+    "Start with /health-check to verify services",
+    "Use /service-logs to investigate issues",
+    "Use /add-tool when adding new features",
+    "Run /test-all before committing",
+    "Use /api-test for integration testing"
+  ]
+}

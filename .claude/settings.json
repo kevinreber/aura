@@ -1,0 +1,103 @@
+{
+  "$schema": "https://claude.ai/schemas/settings.json",
+  "project": {
+    "name": "Aura",
+    "type": "monorepo",
+    "description": "Personal AI productivity platform"
+  },
+  "preferences": {
+    "auto_format": true,
+    "run_tests_before_commit": true,
+    "check_types": true
+  },
+  "code_style": {
+    "python": {
+      "formatter": "black",
+      "line_length": 100,
+      "linter": "flake8",
+      "type_checker": "mypy"
+    },
+    "typescript": {
+      "strict": true,
+      "formatter": "built-in"
+    }
+  },
+  "paths": {
+    "server": "packages/server",
+    "agent": "packages/agent",
+    "ui": "packages/ui",
+    "docker": "docker",
+    "env_example": ".env.example"
+  },
+  "commands": {
+    "start_all": "make dev",
+    "stop_all": "make down",
+    "view_logs": "make logs",
+    "rebuild": "make build",
+    "shell_server": "make shell-server",
+    "shell_agent": "make shell-agent",
+    "redis_cli": "make redis-cli"
+  },
+  "service_urls": {
+    "ui": "http://localhost:5173",
+    "agent": "http://localhost:8001",
+    "server": "http://localhost:8000",
+    "redis": "localhost:6379"
+  },
+  "ai_context": {
+    "main_guide": "CLAUDE.md",
+    "server_guide": "packages/server/CLAUDE.md",
+    "agent_guide": "packages/agent/CLAUDE.md",
+    "ui_guide": "packages/ui/CLAUDE.md",
+    "skills_guide": ".claude/README.md",
+    "quickstart": ".claude/QUICKSTART.md"
+  },
+  "testing": {
+    "server": {
+      "command": "uv run pytest --cov=mcp_server",
+      "directory": "packages/server"
+    },
+    "agent": {
+      "command": "uv run pytest --cov=daily_ai_agent",
+      "directory": "packages/agent"
+    },
+    "ui": {
+      "command": "npm run typecheck",
+      "directory": "packages/ui"
+    }
+  },
+  "important_files": [
+    "CLAUDE.md",
+    "docker-compose.yml",
+    "Makefile",
+    ".env.example",
+    "packages/server/mcp_server/config.py",
+    "packages/agent/src/daily_ai_agent/models/config.py",
+    "packages/ui/app/lib/api.ts"
+  ],
+  "patterns": {
+    "tool_implementation": [
+      "Create schema in packages/server/mcp_server/schemas/",
+      "Create tool in packages/server/mcp_server/tools/",
+      "Register in packages/server/mcp_server/server.py",
+      "Add LangChain tool in packages/agent/src/daily_ai_agent/agent/tools.py",
+      "Add UI component in packages/ui/app/components/",
+      "Update API client in packages/ui/app/lib/api.ts"
+    ],
+    "debugging_flow": [
+      "/health-check to verify service status",
+      "/service-logs to check for errors",
+      "/debug-cache if caching issues",
+      "/restart-service if service unresponsive",
+      "/api-test to verify endpoints"
+    ]
+  },
+  "external_apis": {
+    "openweathermap": "Weather data",
+    "google_calendar": "Calendar CRUD operations",
+    "google_maps": "Directions and commute data",
+    "todoist": "Todo management",
+    "alpha_vantage": "Stock market data",
+    "coingecko": "Cryptocurrency prices"
+  }
+}

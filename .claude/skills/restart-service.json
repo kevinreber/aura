@@ -1,0 +1,5 @@
+{
+  "name": "restart-service",
+  "description": "Restart a specific service or all services",
+  "instructions": "Help the user restart services in the Aura monorepo.\n\n1. Ask which service to restart (server, agent, ui, redis, or all)\n2. If specific service:\n   - Run: docker compose restart <service>\n   - Wait for health check to pass (if applicable)\n   - Verify with curl to service endpoint\n3. If all services:\n   - Run: make down\n   - Run: make dev\n   - Wait for all health checks\n4. After restart:\n   - Show service status: docker compose ps\n   - Run health check on affected services\n   - Tail logs briefly to ensure no errors: docker compose logs --tail=20 <service>\n5. Explain when to restart vs rebuild:\n   - Restart: Code changes with hot reload, config changes\n   - Rebuild: Dependency changes, Dockerfile changes"
+}

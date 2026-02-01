@@ -1,0 +1,5 @@
+{
+  "name": "health-check",
+  "description": "Check the health status of all running services",
+  "instructions": "Check if all Aura services are running and healthy.\n\n1. Check if Docker services are running: docker compose ps\n2. Test server health: curl -f http://localhost:8000/health\n3. Test agent health: curl -f http://localhost:8001/health\n4. Test UI availability: curl -f http://localhost:5173/\n5. Check Redis: docker compose exec redis redis-cli ping\n6. Provide a summary dashboard showing:\n   - ✅ or ❌ for each service\n   - Port numbers and URLs\n   - Any error messages\n   - Suggestions if services are down (e.g., 'Run make dev to start services')"
+}

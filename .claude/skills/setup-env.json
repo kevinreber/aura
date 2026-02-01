@@ -1,0 +1,5 @@
+{
+  "name": "setup-env",
+  "description": "Setup the development environment from scratch",
+  "instructions": "Help the user set up the Aura development environment.\n\n1. Check if .env file exists, if not: cp .env.example .env\n2. List all required API keys from .env.example\n3. For each missing key, provide:\n   - Service name (e.g., OpenWeatherMap, Google Calendar)\n   - Where to get the key (URL)\n   - What features require this key\n   - Whether it's required or optional\n4. Check if Docker is installed: docker --version\n5. If not installed, provide installation instructions for the user's OS\n6. Once .env is configured and Docker is ready:\n   - Run: make build\n   - Run: make dev\n   - Wait for health checks to pass\n   - Provide service URLs\n7. Verify setup with health-check skill"
+}

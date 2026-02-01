@@ -1,0 +1,5 @@
+{
+  "name": "service-logs",
+  "description": "View logs for a specific service or all services",
+  "instructions": "Help the user view logs for Aura services.\n\n1. Ask which service to view logs for (server, agent, ui, redis, or all)\n2. If specific service: docker compose logs -f --tail=100 <service>\n3. If all: docker compose logs -f --tail=50\n4. Provide context about what to look for in logs:\n   - Server: API requests, cache hits/misses, external API calls\n   - Agent: LangChain tool selections, OpenAI API calls, MCP client requests\n   - UI: React component renders, API fetch errors\n   - Redis: Cache operations\n5. If errors are found in logs, help diagnose the issue"
+}
