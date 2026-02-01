@@ -13,22 +13,42 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = [
-    "flasgger==0.9.7.1",
-    "flask-cors==4.0.0",
-    "flask-limiter==3.5.0",
-    "flask[async]==3.0.0",
+    # FastAPI and async server
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sse-starlette>=2.1.0",
+    "slowapi>=0.1.9",
+
+    # MCP SDK for official protocol support
+    "mcp>=1.0.0",
+
+    # Google integrations
     "google-api-python-client>=2.140.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.0",
+
+    # HTTP client
     "httpx>=0.28.1",
+
+    # Logging
     "loguru>=0.7.3",
+
+    # Data validation and settings
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
+
+    # Date/time utilities
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.1",
     "pytz==2025.2",
+
+    # Redis caching
     "redis[hiredis]==5.0.1",
+
+    # HTTP requests
     "requests>=2.32.4",
+
+    # Todoist integration
     "todoist-api-python==2.1.4",
 ]
 
@@ -43,12 +63,13 @@ dev = [
     "pytest-cov==4.1.0",
     "pytest-asyncio==0.21.1",
     "pytest-mock==3.12.0",
-    
+    "httpx>=0.28.1",  # For TestClient
+
     # Code formatting and linting
     "black==23.11.0",
     "flake8==6.1.0",
     "mypy==1.7.1",
-    
+
     # Development tools
     "ipython==8.17.2",
 ]
@@ -72,7 +93,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
     "-v",
-    "--tb=short", 
+    "--tb=short",
     "--strict-markers",
     "--disable-warnings"
 ]

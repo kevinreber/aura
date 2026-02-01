@@ -17,6 +17,9 @@ dependencies = [
     
     # HTTP client for MCP server
     "httpx>=0.25.0",
+
+    # MCP SDK for official protocol support
+    "mcp>=1.0.0",
     
     # Data validation and settings
     # Pin pydantic <2.11 to avoid discriminator compatibility issues with langchain_core

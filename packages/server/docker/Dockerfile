@@ -44,7 +44,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Run the application
+# Run the application with uvicorn
 CMD ["python", "run.py"]
 
 # Production stage
@@ -57,7 +57,5 @@ ENV DEBUG=false
 # Copy only necessary files for production
 COPY --from=base /app /app
 
-# Install gunicorn for production with UV
-RUN uv pip install --system gunicorn
-
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--worker-class", "sync", "mcp_server.app:create_app()"]
+# Run with uvicorn in production mode (workers managed by uvicorn)
+CMD ["uvicorn", "mcp_server.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
