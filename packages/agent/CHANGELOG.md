@@ -5,6 +5,55 @@ All notable changes to the Daily AI Agent will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2025-02-01 - 🔧 **DEVELOPER EXPERIENCE: Observability & Multi-LLM Support**
+
+### 🎉 **MAJOR ENHANCEMENT: LangSmith Tracing Integration**
+
+- **📊 Full Observability**: See exactly what your AI agent is doing under the hood
+- **🔍 Trace Visualization**: View complete timelines of LLM calls, tool calls, and decisions
+- **💰 Cost Tracking**: Monitor token usage and estimated costs per conversation
+- **🐛 Debugging**: Identify why the agent chose specific tools or made certain decisions
+- **⚡ Performance Insights**: Track latency for each step in the agent pipeline
+
+### 🤖 **Multi-LLM Provider Support**
+
+- **OpenAI + Anthropic**: Switch between GPT-4o-mini and Claude with a single env var
+- **Automatic Fallback**: If preferred provider isn't configured, falls back to available one
+- **Configurable Models**: Choose specific models via `OPENAI_MODEL` and `ANTHROPIC_MODEL`
+- **Temperature Control**: Fine-tune response creativity with `LLM_TEMPERATURE`
+
+### 📡 **Streaming Responses**
+
+- **New `/chat/stream` Endpoint**: Real-time token streaming via Server-Sent Events (SSE)
+- **Better UX**: See responses as they're generated instead of waiting for full completion
+- **Memory Support**: Streaming endpoint maintains conversation history same as regular chat
+
+### 🔧 **Configuration Improvements**
+
+- **New Environment Variables**:
+  - `LLM_PROVIDER`: Switch between "openai" and "anthropic"
+  - `OPENAI_MODEL`: Specify OpenAI model (default: gpt-4o-mini)
+  - `ANTHROPIC_MODEL`: Specify Anthropic model (default: claude-3-5-sonnet-20241022)
+  - `LLM_TEMPERATURE`: Control response creativity (default: 0.1)
+  - `LANGCHAIN_TRACING_V2`: Enable LangSmith tracing
+  - `LANGCHAIN_API_KEY`: LangSmith API key
+  - `LANGCHAIN_PROJECT`: Project name in LangSmith dashboard
+
+### 📊 **Enhanced Health Endpoint**
+
+- **LLM Info**: Health endpoint now shows current LLM provider, model, and tracing status
+- **Better Diagnostics**: Easier to verify configuration is correct
+
+### 🛠️ **Technical Details**
+
+- Added `langsmith` and `langchain-anthropic` dependencies
+- New `utils/tracing.py` module for LangSmith configuration
+- Updated `AgentOrchestrator` with `_create_llm()` factory method
+- Added `chat_stream()` async generator method
+- Added `get_llm_info()` method for diagnostics
+
+---
+
 ## [0.4.0] - 2025-08-21 - 🚀 **PERFORMANCE: Lightning-Fast AI Assistant**
 
 ### 🎉 **MAJOR PERFORMANCE ENHANCEMENT: Intelligent Backend Caching**
