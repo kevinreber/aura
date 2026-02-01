@@ -260,3 +260,128 @@ class TestBriefingEndpoint:
             assert response.status_code == 200
             data = json.loads(response.data)
             assert data["type"] == "basic"
+
+
+class TestChatStreamEndpoint:
+    """Tests for the /chat/stream endpoint with tool events."""
+
+    def test_chat_stream_requires_message(self, client):
+        """Test chat stream endpoint requires message field."""
+        response = client.post(
+            "/chat/stream",
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def test_chat_stream_rejects_empty_message(self, client):
+        """Test chat stream endpoint rejects empty messages."""
+        response = client.post(
+            "/chat/stream",
+            data=json.dumps({"message": "   "}),
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+
+    def test_chat_stream_returns_sse_content_type(self, client):
+        """Test chat stream returns correct SSE content type."""
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch_class:
+            mock_orch = MagicMock()
+            mock_orch.is_conversational.return_value = True
+
+            async def mock_stream(msg):
+                yield "Hello"
+                yield " world"
+
+            mock_orch.chat_stream = mock_stream
+            mock_orch_class.return_value = mock_orch
+
+            from daily_ai_agent.api import create_app
+            app = create_app(testing=True)
+            test_client = app.test_client()
+
+            response = test_client.post(
+                "/chat/stream",
+                data=json.dumps({"message": "Hello"}),
+                content_type="application/json",
+            )
+
+            # Check content type is SSE
+            assert response.content_type == "text/event-stream"
+
+    def test_chat_stream_emits_tool_events(self, client):
+        """Test chat stream emits tool start and end events."""
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch_class:
+            mock_orch = MagicMock()
+            mock_orch.is_conversational.return_value = True
+
+            async def mock_stream_with_tools(msg):
+                yield "[TOOL_START] get_weather"
+                yield "[TOOL_END] get_weather"
+                yield "The weather is sunny."
+
+            mock_orch.chat_stream = mock_stream_with_tools
+            mock_orch_class.return_value = mock_orch
+
+            from daily_ai_agent.api import create_app
+            app = create_app(testing=True)
+            test_client = app.test_client()
+
+            response = test_client.post(
+                "/chat/stream",
+                data=json.dumps({"message": "What's the weather?"}),
+                content_type="application/json",
+            )
+
+            # Parse SSE response
+            data = response.data.decode("utf-8")
+
+            # Should contain tool events
+            assert "[TOOL_START] get_weather" in data
+            assert "[TOOL_END] get_weather" in data
+            assert "The weather is sunny." in data
+            assert "[DONE]" in data
+
+    def test_chat_stream_done_marker(self, client):
+        """Test chat stream ends with [DONE] marker."""
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch_class:
+            mock_orch = MagicMock()
+            mock_orch.is_conversational.return_value = True
+
+            async def mock_stream(msg):
+                yield "Response"
+
+            mock_orch.chat_stream = mock_stream
+            mock_orch_class.return_value = mock_orch
+
+            from daily_ai_agent.api import create_app
+            app = create_app(testing=True)
+            test_client = app.test_client()
+
+            response = test_client.post(
+                "/chat/stream",
+                data=json.dumps({"message": "Hello"}),
+                content_type="application/json",
+            )
+
+            data = response.data.decode("utf-8")
+            assert "data: [DONE]" in data
+
+    def test_chat_stream_unavailable_without_llm(self, client):
+        """Test chat stream returns 503 when LLM is not available."""
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch_class:
+            mock_orch = MagicMock()
+            mock_orch.is_conversational.return_value = False
+            mock_orch_class.return_value = mock_orch
+
+            from daily_ai_agent.api import create_app
+            app = create_app(testing=True)
+            test_client = app.test_client()
+
+            response = test_client.post(
+                "/chat/stream",
+                data=json.dumps({"message": "Hello"}),
+                content_type="application/json",
+            )
+
+            assert response.status_code == 503
