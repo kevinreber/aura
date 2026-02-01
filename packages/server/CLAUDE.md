@@ -4,10 +4,11 @@ This document provides essential context for AI assistants working on this codeb
 
 ## Project Overview
 
-Daily MCP Server is a Model Context Protocol (MCP) server providing productivity tools for AI agents. Built with Flask and Python 3.11+, it offers real-time integrations with external APIs for weather, calendar, todos, commute intelligence, and financial data.
+Daily MCP Server is a Model Context Protocol (MCP) server providing productivity tools for AI agents. Built with FastAPI and Python 3.11+, it offers real-time integrations with external APIs for weather, calendar, todos, commute intelligence, and financial data.
 
 **Key Characteristics:**
-- Async Flask server with MCP-style tool interfaces
+- FastAPI server with native async support and auto-generated Swagger/OpenAPI docs
+- Official MCP protocol support via SSE transport (sse-starlette)
 - Real API integrations (Google Calendar, OpenWeatherMap, Google Maps, Todoist, Alpha Vantage)
 - Intelligent caching with Redis primary and in-memory fallback
 - Production deployed on Railway.app
@@ -17,8 +18,10 @@ Daily MCP Server is a Model Context Protocol (MCP) server providing productivity
 ```
 daily-mcp-server/
 ├── mcp_server/                 # Main application package
-│   ├── app.py                  # Flask application factory with route definitions
+│   ├── app.py                  # FastAPI application with auto-generated Swagger docs
 │   ├── server.py               # MCP protocol implementation and tool registry
+│   ├── mcp_sse.py              # SSE transport for MCP protocol clients
+│   ├── mcp_protocol.py         # MCP SDK wrapper for tool integration
 │   ├── config.py               # Pydantic-based configuration with env var support
 │   ├── tools/                  # Individual tool implementations
 │   │   ├── weather.py          # OpenWeatherMap integration
@@ -91,8 +94,12 @@ uv run python run.py
 # Traditional
 python run.py
 
+# Or directly with uvicorn
+uvicorn mcp_server.app:app --host 0.0.0.0 --port 8000 --reload
+
 # Server starts at http://localhost:8000
 # Swagger UI at http://localhost:8000/docs
+# ReDoc at http://localhost:8000/redoc
 ```
 
 ### Testing
@@ -322,6 +329,10 @@ curl http://localhost:8000/mcp/health
 The MCP implementation uses two layers:
 
 1. **mcp_protocol.py** - Wraps existing tools using the official MCP SDK
-2. **mcp_sse.py** - Implements SSE transport for Flask
+2. **mcp_sse.py** - Implements async SSE transport using FastAPI and sse-starlette
 
-This allows the existing HTTP REST API to continue working while adding MCP protocol support for compatible clients.
+The server provides both:
+- **HTTP REST API** - Direct endpoint access with auto-generated Swagger docs
+- **MCP SSE Protocol** - For Claude Desktop, Cursor, and other MCP-compatible clients
+
+Both interfaces share the same underlying tool implementations, ensuring consistent behavior.

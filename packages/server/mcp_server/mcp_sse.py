@@ -1,12 +1,13 @@
-"""SSE (Server-Sent Events) transport for MCP protocol over Flask.
+"""SSE (Server-Sent Events) transport for MCP protocol using FastAPI.
 
-This module implements the MCP SSE transport specification, allowing
-MCP clients to connect to the server over HTTP using Server-Sent Events.
+This module implements the MCP SSE transport specification with proper
+async support, enabling MCP clients like Claude Desktop and Cursor to
+connect to the server.
 
 Protocol flow:
-1. Client connects to GET /mcp/sse to establish SSE stream
+1. Client connects to GET /sse to establish SSE stream
 2. Server sends endpoint URL for client messages
-3. Client sends JSON-RPC messages to POST /mcp/messages
+3. Client sends JSON-RPC messages to POST /messages
 4. Server responds via SSE stream
 
 Reference: https://modelcontextprotocol.io/docs/concepts/transports#server-sent-events-sse
@@ -15,19 +16,20 @@ Reference: https://modelcontextprotocol.io/docs/concepts/transports#server-sent-
 import json
 import asyncio
 import uuid
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from dataclasses import dataclass, field
-from queue import Queue
 
-from flask import Blueprint, Response, request, jsonify, stream_with_context
+from fastapi import APIRouter, Request, HTTPException
+from fastapi.responses import JSONResponse
+from sse_starlette.sse import EventSourceResponse
 
 from .mcp_protocol import get_mcp_app
 from .utils.logging import get_logger
 
 logger = get_logger("mcp_sse")
 
-# Blueprint for MCP SSE endpoints
-mcp_sse_bp = Blueprint("mcp_sse", __name__, url_prefix="/mcp")
+# Create FastAPI router for MCP endpoints
+router = APIRouter()
 
 
 @dataclass
@@ -35,7 +37,7 @@ class SSESession:
     """Represents an active SSE client session."""
 
     session_id: str
-    message_queue: Queue = field(default_factory=Queue)
+    message_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     connected: bool = True
 
 
@@ -65,12 +67,7 @@ def remove_session(session_id: str) -> None:
         logger.info(f"Removed MCP SSE session: {session_id}")
 
 
-def format_sse_message(event: str, data: str) -> str:
-    """Format a message for SSE transmission."""
-    return f"event: {event}\ndata: {data}\n\n"
-
-
-async def handle_jsonrpc_message(message: dict, session: SSESession) -> dict:
+async def handle_jsonrpc_message(message: dict, session: SSESession) -> Optional[dict]:
     """Process a JSON-RPC message and return the response.
 
     Routes messages to the appropriate MCP handlers.
@@ -79,8 +76,6 @@ async def handle_jsonrpc_message(message: dict, session: SSESession) -> dict:
     msg_id = message.get("id")
     params = message.get("params", {})
 
-    mcp_server = get_mcp_app()
-
     try:
         if method == "initialize":
             # Handle initialization
@@ -88,7 +83,7 @@ async def handle_jsonrpc_message(message: dict, session: SSESession) -> dict:
                 "protocolVersion": "2024-11-05",
                 "serverInfo": {
                     "name": "aura-mcp-server",
-                    "version": "1.0.0"
+                    "version": "2.0.0"
                 },
                 "capabilities": {
                     "tools": {"listChanged": False}
@@ -152,159 +147,85 @@ async def handle_jsonrpc_message(message: dict, session: SSESession) -> dict:
         }
 
 
-@mcp_sse_bp.route("/sse", methods=["GET"])
-def sse_endpoint():
-    """SSE endpoint for MCP protocol clients (Claude Desktop, Cursor, etc.).
-    ---
-    tags:
-      - MCP Protocol
-    summary: Establish SSE connection for MCP protocol
-    description: |
-      Server-Sent Events endpoint for Model Context Protocol (MCP) clients.
+async def event_generator(session: SSESession, request: Request) -> AsyncGenerator[dict, None]:
+    """Generate SSE events for the MCP protocol.
 
-      **Protocol Flow:**
-      1. Client connects to this endpoint to establish SSE stream
-      2. Server sends `endpoint` event with URL for posting messages
-      3. Client sends JSON-RPC messages to the provided endpoint
-      4. Server responds via SSE `message` events
+    Yields events in the format expected by sse-starlette:
+    - {"event": "endpoint", "data": "/mcp/messages?session_id=xxx"}
+    - {"event": "message", "data": "...json..."}
+    """
+    try:
+        # Send the endpoint URL for client messages
+        endpoint_url = f"/mcp/messages?session_id={session.session_id}"
+        yield {"event": "endpoint", "data": endpoint_url}
+        logger.debug(f"Sent endpoint URL: {endpoint_url}")
 
-      **Supported MCP Clients:**
-      - Claude Desktop
-      - Cursor
-      - Any MCP-compatible client
+        # Keep connection alive and send queued messages
+        while session.connected:
+            # Check if client disconnected
+            if await request.is_disconnected():
+                logger.info(f"Client disconnected: {session.session_id}")
+                break
 
-      **Reference:** https://modelcontextprotocol.io/docs/concepts/transports#server-sent-events-sse
-    produces:
-      - text/event-stream
-    responses:
-      200:
-        description: SSE stream established successfully
-        schema:
-          type: string
-          example: "event: endpoint\\ndata: /mcp/messages?session_id=abc-123\\n\\n"
+            try:
+                # Wait for messages with timeout for keepalive
+                message = await asyncio.wait_for(
+                    session.message_queue.get(),
+                    timeout=30.0
+                )
+                yield {"event": "message", "data": json.dumps(message)}
+                logger.debug(f"Sent message to client: {session.session_id}")
+
+            except asyncio.TimeoutError:
+                # Send keepalive comment
+                yield {"comment": "keepalive"}
+
+    except asyncio.CancelledError:
+        logger.info(f"SSE stream cancelled: {session.session_id}")
+    except Exception as e:
+        logger.error(f"Error in SSE event generator: {e}")
+    finally:
+        remove_session(session.session_id)
+
+
+@router.get("/sse")
+async def sse_endpoint(request: Request):
+    """SSE endpoint for MCP protocol clients.
+
+    Establishes an SSE connection for MCP clients like Claude Desktop and Cursor.
+    The server sends an 'endpoint' event with the URL for posting messages,
+    then streams 'message' events for responses.
     """
     session = create_session()
 
-    def generate():
-        try:
-            # Send the endpoint URL for client messages
-            # Include session_id so we can route responses back
-            endpoint_url = f"/mcp/messages?session_id={session.session_id}"
-            yield format_sse_message("endpoint", endpoint_url)
-
-            # Keep connection alive and send queued messages
-            while session.connected:
-                try:
-                    # Check for messages to send (non-blocking with timeout)
-                    try:
-                        message = session.message_queue.get(timeout=30)
-                        yield format_sse_message("message", json.dumps(message))
-                    except Exception:
-                        # Timeout - send keepalive
-                        yield ": keepalive\n\n"
-                except GeneratorExit:
-                    break
-
-        finally:
-            remove_session(session.session_id)
-
-    response = Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
+    return EventSourceResponse(
+        event_generator(session, request),
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
         }
     )
-    return response
 
 
-@mcp_sse_bp.route("/messages", methods=["POST"])
-async def messages_endpoint():
+@router.post("/messages")
+async def messages_endpoint(request: Request, session_id: str):
     """Receive JSON-RPC messages from MCP clients.
-    ---
-    tags:
-      - MCP Protocol
-    summary: Send JSON-RPC message to MCP server
-    description: |
-      Endpoint for receiving JSON-RPC 2.0 messages from MCP clients.
-      Responses are delivered via the SSE stream established at `/mcp/sse`.
 
-      **Supported Methods:**
-      - `initialize` - Initialize MCP session
-      - `tools/list` - List available tools
-      - `tools/call` - Call a tool with arguments
-      - `ping` - Health check
-
-      **Note:** This endpoint requires a valid session_id from an active SSE connection.
-    parameters:
-      - name: session_id
-        in: query
-        type: string
-        required: true
-        description: Session ID from the SSE connection
-        example: "abc-123-def-456"
-      - name: body
-        in: body
-        required: true
-        schema:
-          type: object
-          required:
-            - jsonrpc
-            - method
-            - id
-          properties:
-            jsonrpc:
-              type: string
-              example: "2.0"
-              description: JSON-RPC version (must be "2.0")
-            method:
-              type: string
-              example: "tools/list"
-              description: MCP method to call
-            id:
-              type: integer
-              example: 1
-              description: Request ID for correlation
-            params:
-              type: object
-              description: Method-specific parameters
-              example: {"name": "weather.get_daily", "arguments": {"location": "San Francisco"}}
-    responses:
-      202:
-        description: Message accepted, response will be sent via SSE
-      400:
-        description: Invalid request (missing session_id or JSON body)
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "session_id required"
-      404:
-        description: Session not found or expired
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: "Invalid or expired session"
-      500:
-        description: Internal server error
+    Clients POST messages here after connecting via /sse.
+    Responses are sent back via the SSE stream.
     """
-    session_id = request.args.get("session_id")
     if not session_id:
-        return jsonify({"error": "session_id required"}), 400
+        raise HTTPException(status_code=400, detail="session_id required")
 
     session = get_session(session_id)
     if not session:
-        return jsonify({"error": "Invalid or expired session"}), 404
+        raise HTTPException(status_code=404, detail="Invalid or expired session")
 
     try:
-        message = request.get_json()
+        message = await request.json()
         if not message:
-            return jsonify({"error": "JSON body required"}), 400
+            raise HTTPException(status_code=400, detail="JSON body required")
 
         logger.debug(f"Received MCP message: {message.get('method', 'unknown')}")
 
@@ -313,57 +234,28 @@ async def messages_endpoint():
 
         if response:
             # Queue response for SSE delivery
-            session.message_queue.put(response)
+            await session.message_queue.put(response)
 
         # Return 202 Accepted - response will come via SSE
-        return "", 202
+        return JSONResponse(status_code=202, content={})
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error processing MCP message: {e}")
-        return jsonify({"error": str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@mcp_sse_bp.route("/health", methods=["GET"])
-def mcp_health():
+@router.get("/health")
+async def mcp_health():
     """Health check for MCP SSE transport.
-    ---
-    tags:
-      - MCP Protocol
-    summary: Check MCP protocol health status
-    description: |
-      Returns health status of the MCP SSE transport layer.
-      Use this to verify MCP protocol availability before connecting.
-    responses:
-      200:
-        description: MCP transport is healthy
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-              example: "healthy"
-              description: Health status
-            transport:
-              type: string
-              example: "sse"
-              description: Transport type
-            active_sessions:
-              type: integer
-              example: 2
-              description: Number of active SSE sessions
-            protocol_version:
-              type: string
-              example: "2024-11-05"
-              description: MCP protocol version
+
+    Returns health status of the MCP SSE transport layer,
+    including number of active sessions.
     """
-    return jsonify({
+    return {
         "status": "healthy",
         "transport": "sse",
         "active_sessions": len(_sessions),
         "protocol_version": "2024-11-05"
-    })
-
-
-def get_mcp_sse_blueprint() -> Blueprint:
-    """Get the Flask blueprint for MCP SSE endpoints."""
-    return mcp_sse_bp
+    }

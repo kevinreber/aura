@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Aura** is a unified monorepo for a personal AI productivity platform. It combines three services into a full-stack application:
 
-- **Server** (MCP Server) - Python/Flask backend providing productivity tools via Model Context Protocol
+- **Server** (MCP Server) - Python/FastAPI backend providing productivity tools via Model Context Protocol
 - **Agent** (AI Agent) - Python/LangChain orchestrator with conversational AI powered by GPT-4o-mini
 - **UI** (Web Frontend) - React Router v7 application with real-time dashboard and chat interface
 
