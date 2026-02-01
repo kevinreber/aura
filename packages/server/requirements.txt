@@ -1,8 +1,11 @@
-# Core Flask dependencies (with async support)
-flask[async]==3.0.0
-flask-cors==4.0.0
-flask-limiter==3.5.0
-flasgger==0.9.7.1
+# FastAPI and async server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sse-starlette>=2.1.0
+slowapi>=0.1.9
+
+# MCP SDK for official protocol support
+mcp>=1.0.0
 
 # Schema validation (updated for Python 3.13 compatibility)
 pydantic>=2.10.0
@@ -13,9 +16,6 @@ httpx==0.25.2
 
 # Logging
 loguru==0.7.2
-
-# Metrics (optional)
-prometheus-flask-exporter==0.23.0
 
 # Caching (optional)
 redis[hiredis]==5.0.1
@@ -33,6 +33,3 @@ pytz==2025.2  # Timezone handling for smart scheduling
 
 # Environment file loading (optional)
 python-dotenv==1.0.0
-
-# MCP Protocol (placeholder - replace when SDK is available)
-# mcp-sdk==0.1.0
