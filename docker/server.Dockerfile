@@ -31,7 +31,5 @@ CMD ["python", "run.py"]
 
 FROM base AS production
 ENV ENVIRONMENT=production DEBUG=false
-USER root
-RUN uv pip install --system gunicorn
-USER appuser
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--worker-class", "sync", "mcp_server.app:create_app()"]
+# uvicorn is already installed via requirements.txt
+CMD ["uvicorn", "mcp_server.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
