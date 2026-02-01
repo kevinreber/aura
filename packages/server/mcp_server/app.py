@@ -26,7 +26,7 @@ from .schemas import (
     WeatherInput,
     MobilityInput, CommuteInput, ShuttleScheduleInput,
     CalendarInput, CalendarRangeInput, CalendarCreateInput,
-    CalendarUpdateInput, CalendarDeleteInput, FindFreeTimeInput,
+    CalendarUpdateInput, CalendarDeleteInput, CalendarFindFreeTimeInput,
     TodoInput, TodoCreateInput, TodoUpdateInput, TodoCompleteInput, TodoDeleteInput,
     FinancialInput,
 )
@@ -297,7 +297,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.post("/tools/calendar.find_free_time", response_model=None, tags=["Calendar"])
-    async def calendar_find_free_time(input_data: FindFreeTimeInput):
+    async def calendar_find_free_time(input_data: CalendarFindFreeTimeInput):
         """Find available time slots for scheduling.
 
         Searches for free time slots across specified calendars,
