@@ -2,18 +2,17 @@
 
 This client connects to the MCP server using Server-Sent Events (SSE),
 enabling standards-compliant communication and dynamic tool discovery.
+
+Falls back to HTTP REST API if SSE connection fails.
 """
 
 import json
 import asyncio
 from typing import Dict, Any, Optional, List, ClassVar
 from dataclasses import dataclass
-from contextlib import asynccontextmanager
 
+import httpx
 from loguru import logger
-from mcp import ClientSession
-from mcp.client.sse import sse_client
-from mcp.types import Tool
 
 from ..models.config import get_settings
 from ..utils.constants import (
@@ -26,118 +25,123 @@ from ..utils.constants import (
 from ..utils.error_handlers import MCPError
 
 
+# Try to import MCP SDK - fall back to HTTP-only mode if not available
+try:
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
+    from mcp.types import Tool
+    MCP_SDK_AVAILABLE = True
+except ImportError:
+    MCP_SDK_AVAILABLE = False
+    logger.warning("MCP SDK not available, using HTTP-only mode")
+
+
 @dataclass
 class MCPConnection:
     """Represents an active MCP SSE connection."""
-
-    session: ClientSession
-    tools: List[Tool]
+    session: Any  # ClientSession when MCP SDK available
+    tools: List[Any]
 
 
 class MCPClient:
-    """MCP client using official SDK with SSE transport.
+    """MCP client with SSE transport and HTTP fallback.
 
-    Provides tool calling capabilities via the Model Context Protocol,
-    with automatic reconnection and retry logic.
+    Provides tool calling capabilities via the Model Context Protocol.
+    Falls back to HTTP REST API if SSE is unavailable or fails.
     """
 
     # Class-level connection cache
     _connection: ClassVar[Optional[MCPConnection]] = None
     _connection_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
-    _tools_cache: ClassVar[Optional[Dict[str, Tool]]] = None
+    _tools_cache: ClassVar[Optional[Dict[str, Any]]] = None
+    _use_http_fallback: ClassVar[bool] = False
+    _http_client: ClassVar[Optional[httpx.AsyncClient]] = None
 
     def __init__(self) -> None:
         self.settings = get_settings()
+        self.base_url: str = self.settings.mcp_server_url.rstrip('/')
         # SSE endpoint for MCP protocol
-        self.sse_url: str = f"{self.settings.mcp_server_url.rstrip('/')}/mcp/sse"
-        # HTTP endpoint for health checks (non-MCP)
-        self.health_url: str = f"{self.settings.mcp_server_url.rstrip('/')}/health"
+        self.sse_url: str = f"{self.base_url}/mcp/sse"
+        # HTTP endpoint for health checks and fallback
+        self.health_url: str = f"{self.base_url}/health"
         self.timeout: int = self.settings.mcp_server_timeout
 
     @classmethod
-    async def _create_session(cls, sse_url: str) -> MCPConnection:
-        """Create a new MCP session via SSE transport.
-
-        Args:
-            sse_url: URL of the MCP SSE endpoint
-
-        Returns:
-            MCPConnection with active session and discovered tools
-        """
-        logger.info(f"Connecting to MCP server via SSE: {sse_url}")
-
-        async with sse_client(sse_url) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as session:
-                # Initialize the session
-                await session.initialize()
-                logger.info("MCP session initialized")
-
-                # Discover available tools
-                tools_response = await session.list_tools()
-                tools = tools_response.tools
-                logger.info(f"Discovered {len(tools)} tools from MCP server")
-
-                return MCPConnection(session=session, tools=tools)
+    async def get_http_client(cls, timeout: int = 45) -> httpx.AsyncClient:
+        """Get or create shared HTTP client for fallback mode."""
+        async with cls._connection_lock:
+            if cls._http_client is None or cls._http_client.is_closed:
+                cls._http_client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(timeout),
+                    limits=httpx.Limits(
+                        max_connections=100,
+                        max_keepalive_connections=20,
+                        keepalive_expiry=30.0,
+                    ),
+                    headers={"Content-Type": "application/json"},
+                )
+            return cls._http_client
 
     @classmethod
-    def _get_tools_cache(cls) -> Dict[str, Tool]:
-        """Get cached tools dictionary."""
-        if cls._tools_cache is None:
-            cls._tools_cache = {}
-        return cls._tools_cache
+    async def close_client(cls) -> None:
+        """Close the shared HTTP client."""
+        async with cls._connection_lock:
+            if cls._http_client is not None and not cls._http_client.is_closed:
+                await cls._http_client.aclose()
+                cls._http_client = None
 
-    @classmethod
-    async def discover_tools(cls, sse_url: str) -> List[Dict[str, Any]]:
-        """Discover available tools from the MCP server.
-
-        Args:
-            sse_url: URL of the MCP SSE endpoint
-
-        Returns:
-            List of tool definitions with name, description, and schema
-        """
-        try:
-            async with sse_client(sse_url) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    tools_response = await session.list_tools()
-
-                    tools_list = []
-                    for tool in tools_response.tools:
-                        tools_list.append({
-                            "name": tool.name,
-                            "description": tool.description,
-                            "input_schema": tool.inputSchema,
-                        })
-
-                    # Cache the tools
-                    cls._tools_cache = {t.name: t for t in tools_response.tools}
-
-                    return tools_list
-
-        except Exception as e:
-            logger.error(f"Failed to discover tools: {e}")
-            raise MCPError(f"Tool discovery failed: {e}")
-
-    async def _call_tool_with_retry(
+    async def _call_tool_via_http(
         self,
         tool_name: str,
         arguments: Dict[str, Any],
         max_retries: int = MAX_RETRIES,
     ) -> Dict[str, Any]:
-        """Call a tool with retry logic.
+        """Call a tool via HTTP REST API (fallback mode)."""
+        url = f"{self.base_url}/tools/{tool_name}"
+        last_exception: Optional[Exception] = None
+        delay = RETRY_BASE_DELAY
 
-        Args:
-            tool_name: Name of the tool to call
-            arguments: Tool input arguments
-            max_retries: Maximum retry attempts
+        client = await self.get_http_client(self.timeout)
 
-        Returns:
-            Tool response data
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.post(url, json=arguments)
+                response.raise_for_status()
+                return response.json()
 
-        Raises:
-            MCPError: If all retries fail
-        """
+            except httpx.HTTPStatusError as e:
+                if 400 <= e.response.status_code < 500:
+                    raise MCPError(
+                        f"HTTP {e.response.status_code}: {e.response.text}",
+                    )
+                last_exception = e
+
+            except (httpx.TimeoutException, httpx.ConnectError) as e:
+                last_exception = e
+
+            except Exception as e:
+                last_exception = e
+
+            if attempt < max_retries:
+                logger.warning(
+                    f"HTTP call attempt {attempt + 1}/{max_retries + 1} failed: {last_exception}. "
+                    f"Retrying in {delay:.1f}s..."
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * RETRY_EXPONENTIAL_BASE, RETRY_MAX_DELAY)
+
+        raise MCPError(f"Tool {tool_name} failed after {max_retries + 1} attempts: {last_exception}")
+
+    async def _call_tool_via_sse(
+        self,
+        tool_name: str,
+        arguments: Dict[str, Any],
+        max_retries: int = MAX_RETRIES,
+    ) -> Dict[str, Any]:
+        """Call a tool via MCP SSE transport."""
+        if not MCP_SDK_AVAILABLE:
+            raise MCPError("MCP SDK not available")
+
         last_exception: Optional[Exception] = None
         delay = RETRY_BASE_DELAY
 
@@ -146,19 +150,14 @@ class MCPClient:
                 async with sse_client(self.sse_url) as (read_stream, write_stream):
                     async with ClientSession(read_stream, write_stream) as session:
                         await session.initialize()
-
-                        # Call the tool
                         result = await session.call_tool(tool_name, arguments)
 
-                        # Extract text content from response
                         if result.content and len(result.content) > 0:
                             content = result.content[0]
                             if hasattr(content, 'text'):
-                                # Parse JSON response
                                 try:
                                     return json.loads(content.text)
                                 except json.JSONDecodeError:
-                                    # Return as-is if not JSON
                                     return {"result": content.text}
 
                         return {"result": None}
@@ -166,44 +165,51 @@ class MCPClient:
             except Exception as e:
                 last_exception = e
                 logger.warning(
-                    f"MCP call attempt {attempt + 1}/{max_retries + 1} failed: {e}"
+                    f"SSE call attempt {attempt + 1}/{max_retries + 1} failed: {e}"
                 )
 
                 if attempt < max_retries:
-                    logger.info(f"Retrying in {delay:.1f}s...")
                     await asyncio.sleep(delay)
                     delay = min(delay * RETRY_EXPONENTIAL_BASE, RETRY_MAX_DELAY)
 
-        error_msg = f"Tool {tool_name} failed after {max_retries + 1} attempts: {last_exception}"
-        logger.error(error_msg)
-        raise MCPError(error_msg)
+        raise MCPError(f"SSE call failed after {max_retries + 1} attempts: {last_exception}")
 
     async def call_tool(self, tool_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """Call a specific tool on the MCP server.
 
-        Args:
-            tool_name: Name of the tool (e.g., 'weather.get_daily')
-            input_data: Input parameters for the tool
-
-        Returns:
-            Tool response data
-
-        Raises:
-            MCPError: If the tool call fails
+        Tries SSE first, falls back to HTTP if SSE fails.
         """
         logger.info(f"Calling MCP tool: {tool_name} with data: {input_data}")
 
+        # If we've already determined SSE doesn't work, use HTTP
+        if self._use_http_fallback or not MCP_SDK_AVAILABLE:
+            try:
+                result = await self._call_tool_via_http(tool_name, input_data)
+                logger.success(f"Tool {tool_name} completed via HTTP")
+                return result
+            except MCPError:
+                raise
+            except Exception as e:
+                raise MCPError(f"HTTP call failed: {e}")
+
+        # Try SSE first
         try:
-            result = await self._call_tool_with_retry(tool_name, input_data)
-            logger.success(f"Tool {tool_name} completed successfully")
+            result = await self._call_tool_via_sse(tool_name, input_data)
+            logger.success(f"Tool {tool_name} completed via SSE")
             return result
 
-        except MCPError:
-            raise
-        except Exception as e:
-            error_msg = f"Error calling {tool_name}: {str(e)}"
-            logger.error(error_msg)
-            raise MCPError(error_msg)
+        except Exception as sse_error:
+            logger.warning(f"SSE failed, falling back to HTTP: {sse_error}")
+            MCPClient._use_http_fallback = True
+
+            try:
+                result = await self._call_tool_via_http(tool_name, input_data)
+                logger.success(f"Tool {tool_name} completed via HTTP fallback")
+                return result
+            except MCPError:
+                raise
+            except Exception as e:
+                raise MCPError(f"Both SSE and HTTP failed: SSE={sse_error}, HTTP={e}")
 
     async def get_weather(self, location: str, when: str = "today") -> Dict[str, Any]:
         """Get weather forecast for a location."""
@@ -219,7 +225,7 @@ class MCPClient:
         })
 
     async def get_calendar_events_range(self, start_date: str, end_date: str) -> Dict[str, Any]:
-        """Get calendar events for a date range (more efficient than multiple single-date calls)."""
+        """Get calendar events for a date range."""
         return await self.call_tool("calendar.list_events_range", {
             "start_date": start_date,
             "end_date": end_date
@@ -247,7 +253,7 @@ class MCPClient:
         include_driving: bool = True,
         include_transit: bool = True,
     ) -> Dict[str, Any]:
-        """Get comprehensive commute options with driving and transit (Caltrain + shuttle)."""
+        """Get comprehensive commute options with driving and transit."""
         params: Dict[str, Any] = {
             "direction": direction,
             "include_driving": include_driving,
@@ -273,17 +279,9 @@ class MCPClient:
         return await self.call_tool("mobility.get_shuttle_schedule", params)
 
     async def get_all_morning_data(self, date: str) -> Dict[str, Any]:
-        """Get all morning routine data in parallel for speed.
-
-        Args:
-            date: Date in YYYY-MM-DD format
-
-        Returns:
-            Combined data from all tools
-        """
+        """Get all morning routine data in parallel for speed."""
         settings = get_settings()
 
-        # Call all tools in parallel for speed
         tasks = [
             self.get_weather(settings.user_location),
             self.get_calendar_events(date),
@@ -294,7 +292,6 @@ class MCPClient:
         try:
             weather, calendar, todos, commute = await asyncio.gather(*tasks, return_exceptions=True)
 
-            # Handle any exceptions gracefully
             result: Dict[str, Any] = {}
 
             if isinstance(weather, Exception):
@@ -328,47 +325,40 @@ class MCPClient:
             raise
 
     async def health_check(self) -> bool:
-        """Check if the MCP server is healthy.
-
-        Uses the MCP health endpoint to verify connectivity.
-        """
-        import httpx
-
+        """Check if the MCP server is healthy."""
         try:
             async with httpx.AsyncClient(timeout=HEALTH_CHECK_TIMEOUT) as client:
-                # Check both standard health and MCP health endpoints
                 response = await client.get(self.health_url)
                 response.raise_for_status()
-
-                # Also verify MCP endpoint is accessible
-                mcp_health_url = f"{self.settings.mcp_server_url.rstrip('/')}/mcp/health"
-                mcp_response = await client.get(mcp_health_url)
-                mcp_response.raise_for_status()
-
                 return True
-
         except Exception as e:
             logger.error(f"MCP server health check failed: {e}")
             return False
 
     async def list_available_tools(self) -> List[Dict[str, Any]]:
-        """List all available tools from the MCP server.
+        """List all available tools from the MCP server."""
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(f"{self.base_url}/tools")
+                response.raise_for_status()
+                data = response.json()
+                return [
+                    {"name": name, **info}
+                    for name, info in data.get("tools", {}).items()
+                ]
+        except Exception as e:
+            logger.error(f"Failed to list tools: {e}")
+            raise MCPError(f"Tool discovery failed: {e}")
 
-        Returns:
-            List of tool definitions
-        """
-        return await self.discover_tools(self.sse_url)
 
-
-# Convenience function for one-off tool discovery
+# Convenience function for tool discovery
 async def discover_mcp_tools(server_url: str) -> List[Dict[str, Any]]:
-    """Discover tools from an MCP server.
-
-    Args:
-        server_url: Base URL of the MCP server
-
-    Returns:
-        List of available tools
-    """
-    sse_url = f"{server_url.rstrip('/')}/mcp/sse"
-    return await MCPClient.discover_tools(sse_url)
+    """Discover tools from an MCP server."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(f"{server_url.rstrip('/')}/tools")
+        response.raise_for_status()
+        data = response.json()
+        return [
+            {"name": name, **info}
+            for name, info in data.get("tools", {}).items()
+        ]
