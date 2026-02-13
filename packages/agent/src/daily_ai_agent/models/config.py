@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8001
 
+    # Security
+    api_key: str = ""  # Required in production — set via API_KEY env var
+    max_message_length: int = 4000  # Max characters per chat message
+
     # CORS Configuration - can be set via ALLOWED_ORIGINS env var (comma-separated)
     allowed_origins_env: Optional[str] = None
     rate_limit_per_minute: int = 60
@@ -141,8 +145,10 @@ class Settings(BaseSettings):
 
         super().__init__(**kwargs)
 
-        # Validate required API keys in production
+        # Validate required settings in production
         if self.is_production:
+            if not self.api_key:
+                raise ValueError("API_KEY is required in production for request authentication")
             if self.llm_provider == "openai" and not self.openai_api_key:
                 raise ValueError("OPENAI_API_KEY is required when using OpenAI in production")
             if self.llm_provider == "anthropic" and not self.anthropic_api_key:

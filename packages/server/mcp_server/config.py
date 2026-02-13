@@ -40,17 +40,21 @@ class Settings(BaseSettings):
     cache_ttl: int = 300  # 5 minutes default
 
     # Security & CORS
-    secret_key: str = "your-secret-key-change-in-production"
+    secret_key: str = os.getenv("SECRET_KEY", "dev-only-secret-key")
+    api_key: str = os.getenv("API_KEY", "")  # Required in production
     allowed_origins: List[str] = [
-        "http://localhost:3000", 
-        "http://localhost:5173", 
+        "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:5174",
         "https://daily-agent-ui.vercel.app",
         "https://web-production-66f9.up.railway.app"
     ]
-    
+
     # Rate limiting
     rate_limit_per_minute: int = 60
+
+    # Request size limits
+    max_request_body_bytes: int = 1_048_576  # 1 MB
 
     class Config:
         env_file = ".env"
@@ -59,8 +63,12 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         
-        # Validate required API keys and addresses in production
+        # Validate required settings in production
         if self.environment == "production":
+            if not self.api_key:
+                raise ValueError("API_KEY is required in production for request authentication")
+            if self.secret_key == "dev-only-secret-key":
+                raise ValueError("SECRET_KEY must be changed from default in production")
             if not self.weather_api_key:
                 raise ValueError("WEATHER_API_KEY is required in production")
             if not self.google_maps_api_key:

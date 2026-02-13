@@ -194,6 +194,21 @@ Always maintain context from earlier in the conversation."""),
             logger.error(f"Error initializing LangChain agent: {e}")
             self.agent = None
 
+    @staticmethod
+    def _sanitize_input(text: str) -> str:
+        """Sanitize user input to mitigate prompt injection.
+
+        Strips null bytes and excessive whitespace. The LLM system prompt
+        is constructed server-side so user text only enters via the {input}
+        placeholder, but this provides an extra layer of defense.
+        """
+        # Remove null bytes
+        text = text.replace("\x00", "")
+        # Collapse excessive whitespace (but keep single newlines for readability)
+        lines = text.splitlines()
+        cleaned_lines = [" ".join(line.split()) for line in lines]
+        return "\n".join(cleaned_lines).strip()
+
     async def chat(self, user_input: str) -> str:
         """
         Handle a conversational input from the user.
@@ -208,6 +223,7 @@ Always maintain context from earlier in the conversation."""),
             return "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
 
         try:
+            user_input = self._sanitize_input(user_input)
             logger.info(f"Processing user input: {user_input}")
 
             # Build the invoke payload
@@ -253,6 +269,7 @@ Always maintain context from earlier in the conversation."""),
             return
 
         try:
+            user_input = self._sanitize_input(user_input)
             logger.info(f"Processing user input (streaming): {user_input}")
 
             # Build the invoke payload

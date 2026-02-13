@@ -18,6 +18,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from .config import get_settings
+from .middleware import APIKeyAuthMiddleware, SecurityHeadersMiddleware, RequestSizeLimitMiddleware
 from .utils.logging import setup_logging, get_logger
 from .utils.cache import get_cache_service
 from .server import get_mcp_server
@@ -86,14 +87,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Configure CORS
+    # Configure CORS — restrict to specific methods and headers
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Request-ID"],
     )
+
+    # Security middleware (order matters — outermost middleware runs first)
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestSizeLimitMiddleware)
+    app.add_middleware(APIKeyAuthMiddleware)
 
     # Add rate limiter
     app.state.limiter = limiter

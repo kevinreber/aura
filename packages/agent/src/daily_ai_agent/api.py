@@ -1,6 +1,7 @@
 """Flask API for the AI agent - provides web endpoints for all agent functionality."""
 
 import asyncio
+import hmac
 import uuid
 import time
 from datetime import datetime
@@ -24,6 +25,9 @@ from .utils.constants import (
     RATE_LIMIT_HEADERS,
 )
 from .utils.error_handlers import handle_api_error, APIError
+
+# Endpoints that bypass API key authentication
+AUTH_EXEMPT_PATHS = {"/health", "/version", "/docs", "/apispec_1.json", "/flasgger_static"}
 
 
 def create_app(testing: bool = False) -> Flask:
@@ -91,7 +95,7 @@ def create_app(testing: bool = False) -> Flask:
 
     @app.before_request
     def before_request():
-        """Add request ID and start timing for each request."""
+        """Add request ID, start timing, and validate API key."""
         # Generate or use existing request ID
         g.request_id = request.headers.get(REQUEST_ID_HEADER, str(uuid.uuid4()))
         g.start_time = time.time()
@@ -102,15 +106,42 @@ def create_app(testing: bool = False) -> Flask:
             f"- Client: {request.remote_addr}"
         )
 
+        # API key authentication (skip for exempt paths and OPTIONS preflight)
+        if settings.api_key and request.method != "OPTIONS":
+            path = request.path
+            is_exempt = path in AUTH_EXEMPT_PATHS or any(
+                path.startswith(p) for p in ("/flasgger_static",)
+            )
+            if not is_exempt:
+                provided_key = request.headers.get("X-API-Key", "")
+                if not provided_key or not hmac.compare_digest(provided_key, settings.api_key):
+                    logger.warning(
+                        f"[{g.request_id}] Unauthorized request to {path} "
+                        f"from {request.remote_addr}"
+                    )
+                    return jsonify({
+                        "error": "Invalid or missing API key",
+                        "request_id": g.request_id,
+                    }), 401
+
     @app.after_request
     def after_request(response):
-        """Add standard headers to response."""
+        """Add standard headers and security headers to response."""
         # Add request ID to response
         response.headers[REQUEST_ID_HEADER] = g.get('request_id', 'unknown')
 
         # Calculate request duration
         duration = time.time() - g.get('start_time', time.time())
         response.headers['X-Response-Time'] = f"{duration:.3f}s"
+
+        # Security headers
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        if settings.is_production:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
 
         # Log response
         logger.info(
@@ -263,6 +294,12 @@ def create_app(testing: bool = False) -> Flask:
             if not message:
                 raise BadRequest("Message cannot be empty")
 
+            if len(message) > settings.max_message_length:
+                return jsonify({
+                    "error": f"Message too long (max {settings.max_message_length} characters)",
+                    "request_id": g.get('request_id', 'unknown'),
+                }), 400
+
             if not orchestrator.is_conversational():
                 return jsonify({
                     "error": "Conversational AI not available",
@@ -328,6 +365,12 @@ def create_app(testing: bool = False) -> Flask:
             message = data['message'].strip()
             if not message:
                 raise BadRequest("Message cannot be empty")
+
+            if len(message) > settings.max_message_length:
+                return jsonify({
+                    "error": f"Message too long (max {settings.max_message_length} characters)",
+                    "request_id": g.get('request_id', 'unknown'),
+                }), 400
 
             if not orchestrator.is_conversational():
                 return jsonify({

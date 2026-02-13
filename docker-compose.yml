@@ -13,6 +13,8 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - REDIS_URL=redis://redis:6379
+      - API_KEY=${API_KEY:-}
+      - SECRET_KEY=${SECRET_KEY:-dev-only-secret-key}
       - WEATHER_API_KEY=${WEATHER_API_KEY:-}
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
       - TODOIST_API_KEY=${TODOIST_API_KEY:-}
@@ -47,6 +49,7 @@ services:
       - LOG_LEVEL=INFO
       - HOST=0.0.0.0
       - PORT=8001
+      - API_KEY=${API_KEY:-}
       - MCP_SERVER_URL=http://server:8000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
@@ -75,6 +78,7 @@ services:
       - VITE_MCP_SERVER_URL=http://localhost:8000
       - VITE_AGENT_URL=http://localhost:8001
       - VITE_AI_AGENT_API_URL=http://agent:8001
+      - VITE_API_KEY=${API_KEY:-}
     volumes:
       - ./packages/ui/app:/app/app
       - ./packages/ui/public:/app/public

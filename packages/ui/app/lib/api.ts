@@ -30,15 +30,27 @@ const isRetryableError = (error: unknown, response?: Response): boolean => {
 // API client for communicating with the AI Agent
 export class AIAgentAPI {
   private baseURL: string;
+  private apiKey: string;
 
   constructor() {
     // Use environment variable if set, otherwise default to localhost
     this.baseURL = import.meta.env?.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
+    this.apiKey = import.meta.env?.VITE_API_KEY || '';
 
     if (import.meta.env?.VITE_DEBUG === 'true') {
       console.log(`🔗 AI Agent API URL: ${this.baseURL}`);
       console.log(`🌍 Environment: ${import.meta.env?.VITE_ENVIRONMENT}`);
     }
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey;
+    }
+    return headers;
   }
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -50,7 +62,7 @@ export class AIAgentAPI {
       try {
         const response = await fetch(url, {
           headers: {
-            'Content-Type': 'application/json',
+            ...this.getHeaders(),
             ...options.headers,
           },
           ...options,
@@ -636,12 +648,14 @@ export const apiClient = new AIAgentAPI();
 // Server-side API client (uses Node.js environment variables)
 export class ServerAIAgentAPI {
   private baseURL: string;
+  private apiKey: string;
 
   constructor() {
     // Use Node.js environment variables for server-side
     // Only access process.env on server-side (Node.js environment)
     if (typeof window === 'undefined') {
       this.baseURL = process.env.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
+      this.apiKey = process.env.VITE_API_KEY || '';
 
       if (process.env.VITE_DEBUG === 'true') {
         console.log(`🔗 Server AI Agent API URL: ${this.baseURL}`);
@@ -649,14 +663,25 @@ export class ServerAIAgentAPI {
     } else {
       // Fallback for browser (shouldn't be used)
       this.baseURL = 'http://localhost:8001';
+      this.apiKey = '';
     }
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey;
+    }
+    return headers;
   }
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
     const url = `${this.baseURL}${endpoint}`;
     const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json',
+        ...this.getHeaders(),
         ...options.headers,
       },
       ...options,
