@@ -49,6 +49,15 @@ services:
       - PORT=8001
       - MCP_SERVER_URL=http://server:8000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # LangSmith tracing
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2:-false}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY:-}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT:-aura}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT:-https://api.smith.langchain.com}
+      # Hugging Face settings
+      - HF_INTENT_CLASSIFIER_ENABLED=${HF_INTENT_CLASSIFIER_ENABLED:-true}
+      - HF_EMBEDDINGS_ENABLED=${HF_EMBEDDINGS_ENABLED:-true}
     volumes:
       - ./packages/agent/src:/app/src
     depends_on:
