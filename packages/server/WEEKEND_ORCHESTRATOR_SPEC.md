@@ -522,3 +522,87 @@ data/
 
 .env.example                    # MODIFY - Add BANDSINTOWN_APP_ID, OUTDOORACTIVE_API_KEY
 ```
+
+---
+
+## 18. Follow-Up Actions (Pre-Development Checklist)
+
+These are the manual steps you need to complete before development can begin.
+
+### API Keys & Accounts to Set Up
+
+- [ ] **Bandsintown App ID** (Required for concerts)
+  1. Go to https://www.bandsintown.com/for-artists
+  2. Sign up for a developer/artist account
+  3. Navigate to API settings and create an App ID
+  4. Add `BANDSINTOWN_APP_ID=your_app_id` to your `.env`
+
+- [ ] **Outdooractive API Key** (Optional - only if using as primary trail provider)
+  1. Go to https://developers.outdooractive.com/
+  2. Apply for the developer program (may take a few days for approval)
+  3. Create a project and generate an API key
+  4. Add `OUTDOORACTIVE_API_KEY=your_key` to your `.env`
+  5. **Note**: If skipping this, Google Places will be used as the trail provider — it's already configured via your `GOOGLE_MAPS_API_KEY`
+
+- [ ] **Google Maps Places API** (Likely already enabled)
+  1. Go to https://console.cloud.google.com/apis/library
+  2. Verify that **Places API** and **Places API (New)** are enabled on the same project as your existing `GOOGLE_MAPS_API_KEY`
+  3. Your existing key should work — no new key needed, but Places may not be enabled yet
+  4. Check your billing dashboard for the $200/month free credit status
+
+### Google Maps API Enablement Check
+
+Your existing `GOOGLE_MAPS_API_KEY` is used for Directions (mobility tool). The itinerary tool additionally needs:
+
+| API | Current Status | Action |
+|-----|---------------|--------|
+| Directions API | Already enabled (used by mobility tool) | No action needed |
+| Places API | Likely NOT enabled | Enable in Google Cloud Console |
+| Places API (New) | Likely NOT enabled | Enable for newer Nearby Search endpoints |
+| Geocoding API | Already enabled (used by weather tool indirectly) | No action needed |
+
+To check: `curl "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=37.7749,-122.4194&radius=5000&type=park&key=$GOOGLE_MAPS_API_KEY"` — if you get a `REQUEST_DENIED` error, Places API needs to be enabled.
+
+### Environment File Updates
+
+Add these to your `.env` (and `.env.example` will be updated during implementation):
+
+```bash
+# Weekend Orchestrator (add to MCP Server section)
+BANDSINTOWN_APP_ID=your_bandsintown_app_id
+OUTDOORACTIVE_API_KEY=your_outdooractive_key  # Optional, falls back to Google Places
+```
+
+### Railway / Production Deployment
+
+- [ ] Add `BANDSINTOWN_APP_ID` to Railway environment variables for `server` service
+- [ ] Add `OUTDOORACTIVE_API_KEY` to Railway environment variables (if using)
+- [ ] Verify Google Places API is enabled on the production GCP project (may be a different project than local dev)
+
+### Decision Points to Resolve
+
+Before starting Phase 1, decide on these open questions:
+
+- [ ] **Trail provider for v1**: Start with Google Places (zero setup) or Outdooractive (richer data, requires approval)? Recommendation: Start with Google Places, upgrade later.
+- [ ] **Spotify integration**: Defer to v2 or set up OAuth now? If yes:
+  1. Go to https://developer.spotify.com/dashboard
+  2. Create an app, get Client ID + Secret
+  3. Add `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` to `.env`
+  4. Implement OAuth flow for "Recently Played" access
+- [ ] **Proactive vs. on-demand**: Decide if the "Friday Morning Routine" should be cron-triggered or only user-initiated for v1
+
+### User Preferences File
+
+Create `data/weekend_preferences.json` with your personal defaults:
+
+```json
+{
+  "favorite_artists": ["Artist1", "Artist2", "Artist3"],
+  "activity_preferences": ["hiking", "cycling"],
+  "max_drive_hours": 4,
+  "budget_level": "moderate",
+  "home_base": "San Francisco, CA"
+}
+```
+
+This file is read by the MCP server as a Resource (Phase 3) and should **not** be committed to git (add to `.gitignore`).
