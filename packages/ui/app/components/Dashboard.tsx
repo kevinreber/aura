@@ -26,7 +26,24 @@ import Clock from './Clock';
 import { CommuteDashboard } from './CommuteDashboard';
 import { HabitsWidget } from './HabitsWidget';
 import { NotesWidget } from './NotesWidget';
+import type { Components } from 'react-markdown';
 import { PomodoroWidget } from './PomodoroWidget';
+
+const markdownComponents: Components = {
+  h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-base font-semibold mb-1">{children}</h3>,
+  h4: ({ children }) => <h4 className="text-sm font-semibold mb-1">{children}</h4>,
+  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+  ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+  li: ({ children }) => <li className="mb-1">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  code: ({ children }) => (
+    <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
+  ),
+  hr: () => <hr className="my-2 border-gray-300 dark:border-gray-600" />,
+};
 
 interface DashboardProps {
   userName?: string;
@@ -1211,26 +1228,7 @@ export default function Dashboard({
                         </div>
                       ) : (
                         // Regular markdown rendering for non-slash-command messages
-                        <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => (
-                              <ul className="list-disc pl-4 mb-2">{children}</ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                            ),
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            strong: ({ children }) => (
-                              <strong className="font-semibold">{children}</strong>
-                            ),
-                            code: ({ children }) => (
-                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
-                                {children}
-                              </code>
-                            ),
-                          }}
-                        >
+                        <ReactMarkdown components={markdownComponents}>
                           {message.message}
                         </ReactMarkdown>
                       )}
@@ -1255,26 +1253,7 @@ export default function Dashboard({
                         </div>
                       )}
                       {streamingMessage ? (
-                        <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => (
-                              <ul className="list-disc pl-4 mb-2">{children}</ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                            ),
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            strong: ({ children }) => (
-                              <strong className="font-semibold">{children}</strong>
-                            ),
-                            code: ({ children }) => (
-                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
-                                {children}
-                              </code>
-                            ),
-                          }}
-                        >
+                        <ReactMarkdown components={markdownComponents}>
                           {streamingMessage}
                         </ReactMarkdown>
                       ) : (
