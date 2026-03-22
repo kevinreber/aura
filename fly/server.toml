@@ -1,5 +1,5 @@
 # Fly.io config for MCP Server
-app = "aura-server"
+app = "aura-mcp-server"
 primary_region = "sjc"
 
 # Build is handled via deploy.sh flags:
