@@ -62,6 +62,7 @@ services:
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
     depends_on:
       server:
         condition: service_healthy
