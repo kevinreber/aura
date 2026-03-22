@@ -1,4 +1,4 @@
-.PHONY: help dev up down build logs clean test e2e e2e-full e2e-clean deploy deploy-build deploy-down deploy-logs
+.PHONY: help dev up down build logs clean test e2e e2e-full e2e-clean deploy deploy-build deploy-down deploy-logs fly-setup fly-deploy fly-server fly-agent fly-ui
 
 help:
 	@echo "Aura Monorepo Commands"
@@ -11,11 +11,18 @@ help:
 	@echo "  make build     - Build images"
 	@echo "  make clean     - Remove containers/volumes"
 	@echo ""
-	@echo "Production (DigitalOcean):"
+	@echo "Production (Docker Compose):"
 	@echo "  make deploy       - Build and start production services"
 	@echo "  make deploy-build - Build production images only"
 	@echo "  make deploy-down  - Stop production services"
 	@echo "  make deploy-logs  - Tail production logs"
+	@echo ""
+	@echo "Fly.io Deployment:"
+	@echo "  make fly-setup    - Create Fly.io apps and show secrets setup"
+	@echo "  make fly-deploy   - Deploy server + agent to Fly.io"
+	@echo "  make fly-server   - Deploy server only"
+	@echo "  make fly-agent    - Deploy agent only"
+	@echo "  make fly-ui       - Deploy UI to Fly.io (optional, default is Vercel)"
 	@echo ""
 	@echo "E2E Testing:"
 	@echo "  make e2e       - Run smoke tests (no API keys needed)"
@@ -61,6 +68,22 @@ deploy-down:
 
 deploy-logs:
 	docker compose -f docker-compose.prod.yml logs -f
+
+# Fly.io Deployment
+fly-setup:
+	./fly/deploy.sh setup
+
+fly-deploy:
+	./fly/deploy.sh all
+
+fly-server:
+	./fly/deploy.sh server
+
+fly-agent:
+	./fly/deploy.sh agent
+
+fly-ui:
+	./fly/deploy.sh ui
 
 # E2E Testing
 e2e:

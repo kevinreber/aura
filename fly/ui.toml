@@ -1,0 +1,36 @@
+# Fly.io config for UI (React Router v7)
+# Note: UI is currently deployed on Vercel. This config is provided
+# as an alternative if you want to consolidate everything on Fly.io.
+app = "aura-ui"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "../docker/ui.Dockerfile"
+  build_target = "production"
+
+[env]
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
