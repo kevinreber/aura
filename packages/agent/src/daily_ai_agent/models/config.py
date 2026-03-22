@@ -13,12 +13,10 @@ DEFAULT_CORS_ORIGINS = [
     "http://localhost:5174",
 ]
 
-# Default CORS origins for production (can be overridden via env)
+# Default CORS origins for production (can be extended via ALLOWED_ORIGINS env var)
 PRODUCTION_CORS_ORIGINS = [
     "https://daily-agent-ui.vercel.app",
     "https://aura-six-sable.vercel.app",
-    "https://web-production-66f9.up.railway.app",
-    "https://web-production-f80730.up.railway.app",
 ]
 
 
@@ -76,23 +74,24 @@ class Settings(BaseSettings):
         """
         Get allowed CORS origins.
 
-        Priority:
-        1. ALLOWED_ORIGINS environment variable (comma-separated)
-        2. Default origins based on environment
+        In production: includes Vercel defaults + any extras from ALLOWED_ORIGINS env var.
+        In development: localhost origins + any extras from ALLOWED_ORIGINS env var.
         """
+        if self.environment == "production":
+            origins = PRODUCTION_CORS_ORIGINS + DEFAULT_CORS_ORIGINS
+        else:
+            origins = DEFAULT_CORS_ORIGINS
+
+        # ALLOWED_ORIGINS env var adds extra origins (comma-separated)
         if self.allowed_origins_env:
-            # Parse comma-separated origins from environment
-            origins = [
+            extras = [
                 origin.strip()
                 for origin in self.allowed_origins_env.split(",")
                 if origin.strip()
             ]
-            return origins
+            origins = origins + extras
 
-        # Use default origins based on environment
-        if self.environment == "production":
-            return PRODUCTION_CORS_ORIGINS + DEFAULT_CORS_ORIGINS
-        return DEFAULT_CORS_ORIGINS
+        return origins
 
     @property
     def is_production(self) -> bool:
