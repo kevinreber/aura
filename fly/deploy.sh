@@ -45,7 +45,12 @@ deploy_service() {
 # First-time setup helper
 setup_service() {
     local service=$1
-    local app_name="aura-${service}"
+    # Map service name to Fly app name
+    local app_name
+    case "$service" in
+        server) app_name="aura-mcp-server" ;;
+        *)      app_name="aura-${service}" ;;
+    esac
 
     echo "==> Creating app: $app_name"
     fly apps create "$app_name" --org personal 2>/dev/null || echo "    App $app_name already exists"
@@ -60,7 +65,7 @@ if [ "${1:-}" = "setup" ]; then
     echo "Apps created. Now set your secrets:"
     echo ""
     echo "  # Server secrets (use your Upstash Redis URL)"
-    echo "  fly secrets set -a aura-server \\"
+    echo "  fly secrets set -a aura-mcp-server \\"
     echo "    REDIS_URL=<your-upstash-redis-url> \\"
     echo "    WEATHER_API_KEY=<key> \\"
     echo "    GOOGLE_MAPS_API_KEY=<key> \\"
@@ -71,7 +76,7 @@ if [ "${1:-}" = "setup" ]; then
     echo ""
     echo "  # Agent secrets"
     echo "  fly secrets set -a aura-agent \\"
-    echo "    MCP_SERVER_URL=https://aura-server.fly.dev \\"
+    echo "    MCP_SERVER_URL=https://aura-mcp-server.fly.dev \\"
     echo "    OPENAI_API_KEY=<key> \\"
     echo "    ALLOWED_ORIGINS=https://aura-ui.fly.dev"
     echo ""
