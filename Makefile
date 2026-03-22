@@ -1,4 +1,4 @@
-.PHONY: help dev up down build logs clean test e2e e2e-full e2e-clean
+.PHONY: help dev up down build logs clean test e2e e2e-full e2e-clean deploy deploy-build deploy-down deploy-logs
 
 help:
 	@echo "Aura Monorepo Commands"
@@ -10,6 +10,12 @@ help:
 	@echo "  make logs      - Tail logs"
 	@echo "  make build     - Build images"
 	@echo "  make clean     - Remove containers/volumes"
+	@echo ""
+	@echo "Production (DigitalOcean):"
+	@echo "  make deploy       - Build and start production services"
+	@echo "  make deploy-build - Build production images only"
+	@echo "  make deploy-down  - Stop production services"
+	@echo "  make deploy-logs  - Tail production logs"
 	@echo ""
 	@echo "E2E Testing:"
 	@echo "  make e2e       - Run smoke tests (no API keys needed)"
@@ -42,6 +48,19 @@ shell-agent:
 
 redis-cli:
 	docker compose exec redis redis-cli
+
+# Production Deployment
+deploy:
+	./deploy/deploy.sh
+
+deploy-build:
+	docker compose -f docker-compose.prod.yml build
+
+deploy-down:
+	docker compose -f docker-compose.prod.yml down
+
+deploy-logs:
+	docker compose -f docker-compose.prod.yml logs -f
 
 # E2E Testing
 e2e:
