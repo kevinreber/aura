@@ -2,9 +2,8 @@
 app = "aura-server"
 primary_region = "sjc"
 
-[build]
-  dockerfile = "../docker/server.Dockerfile"
-  build_target = "production"
+# Build is handled via deploy.sh flags:
+#   --dockerfile docker/server.Dockerfile --build-target production
 
 [env]
   ENVIRONMENT = "production"

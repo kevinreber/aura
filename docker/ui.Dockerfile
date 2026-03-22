@@ -11,6 +11,8 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 FROM base AS build
 ENV NODE_ENV=production
+ARG VITE_AI_AGENT_API_URL
+ENV VITE_AI_AGENT_API_URL=$VITE_AI_AGENT_API_URL
 RUN npm run build
 
 FROM node:20-alpine AS production

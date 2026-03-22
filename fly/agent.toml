@@ -2,9 +2,8 @@
 app = "aura-agent"
 primary_region = "sjc"
 
-[build]
-  dockerfile = "../docker/agent.Dockerfile"
-  build_target = "production"
+# Build is handled via deploy.sh flags:
+#   --dockerfile docker/agent.Dockerfile --build-target production
 
 [env]
   ENVIRONMENT = "production"

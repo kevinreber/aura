@@ -14,6 +14,7 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 deploy_service() {
     local service=$1
     local config="$SCRIPT_DIR/${service}.toml"
+    local dockerfile="docker/${service}.Dockerfile"
 
     if [ ! -f "$config" ]; then
         echo "Error: Config not found: $config"
@@ -22,7 +23,22 @@ deploy_service() {
 
     echo "==> Deploying $service..."
     cd "$ROOT_DIR"
-    fly deploy --config "$config" --dockerfile "docker/${service}.Dockerfile" --build-target production
+
+    if [ "$service" = "ui" ]; then
+        # VITE_ vars must be set at build time (Vite inlines them)
+        local agent_url="${VITE_AI_AGENT_API_URL:-https://aura-agent.fly.dev}"
+        fly deploy \
+            --config "$config" \
+            --dockerfile "$dockerfile" \
+            --build-target production \
+            --build-arg "VITE_AI_AGENT_API_URL=$agent_url"
+    else
+        fly deploy \
+            --config "$config" \
+            --dockerfile "$dockerfile" \
+            --build-target production
+    fi
+
     echo "==> $service deployed successfully"
 }
 
@@ -43,7 +59,7 @@ if [ "${1:-}" = "setup" ]; then
     echo ""
     echo "Apps created. Now set your secrets:"
     echo ""
-    echo "  # Server secrets"
+    echo "  # Server secrets (use your Upstash Redis URL)"
     echo "  fly secrets set -a aura-server \\"
     echo "    REDIS_URL=<your-upstash-redis-url> \\"
     echo "    WEATHER_API_KEY=<key> \\"
@@ -57,11 +73,12 @@ if [ "${1:-}" = "setup" ]; then
     echo "  fly secrets set -a aura-agent \\"
     echo "    MCP_SERVER_URL=https://aura-server.fly.dev \\"
     echo "    OPENAI_API_KEY=<key> \\"
-    echo "    ALLOWED_ORIGINS=https://aura-six-sable.vercel.app"
+    echo "    ALLOWED_ORIGINS=https://aura-ui.fly.dev"
     echo ""
-    echo "  # UI env (if deploying UI to Fly instead of Vercel)"
-    echo "  fly secrets set -a aura-ui \\"
-    echo "    VITE_AI_AGENT_API_URL=https://aura-agent.fly.dev"
+    echo "  # UI: VITE_ vars are build-time only (set via --build-arg in deploy)."
+    echo "  # To customize the agent URL for UI builds, export before deploying:"
+    echo "  #   export VITE_AI_AGENT_API_URL=https://aura-agent.fly.dev"
+    echo "  #   ./fly/deploy.sh ui"
     echo ""
     echo "Then deploy with: ./fly/deploy.sh"
     exit 0
