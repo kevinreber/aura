@@ -50,6 +50,11 @@ dependencies = [
 
     # Anthropic Claude support (optional)
     "langchain-anthropic>=0.1.0",
+
+    # Hugging Face - lightweight intent classification & semantic embeddings
+    "transformers>=4.40.0",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
 ]
 
 [project.scripts]

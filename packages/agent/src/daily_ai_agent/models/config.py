@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     langchain_project: str = "aura"
     langchain_endpoint: str = "https://api.smith.langchain.com"
 
+    # Hugging Face - Intent Classification & Embeddings
+    hf_intent_classifier_enabled: bool = True
+    hf_intent_classifier_model: str = "cross-encoder/nli-deberta-v3-small"
+    hf_intent_confidence_threshold: float = 0.70
+    hf_embeddings_enabled: bool = True
+    hf_embeddings_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+
     # MCP Server Connection
     mcp_server_url: str = "http://localhost:8000"
     mcp_server_timeout: int = 45

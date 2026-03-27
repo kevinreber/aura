@@ -12,6 +12,8 @@ from datetime import datetime
 from .tools import get_all_tools
 from ..models.config import get_settings
 from ..services.llm import LLMService
+from ..services.intent_classifier import IntentClassifier
+from ..services.embeddings import EmbeddingService
 from ..utils.tracing import setup_langsmith_tracing, is_tracing_active
 
 # Module-level tool cache for performance
@@ -66,6 +68,21 @@ class AgentOrchestrator:
             self.tools = get_cached_tools()
         else:
             self.tools = get_all_tools()
+
+        # Initialize Hugging Face services (lazy-loaded, won't download until first use)
+        self.intent_classifier = IntentClassifier(
+            model_name=self.settings.hf_intent_classifier_model,
+            confidence_threshold=self.settings.hf_intent_confidence_threshold,
+            enabled=self.settings.hf_intent_classifier_enabled,
+        )
+        self.embedding_service = EmbeddingService(
+            model_name=self.settings.hf_embeddings_model,
+            enabled=self.settings.hf_embeddings_enabled,
+        )
+        logger.info(
+            f"HF services: intent_classifier={'enabled' if self.intent_classifier.enabled else 'disabled'}, "
+            f"embeddings={'enabled' if self.embedding_service.enabled else 'disabled'}"
+        )
 
         # Determine which LLM provider to use
         self.llm_provider = self.settings.effective_llm_provider
@@ -194,9 +211,54 @@ Always maintain context from earlier in the conversation."""),
             logger.error(f"Error initializing LangChain agent: {e}")
             self.agent = None
 
+    async def _try_direct_tool_call(self, tool_name: str, user_input: str) -> Optional[str]:
+        """
+        Attempt to call a tool directly based on intent classification,
+        bypassing the LLM for simple queries.
+
+        Returns the tool result string, or None if the tool call fails
+        and the query should fall through to the full LLM agent.
+        """
+        tool_map = {t.name: t for t in self.tools}
+        tool = tool_map.get(tool_name)
+        if not tool:
+            return None
+
+        try:
+            logger.info(f"Fast path: calling {tool_name} directly (skipping LLM)")
+
+            # For tools with simple defaults, call directly
+            if tool_name == "get_morning_briefing":
+                return await tool._arun()
+            elif tool_name == "get_weather":
+                return await tool._arun(location=self.settings.user_location)
+            elif tool_name == "get_calendar":
+                today = datetime.now().strftime("%Y-%m-%d")
+                return await tool._arun(date=today)
+            elif tool_name == "get_todos":
+                return await tool._arun()
+            elif tool_name == "get_financial_data":
+                from ..utils.constants import FINANCIAL_SYMBOLS
+                return await tool._arun(symbols=FINANCIAL_SYMBOLS, data_type="mixed")
+            elif tool_name == "get_commute":
+                return await tool._arun(
+                    origin=self.settings.default_commute_origin,
+                    destination=self.settings.default_commute_destination,
+                )
+            else:
+                # Tool needs parameters we can't infer — fall through to LLM
+                return None
+        except Exception as e:
+            logger.warning(f"Direct tool call failed for {tool_name}: {e}")
+            return None
+
     async def chat(self, user_input: str) -> str:
         """
         Handle a conversational input from the user.
+
+        Uses a two-stage approach:
+        1. Fast path: HF intent classifier routes simple queries directly to tools
+        2. Full path: LLM agent handles complex/ambiguous queries
 
         Args:
             user_input: Natural language input from user
@@ -210,8 +272,28 @@ Always maintain context from earlier in the conversation."""),
         try:
             logger.info(f"Processing user input: {user_input}")
 
-            # Build the invoke payload
+            # Stage 1: Try fast intent classification
+            intent_tool, confidence = self.intent_classifier.classify(user_input)
+            if intent_tool:
+                logger.info(f"Intent classified: {intent_tool} (confidence={confidence:.2f})")
+                direct_result = await self._try_direct_tool_call(intent_tool, user_input)
+                if direct_result:
+                    # Store in memory and embeddings
+                    self._store_exchange(user_input, direct_result)
+                    return direct_result
+
+            # Stage 2: Full LLM agent path
             invoke_payload: Dict[str, Any] = {"input": user_input}
+
+            # Enrich input with semantically relevant context from embeddings
+            if self.embedding_service.enabled and self.embedding_service.history_size() > 0:
+                relevant = self.embedding_service.get_relevant_context(user_input, top_k=3)
+                if relevant:
+                    context_block = "\n".join(f"- {msg}" for msg in relevant)
+                    invoke_payload["input"] = (
+                        f"[Relevant prior context:\n{context_block}]\n\n{user_input}"
+                    )
+                    logger.debug(f"Enriched input with {len(relevant)} relevant context messages")
 
             # Include chat history if memory is enabled
             if self.enable_memory:
@@ -222,11 +304,8 @@ Always maintain context from earlier in the conversation."""),
             result = await self.agent.ainvoke(invoke_payload)
             response = result.get("output", "I'm not sure how to help with that.")
 
-            # Store the conversation in memory if enabled
-            if self.enable_memory:
-                self.chat_history.append(HumanMessage(content=user_input))
-                self.chat_history.append(AIMessage(content=response))
-                logger.debug(f"Chat history now has {len(self.chat_history)} messages")
+            # Store in memory and embeddings
+            self._store_exchange(user_input, response)
 
             logger.info("Successfully generated response")
             return response
@@ -234,6 +313,17 @@ Always maintain context from earlier in the conversation."""),
         except Exception as e:
             logger.error(f"Error in chat processing: {e}")
             return f"Sorry, I encountered an error: {str(e)}"
+
+    def _store_exchange(self, user_input: str, response: str) -> None:
+        """Store a user/assistant exchange in chat history and embeddings."""
+        if self.enable_memory:
+            self.chat_history.append(HumanMessage(content=user_input))
+            self.chat_history.append(AIMessage(content=response))
+            logger.debug(f"Chat history now has {len(self.chat_history)} messages")
+
+        # Store embeddings for semantic retrieval
+        self.embedding_service.add_to_history(user_input, {"role": "user"})
+        self.embedding_service.add_to_history(response, {"role": "assistant"})
 
     async def chat_stream(self, user_input: str) -> AsyncIterator[str]:
         """
@@ -290,11 +380,9 @@ Always maintain context from earlier in the conversation."""),
                         logger.debug(f"Tool completed: {tool_name}")
                     yield f"[TOOL_END] {tool_name}"
 
-            # Store the conversation in memory if enabled
-            if self.enable_memory and full_response:
-                self.chat_history.append(HumanMessage(content=user_input))
-                self.chat_history.append(AIMessage(content=full_response))
-                logger.debug(f"Chat history now has {len(self.chat_history)} messages")
+            # Store in memory and embeddings
+            if full_response:
+                self._store_exchange(user_input, full_response)
 
             logger.info("Successfully generated streaming response")
 
@@ -335,9 +423,10 @@ Always maintain context from earlier in the conversation."""),
         return self.agent is not None
 
     def clear_memory(self) -> None:
-        """Clear the conversation history to start a fresh session."""
+        """Clear the conversation history and embedding history."""
         self.chat_history.clear()
-        logger.info("Conversation memory cleared")
+        self.embedding_service.clear()
+        logger.info("Conversation memory and embeddings cleared")
 
     def get_memory_length(self) -> int:
         """Get the number of messages in conversation history."""
@@ -352,7 +441,7 @@ Always maintain context from earlier in the conversation."""),
         return self.enable_memory and len(self.chat_history) > 0
 
     def get_llm_info(self) -> Dict[str, Any]:
-        """Get information about the current LLM configuration."""
+        """Get information about the current LLM and HF configuration."""
         return {
             "provider": self.llm_provider,
             "model": (
@@ -362,4 +451,7 @@ Always maintain context from earlier in the conversation."""),
             ),
             "tracing_enabled": is_tracing_active(),
             "tracing_project": self.settings.langchain_project if is_tracing_active() else None,
+            "hf_intent_classifier": self.intent_classifier.enabled,
+            "hf_embeddings": self.embedding_service.enabled,
+            "hf_embeddings_stored": self.embedding_service.history_size(),
         }
