@@ -573,10 +573,10 @@ BANDSINTOWN_APP_ID=your_bandsintown_app_id
 OUTDOORACTIVE_API_KEY=your_outdooractive_key  # Optional, falls back to Google Places
 ```
 
-### Railway / Production Deployment
+### Render / Production Deployment
 
-- [ ] Add `BANDSINTOWN_APP_ID` to Railway environment variables for `server` service
-- [ ] Add `OUTDOORACTIVE_API_KEY` to Railway environment variables (if using)
+- [ ] Add `BANDSINTOWN_APP_ID` to Render environment variables for `aura-server-sxxd` service
+- [ ] Add `OUTDOORACTIVE_API_KEY` to Render environment variables (if using)
 - [ ] Verify Google Places API is enabled on the production GCP project (may be a different project than local dev)
 
 ### Decision Points to Resolve
