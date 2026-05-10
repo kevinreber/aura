@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional
 from datetime import datetime, timezone
 import datetime as dt  # Import module to avoid name clash
+import pytz
+
+# Default IANA timezone used to interpret naive datetimes from the agent.
+# Matches GoogleCalendarClient.timezone — keep these in sync.
+_DEFAULT_TZ = pytz.timezone("America/Los_Angeles")
 
 
 class CalendarInput(BaseModel):
@@ -231,8 +236,10 @@ class CalendarUpdateInput(BaseModel):
     @classmethod
     def validate_times(cls, v):
         if v is not None and v.tzinfo is None:
-            # Add UTC timezone if none specified
-            v = v.replace(tzinfo=timezone.utc)
+            # Naive datetimes from the agent are interpreted as the user's
+            # local timezone (Pacific). Stamping UTC here was the original
+            # behavior and caused 4pm to be saved as 9am Pacific.
+            v = _DEFAULT_TZ.localize(v)
         return v
 
     @model_validator(mode='after')

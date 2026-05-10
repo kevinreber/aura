@@ -49,7 +49,7 @@ class CalendarCreateInput(BaseModel):
 
 class CalendarUpdateInput(BaseModel):
     """Input schema for calendar update tool — used to MOVE/EDIT existing events."""
-    event_id: str = Field(description="Google Calendar event ID to update (get this from calendar.list_events or from a previous create_calendar_event response)")
+    event_id: str = Field(description="The actual event_id value from a prior tool response (e.g. 'p4hq8t19ajuclc4khnhs1tkjls'). NEVER pass the literal string 'event_id' — that will fail. Look in [event_id=...] tags in prior tool outputs, or call get_calendar first to fetch IDs.")
     title: Optional[str] = Field(default=None, description="New event title — only set if changing")
     start_time: Optional[str] = Field(default=None, description="New start time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
     end_time: Optional[str] = Field(default=None, description="New end time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
@@ -62,7 +62,7 @@ class CalendarUpdateInput(BaseModel):
 
 class CalendarDeleteInput(BaseModel):
     """Input schema for calendar delete tool — used to REMOVE/CANCEL existing events."""
-    event_id: str = Field(description="Google Calendar event ID to delete (get this from calendar.list_events or from a previous tool response)")
+    event_id: str = Field(description="The actual event_id value from a prior tool response (e.g. 'p4hq8t19ajuclc4khnhs1tkjls'). NEVER pass the literal string 'event_id' — that will fail. Look in [event_id=...] tags in prior tool outputs, or call get_calendar first to fetch IDs.")
     calendar_name: str = Field(default="primary", description="Calendar containing the event")
 
 
@@ -166,18 +166,23 @@ class CalendarTool(BaseTool):
             data = await client.get_calendar_events(date)
             events = data.get('events', [])
             total = data.get('total_events', 0)
-            
+
             if total == 0:
                 return f"No events scheduled for {date}"
-            
+
             event_summaries = []
-            for event in events[:3]:  # Show max 3 events
-                event_summaries.append(f"- {event.get('title', 'N/A')} at {event.get('time', 'N/A')}")
-            
-            result = f"{total} events on {date}:\\n" + "\\n".join(event_summaries)
-            if total > 3:
-                result += f"\\n... and {total - 3} more events"
-            
+            # Surface event_id alongside title + time so the agent can use the ID
+                # for follow-up update_calendar_event / delete_calendar_event calls.
+            for event in events[:5]:
+                event_id = event.get('id', '')
+                title = event.get('title', 'N/A')
+                start = event.get('start_time') or event.get('time', 'N/A')
+                event_summaries.append(f"- [event_id={event_id}] {title} at {start}")
+
+            result = f"{total} events on {date}:\n" + "\n".join(event_summaries)
+            if total > 5:
+                result += f"\n... and {total - 5} more events"
+
             return result
         except Exception as e:
             return f"Error getting calendar: {str(e)}"
@@ -221,12 +226,14 @@ class CalendarRangeTool(BaseTool):
             for date, day_events in sorted(events_by_date.items()):
                 result_lines.append(f"\n{date}:")
                 for event in day_events[:3]:  # Show max 3 events per day
+                    event_id = event.get('id', '')
+                    title = event.get('title', 'N/A')
                     time_str = event.get('start_time', '')
                     if 'T' in time_str:
                         time_part = time_str.split('T')[1][:5]  # Extract HH:MM
-                        result_lines.append(f"  - {event.get('title', 'N/A')} at {time_part}")
+                        result_lines.append(f"  - [event_id={event_id}] {title} at {time_part}")
                     else:
-                        result_lines.append(f"  - {event.get('title', 'N/A')} (all day)")
+                        result_lines.append(f"  - [event_id={event_id}] {title} (all day)")
                 
                 if len(day_events) > 3:
                     result_lines.append(f"  ... and {len(day_events) - 3} more")
@@ -279,19 +286,26 @@ class CalendarCreateTool(BaseTool):
             if result.get('success'):
                 message = result.get('message', 'Event created successfully')
                 conflicts = result.get('conflicts', [])
-                
+
+                # Surface event_id explicitly so the agent can reference it for
+                # later update/delete calls. Without this the agent falls back
+                # to passing the literal string "event_id" — the actual ID
+                # never reaches its context window otherwise.
+                event_id = result.get('event_id', '')
+                if event_id:
+                    message += f"\n[event_id={event_id}]"
+
                 if conflicts:
                     conflict_details = []
                     for conflict in conflicts:
                         conflict_details.append(f"- {conflict.get('title', 'Unknown')} at {conflict.get('start_time', 'Unknown time')}")
-                    
-                    message += f"\\n\\n⚠️ Conflicts detected:\\n" + "\\n".join(conflict_details)
-                    message += "\\n\\nYou may want to reschedule one of these events."
-                
-                # Add event URL if available
+
+                    message += f"\n\n⚠️ Conflicts detected:\n" + "\n".join(conflict_details)
+                    message += "\n\nYou may want to reschedule one of these events."
+
                 if result.get('event_url'):
-                    message += f"\\n\\n📅 View event: {result['event_url']}"
-                
+                    message += f"\n\n📅 View event: {result['event_url']}"
+
                 return message
             else:
                 return f"❌ Failed to create event: {result.get('message', 'Unknown error')}"

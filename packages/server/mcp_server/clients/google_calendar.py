@@ -39,6 +39,12 @@ class GoogleCalendarClient:
         self.credentials_path = credentials_path
         self.credentials_json = credentials_json
         self.service = None
+        # IANA timezone used when writing events back to Google Calendar.
+        # Used by update_event when the caller doesn't include a timezone-aware
+        # datetime. Defaults to Pacific since this is a personal-use deployment.
+        # When we add multi-user, this should come from the user's primary
+        # calendar's timeZone setting.
+        self.timezone = "America/Los_Angeles"
         self._initialize_service()
     
     def _initialize_service(self):

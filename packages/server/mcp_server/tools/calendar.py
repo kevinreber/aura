@@ -535,21 +535,13 @@ class CalendarTool:
                 )
                 
                 if result['success']:
-                    # Convert the events to our schema
-                    original_event = None
-                    updated_event = None
-                    
-                    if result.get('original_event'):
-                        original_event = self._convert_google_event_from_api(
-                            result['original_event'], 
-                            input_data.calendar_name or "primary"
-                        )
-                    
-                    if result.get('updated_event'):
-                        updated_event = self._convert_google_event_from_api(
-                            result['updated_event'], 
-                            input_data.calendar_name or "primary"
-                        )
+                    # The underlying GoogleCalendarClient.update_event already
+                    # converts events to CalendarEvent Pydantic objects via
+                    # _convert_google_event(). Don't re-convert (which would
+                    # call .get() on a Pydantic model and crash with
+                    # "'CalendarEvent' object has no attribute 'get'").
+                    original_event = result.get('original_event')
+                    updated_event = result.get('updated_event')
                     
                     # Format success message
                     changes_made = result.get('changes_made', [])
