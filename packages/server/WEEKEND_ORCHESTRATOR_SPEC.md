@@ -838,16 +838,24 @@ For the "Friday Morning Routine" specifically, the prompt should:
 
 These are illustrative — not part of v1. They're listed here so the schema accommodates them gracefully:
 
-| Category ID | Tool(s) | Notes |
-|---|---|---|
-| `festivals` | `weekend.get_festivals` | Music festivals, food fests — separate from individual concerts |
-| `food_tours` | `weekend.get_food_tours` | Curated multi-stop food experiences, brewery tours, cocktail crawls |
-| `sports` | `weekend.get_sports_events` | Local games, climbing comps, races |
-| `art` | `weekend.get_art_events` | Gallery openings, exhibits, artist talks |
-| `comedy` | `weekend.get_comedy` | Stand-up shows, improv, comedy clubs |
-| `theater` | `weekend.get_theater` | Plays, musicals, dance performances |
+| Category ID | Tool(s) | Provider(s) | Notes |
+|---|---|---|---|
+| `running` / `cycling` | `weekend.get_strava_segments` | Strava `/segments/explore` | Per-user OAuth. User-curated rated route segments with distance + elevation + popularity. Best-in-class for running and cycling routes. |
+| `climbing` | `weekend.get_climbing_routes` | **OpenBeta** (https://openbeta.io) GraphQL API | Open-source replacement for the now-dead Mountain Project API. No auth required. Growing US route dataset. |
+| `camping` | `weekend.get_camping` | **RIDB** (recreation.gov) via api.data.gov | Federal lands (NPS, USFS, BLM, Army Corps). Sign up at https://api.data.gov/signup/ — instant, free, NOT through recreation.gov consumer account. |
+| `festivals` | `weekend.get_festivals` | TBD | Music festivals, food fests — separate from individual concerts |
+| `food_tours` | `weekend.get_food_tours` | TBD | Curated multi-stop food experiences, brewery tours, cocktail crawls |
+| `sports` | `weekend.get_sports_events` | Ticketmaster `classificationName=sports` | Local games — actually doable with the existing Ticketmaster integration |
+| `art` | `weekend.get_art_events` | TBD | Gallery openings, exhibits, artist talks |
+| `comedy` | `weekend.get_comedy` | Ticketmaster `classificationName=arts` | Stand-up shows, improv |
+| `theater` | `weekend.get_theater` | Ticketmaster `classificationName=arts` | Plays, musicals, dance performances |
 
 Each future category gets a new tool + a new entry in `/weekend/categories`. No schema migrations.
+
+> **Provider gotchas (verified 2026-05-09):**
+> - **Mountain Project API is permanently shut down.** onX acquired Adventure Projects in Dec 2020 and continues to decline new API requests. Use OpenBeta instead.
+> - **Bandsintown** requires partnership program approval (`API@bandsintown.com`). Use Ticketmaster Discovery API instead — already integrated in v1.
+> - **Outdooractive** has no self-serve developer signup. Use Google Places (already integrated) or OSM Overpass for trail data.
 
 ### Phased Recommendation
 
