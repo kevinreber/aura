@@ -1,5 +1,69 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// Component overrides shared between the chat-history and streaming
+// ReactMarkdown instances. Tailwind classes match the chat bubble's `text-sm`.
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-2 last:mb-0">{children}</p>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-base font-semibold mt-3 mb-2 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-sm font-semibold mt-3 mb-1.5 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-semibold mt-2.5 mb-1 first:mt-0 text-gray-800 dark:text-gray-100">
+      {children}
+    </h3>
+  ),
+  h4: ({ children }: { children?: React.ReactNode }) => (
+    <h4 className="text-sm font-medium mt-2 mb-1 first:mt-0">{children}</h4>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => <li className="mb-1">{children}</li>,
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 dark:text-blue-400 hover:underline"
+    >
+      {children}
+    </a>
+  ),
+};
+
+const REMARK_PLUGINS = [remarkGfm];
+
+// LLMs (especially GPT-4o-mini) sometimes generate markdown without proper
+// line breaks before headers and list items, e.g. "intro:### Day 1:- item".
+// Markdown specs require headers and list items to start on their own line,
+// so we insert newlines before these tokens when they appear mid-line.
+function normalizeMarkdown(text: string): string {
+  if (!text) return text;
+  return (
+    text
+      // Insert blank lines before ATX headers that appear mid-line.
+      .replace(/([^\n])(#{1,6} )/g, '$1\n\n$2')
+      // Insert a newline before "- " bullets that follow non-bullet text.
+      .replace(/([^\n\s])(- (?=[A-Z*_]))/g, '$1\n$2')
+  );
+}
 import { useDarkMode } from '../hooks/useDarkMode';
 import { usePolling } from '../hooks/usePolling';
 import {
@@ -1243,26 +1307,10 @@ export default function Dashboard({
                       ) : (
                         // Regular markdown rendering for non-slash-command messages
                         <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => (
-                              <ul className="list-disc pl-4 mb-2">{children}</ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                            ),
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            strong: ({ children }) => (
-                              <strong className="font-semibold">{children}</strong>
-                            ),
-                            code: ({ children }) => (
-                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
-                                {children}
-                              </code>
-                            ),
-                          }}
+                          components={MARKDOWN_COMPONENTS}
+                          remarkPlugins={REMARK_PLUGINS}
                         >
-                          {message.message}
+                          {normalizeMarkdown(message.message)}
                         </ReactMarkdown>
                       )}
                     </div>
@@ -1287,26 +1335,10 @@ export default function Dashboard({
                       )}
                       {streamingMessage ? (
                         <ReactMarkdown
-                          components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                            ul: ({ children }) => (
-                              <ul className="list-disc pl-4 mb-2">{children}</ul>
-                            ),
-                            ol: ({ children }) => (
-                              <ol className="list-decimal pl-4 mb-2">{children}</ol>
-                            ),
-                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                            strong: ({ children }) => (
-                              <strong className="font-semibold">{children}</strong>
-                            ),
-                            code: ({ children }) => (
-                              <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">
-                                {children}
-                              </code>
-                            ),
-                          }}
+                          components={MARKDOWN_COMPONENTS}
+                          remarkPlugins={REMARK_PLUGINS}
                         >
-                          {streamingMessage}
+                          {normalizeMarkdown(streamingMessage)}
                         </ReactMarkdown>
                       ) : (
                         <span className="text-gray-600 dark:text-gray-300 animate-pulse">
