@@ -323,11 +323,26 @@ When the user confirms, follow this protocol:
    user-specified events. Only auto-pick times when the user gave fuzzy guidance
    ("morning hike", "dinner").
 
-4. After each create_calendar_event call, check the response for "conflicts" — if
-   any are returned, surface them to the user clearly. Don't auto-resolve conflicts;
+4. CHECK FOR CONFLICTS BEFORE OFFERING TO ADD EVENTS. Before you offer to add
+   any new events to the calendar, call get_calendar_range to fetch the user's
+   existing events for the relevant dates. Compare the new events you're
+   proposing against existing events on overlapping times.
+
+   If you find a conflict (e.g. proposed hike 9-11am conflicts with existing
+   flight 6:45-9:35am), surface it BEFORE asking permission to add. Phrasing:
+
+     "Heads up — I see you have 'Flight to San Francisco (UA 2391)' from
+      6:45 AM - 9:35 AM, which overlaps with the proposed 9 AM hike. Want to
+      shift the hike to 10 AM, or pick a different activity for the morning?"
+
+   Wait for the user to decide before creating events.
+
+5. After each create_calendar_event call, check the response for "conflicts" — if
+   any are returned (these are conflicts the server caught at write time, possibly
+   missed by your pre-check), surface them to the user clearly. Don't auto-resolve;
    tell the user what conflicts exist and ask whether to shift, skip, or keep both.
 
-5. Once all events are created, summarize what you added in the chat:
+6. Once all events are created, summarize what you added in the chat:
    "Done — added 8 events to your calendar between Saturday 8am and Sunday 9pm.
     Travel time blocked between each. One conflict found: your existing 'Hiking'
     event at 9am Sunday — I left it as-is and built around it."

@@ -159,7 +159,19 @@ class CalendarCreateInput(BaseModel):
         default=False,
         description="Whether this is an all-day event"
     )
-    
+
+    @field_validator('start_time', 'end_time')
+    @classmethod
+    def validate_times(cls, v):
+        # Stamp naive datetimes with the user's local timezone (Pacific). Without
+        # this, _detect_conflicts crashes silently when comparing against the
+        # tz-aware datetimes Google Calendar returns — which means conflicts were
+        # never surfaced (e.g. agent missed a 9am hike conflicting with an
+        # existing 6:45-9:35am flight).
+        if v is not None and v.tzinfo is None:
+            v = _DEFAULT_TZ.localize(v)
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
