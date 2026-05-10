@@ -1,0 +1,9 @@
+{
+  "displayName": "Aura",
+  "description": "Unified productivity platform combining an LLM-powered agent, MCP server API, and React web UI for AI-assisted task management and workflow automation.",
+  "tech": ["React", "TypeScript", "Python", "Flask", "LangChain", "Tailwind", "Vite"],
+  "thumbnail": "docs/images/thumbnail.png",
+  "demo": "docs/images/demo.gif",
+  "liveUrl": "https://aura-six-sable.vercel.app",
+  "order": 5
+}

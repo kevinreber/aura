@@ -1,0 +1,21 @@
+# Replace with your domain, or use :80 for IP-only access
+{$DOMAIN:localhost} {
+	# UI - serve the frontend
+	handle {
+		reverse_proxy ui:3000
+	}
+
+	# Agent API - proxy /api requests to the agent
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy agent:8001
+	}
+
+	# MCP Server - expose for external MCP clients (Claude Desktop, Cursor)
+	handle /mcp/* {
+		reverse_proxy server:8000
+	}
+
+	# Compression
+	encode gzip zstd
+}

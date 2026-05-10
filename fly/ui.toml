@@ -1,0 +1,39 @@
+# Fly.io config for UI (React Router v7)
+# Note: UI is currently deployed on Vercel. This config is provided
+# as an alternative if you want to consolidate everything on Fly.io.
+#
+# IMPORTANT: VITE_AI_AGENT_API_URL must be set as a build arg, not a
+# runtime secret, because Vite inlines import.meta.env at build time.
+# Use: fly deploy --build-arg VITE_AI_AGENT_API_URL=https://aura-agent.fly.dev
+app = "aura-ui"
+primary_region = "sjc"
+
+# Build is handled via deploy.sh flags:
+#   --dockerfile docker/ui.Dockerfile --build-target production
+
+[env]
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 250
+    soft_limit = 200
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

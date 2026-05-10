@@ -33,4 +33,4 @@ ENV ENVIRONMENT=production DEBUG=false
 USER root
 RUN uv pip install --system gunicorn
 USER appuser
-CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "2", "--worker-class", "sync", "daily_ai_agent.api_server:create_app()"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "1", "--worker-class", "sync", "daily_ai_agent.api_server:create_app()"]

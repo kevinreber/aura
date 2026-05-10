@@ -1,0 +1,37 @@
+# Fly.io config for AI Agent
+app = "aura-agent"
+primary_region = "sjc"
+
+# Build is handled via deploy.sh flags:
+#   --dockerfile docker/agent.Dockerfile --build-target production
+
+[env]
+  ENVIRONMENT = "production"
+  DEBUG = "false"
+  LOG_LEVEL = "WARNING"
+  HOST = "0.0.0.0"
+  PORT = "8001"
+
+[http_service]
+  internal_port = 8001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[http_service.checks]]
+  grace_period = "15s"
+  interval = "30s"
+  method = "GET"
+  timeout = "5s"
+  path = "/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

@@ -46,6 +46,7 @@ const MARKDOWN_COMPONENTS = {
       {children}
     </a>
   ),
+  hr: () => <hr className="my-2 border-gray-300 dark:border-gray-600" />,
 };
 
 const REMARK_PLUGINS = [remarkGfm];
