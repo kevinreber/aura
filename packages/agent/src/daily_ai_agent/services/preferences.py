@@ -8,6 +8,7 @@ out-of-the-box for new installs.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -33,18 +34,35 @@ class WeekendPreferences(BaseModel):
 
 
 def _find_prefs_path() -> Path:
-    """Locate weekend_preferences.json at the monorepo root.
+    """Locate weekend_preferences.json.
 
-    The agent runs from packages/agent/, so we walk up to find data/.
+    Resolution order:
+      1. WEEKEND_PREFS_PATH env var (explicit override — recommended for prod)
+      2. Walk up from this file looking for data/weekend_preferences.json
+      3. Fall back to data/weekend_preferences.json relative to cwd
+
+    The fallback never throws — callers handle FileNotFoundError downstream
+    to apply defaults so the agent works on first run before a prefs file
+    exists.
+
+    Bug history: previously hardcoded `parents[5]` for the local monorepo
+    layout, which raised IndexError in Docker (where the path depth is
+    shorter, e.g. /app/src/daily_ai_agent/services/preferences.py has only
+    4 parents). Caused agent to crash on startup in any non-local deploy.
     """
+    override = os.environ.get("WEEKEND_PREFS_PATH")
+    if override:
+        return Path(override)
+
     here = Path(__file__).resolve()
     for parent in here.parents:
         candidate = parent / "data" / "weekend_preferences.json"
         if candidate.exists():
             return candidate
-    # Fall back to the conventional location even if the file doesn't exist —
-    # callers handle FileNotFoundError to apply defaults.
-    return Path(__file__).resolve().parents[5] / "data" / "weekend_preferences.json"
+
+    # File not found in any ancestor. Return a path-shaped non-existent
+    # location — callers will FileNotFoundError and apply defaults.
+    return Path.cwd() / "data" / "weekend_preferences.json"
 
 
 def load_preferences() -> WeekendPreferences:
