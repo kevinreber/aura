@@ -3,7 +3,7 @@
 from langchain_core.tools import BaseTool
 from typing import Dict, Any, Optional, Type, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 
 from ..services.mcp_client import MCPClient
@@ -47,9 +47,38 @@ class CalendarCreateInput(BaseModel):
     all_day: bool = Field(default=False, description="Whether this is an all-day event")
 
 
+class CalendarUpdateInput(BaseModel):
+    """Input schema for calendar update tool — used to MOVE/EDIT existing events."""
+    event_id: str = Field(description="The actual event_id value from a prior tool response (e.g. 'p4hq8t19ajuclc4khnhs1tkjls'). NEVER pass the literal string 'event_id' — that will fail. Look in [event_id=...] tags in prior tool outputs, or call get_calendar first to fetch IDs.")
+    title: Optional[str] = Field(default=None, description="New event title — only set if changing")
+    start_time: Optional[str] = Field(default=None, description="New start time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
+    end_time: Optional[str] = Field(default=None, description="New end time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
+    description: Optional[str] = Field(default=None, description="New description — only set if changing")
+    location: Optional[str] = Field(default=None, description="New location — only set if changing")
+    attendees: Optional[list] = Field(default=None, description="New attendee list — only set if changing")
+    calendar_name: str = Field(default="primary", description="Calendar containing the event")
+    all_day: Optional[bool] = Field(default=None, description="Whether to convert to/from all-day")
+
+
+class CalendarDeleteInput(BaseModel):
+    """Input schema for calendar delete tool — used to REMOVE/CANCEL existing events."""
+    event_id: str = Field(description="The actual event_id value from a prior tool response (e.g. 'p4hq8t19ajuclc4khnhs1tkjls'). NEVER pass the literal string 'event_id' — that will fail. Look in [event_id=...] tags in prior tool outputs, or call get_calendar first to fetch IDs.")
+    calendar_name: str = Field(default="primary", description="Calendar containing the event")
+
+
 class TodoInput(BaseModel):
-    """Input schema for todo tool.""" 
+    """Input schema for todo tool."""
     bucket: Optional[str] = Field(default=None, description="Todo bucket: 'work', 'home', 'errands', 'personal', or leave empty for all todos")
+
+
+class TodoCreateInput(BaseModel):
+    """Input schema for todo create tool."""
+    title: str = Field(description="Todo item title/description, e.g. 'Research Denver Airbnbs' or 'Pack hiking gear'")
+    priority: str = Field(default="medium", description="Priority level: 'low', 'medium', 'high'")
+    bucket: str = Field(default="personal", description="Category: 'work', 'home', 'errands', 'personal'")
+    due_date: Optional[str] = Field(default=None, description="Due date in natural language ('tomorrow', 'next Friday', '2026-05-15') or omit for no due date")
+    tags: Optional[List[str]] = Field(default=None, description="Tags for grouping, e.g. ['travel', 'denver']")
+    description: Optional[str] = Field(default=None, description="Optional longer-form notes or details")
 
 
 class CommuteInput(BaseModel):
@@ -78,6 +107,39 @@ class FinancialInput(BaseModel):
     """Input schema for financial tool."""
     symbols: list = Field(description="List of stock/crypto symbols like ['MSFT', 'BTC', 'ETH']")
     data_type: str = Field(default="mixed", description="Type: 'stocks', 'crypto', or 'mixed'")
+
+
+class CreateTravelBlockInput(BaseModel):
+    """Input schema for the deterministic travel-block helper."""
+    next_event_title: str = Field(description="Title of the destination event being travelled to (e.g. 'Tycho Concert at The Fillmore'). Used to generate the travel block's title.")
+    next_event_start_time: str = Field(description="ISO start time of the destination event (YYYY-MM-DDTHH:MM:SS). The travel block will end exactly at this time.")
+    drive_minutes: int = Field(description="Drive duration in minutes from the previous location to the destination. Get this from get_commute first.")
+    destination_address: str = Field(description="Full street address of the destination — used as the event location so Google Calendar's Get Directions works correctly.")
+    calendar_name: str = Field(default="primary", description="Calendar to add the event to.")
+
+
+class WeekendTrailsInput(BaseModel):
+    """Input schema for weekend trail scouting tool."""
+    location: str = Field(description="City or region to search near, e.g. 'Boulder, CO' or 'San Francisco, CA'")
+    activity_type: str = Field(default="all", description="Activity type: 'hiking', 'running', 'cycling', or 'all'")
+    max_distance_miles: int = Field(default=25, description="Maximum trail distance in miles (1-200)")
+    difficulty: Optional[str] = Field(default=None, description="Optional difficulty filter: 'easy', 'moderate', 'hard', or omit for any")
+
+
+class WeekendConcertsInput(BaseModel):
+    """Input schema for weekend concert lookup tool."""
+    location: str = Field(description="City to search around, e.g. 'San Francisco, CA' or 'Denver, CO'")
+    artists: Optional[List[str]] = Field(default=None, description="Specific artists to track. Omit to find any events in radius.")
+    radius_miles: int = Field(default=50, description="Search radius in miles (1-500)")
+    date_range_days: int = Field(default=14, description="How far ahead to look in days (1-90)")
+
+
+class WeekendItineraryInput(BaseModel):
+    """Input schema for weekend multi-day itinerary tool."""
+    destination: str = Field(description="City or region for the trip, e.g. 'Denver, CO' or 'Asheville, NC'")
+    duration_days: int = Field(description="Number of days for the trip (1-7)")
+    interests: List[str] = Field(default=[], description="Interest tags like ['outdoors', 'live music', 'food', 'craft beer']")
+    base_location: Optional[str] = Field(default=None, description="Hotel/Airbnb address — used to compute drive-time estimates between POIs")
 
 
 class WeatherTool(BaseTool):
@@ -123,18 +185,23 @@ class CalendarTool(BaseTool):
             data = await client.get_calendar_events(date)
             events = data.get('events', [])
             total = data.get('total_events', 0)
-            
+
             if total == 0:
                 return f"No events scheduled for {date}"
-            
+
             event_summaries = []
-            for event in events[:3]:  # Show max 3 events
-                event_summaries.append(f"- {event.get('title', 'N/A')} at {event.get('time', 'N/A')}")
-            
-            result = f"{total} events on {date}:\\n" + "\\n".join(event_summaries)
-            if total > 3:
-                result += f"\\n... and {total - 3} more events"
-            
+            # Surface event_id alongside title + time so the agent can use the ID
+                # for follow-up update_calendar_event / delete_calendar_event calls.
+            for event in events[:5]:
+                event_id = event.get('id', '')
+                title = event.get('title', 'N/A')
+                start = event.get('start_time') or event.get('time', 'N/A')
+                event_summaries.append(f"- [event_id={event_id}] {title} at {start}")
+
+            result = f"{total} events on {date}:\n" + "\n".join(event_summaries)
+            if total > 5:
+                result += f"\n... and {total - 5} more events"
+
             return result
         except Exception as e:
             return f"Error getting calendar: {str(e)}"
@@ -178,12 +245,14 @@ class CalendarRangeTool(BaseTool):
             for date, day_events in sorted(events_by_date.items()):
                 result_lines.append(f"\n{date}:")
                 for event in day_events[:3]:  # Show max 3 events per day
+                    event_id = event.get('id', '')
+                    title = event.get('title', 'N/A')
                     time_str = event.get('start_time', '')
                     if 'T' in time_str:
                         time_part = time_str.split('T')[1][:5]  # Extract HH:MM
-                        result_lines.append(f"  - {event.get('title', 'N/A')} at {time_part}")
+                        result_lines.append(f"  - [event_id={event_id}] {title} at {time_part}")
                     else:
-                        result_lines.append(f"  - {event.get('title', 'N/A')} (all day)")
+                        result_lines.append(f"  - [event_id={event_id}] {title} (all day)")
                 
                 if len(day_events) > 3:
                     result_lines.append(f"  ... and {len(day_events) - 3} more")
@@ -236,19 +305,26 @@ class CalendarCreateTool(BaseTool):
             if result.get('success'):
                 message = result.get('message', 'Event created successfully')
                 conflicts = result.get('conflicts', [])
-                
+
+                # Surface event_id explicitly so the agent can reference it for
+                # later update/delete calls. Without this the agent falls back
+                # to passing the literal string "event_id" — the actual ID
+                # never reaches its context window otherwise.
+                event_id = result.get('event_id', '')
+                if event_id:
+                    message += f"\n[event_id={event_id}]"
+
                 if conflicts:
                     conflict_details = []
                     for conflict in conflicts:
                         conflict_details.append(f"- {conflict.get('title', 'Unknown')} at {conflict.get('start_time', 'Unknown time')}")
-                    
-                    message += f"\\n\\n⚠️ Conflicts detected:\\n" + "\\n".join(conflict_details)
-                    message += "\\n\\nYou may want to reschedule one of these events."
-                
-                # Add event URL if available
+
+                    message += f"\n\n⚠️ Conflicts detected:\n" + "\n".join(conflict_details)
+                    message += "\n\nYou may want to reschedule one of these events."
+
                 if result.get('event_url'):
-                    message += f"\\n\\n📅 View event: {result['event_url']}"
-                
+                    message += f"\n\n📅 View event: {result['event_url']}"
+
                 return message
             else:
                 return f"❌ Failed to create event: {result.get('message', 'Unknown error')}"
@@ -256,13 +332,131 @@ class CalendarCreateTool(BaseTool):
         except Exception as e:
             return f"❌ Error creating calendar event: {str(e)}"
     
-    def _run(self, title: str, start_time: str, end_time: str, 
+    def _run(self, title: str, start_time: str, end_time: str,
              description: Optional[str] = None, location: Optional[str] = None,
              attendees: Optional[list] = None, calendar_name: str = "primary",
              all_day: bool = False) -> str:
         """Sync wrapper for async call."""
-        return asyncio.run(self._arun(title, start_time, end_time, description, 
+        return asyncio.run(self._arun(title, start_time, end_time, description,
                                     location, attendees, calendar_name, all_day))
+
+
+class CalendarUpdateTool(BaseTool):
+    """Tool to UPDATE/MOVE existing calendar events — use for 'move', 'reschedule', 'change time', etc."""
+
+    name: str = "update_calendar_event"
+    description: str = (
+        "Update an existing calendar event. Use this when the user wants to MOVE, "
+        "RESCHEDULE, or EDIT an event they already have. Requires the event_id from "
+        "calendar.list_events or from a previous create response. DO NOT create a new "
+        "event when the user wants to move an existing one — that would leave both."
+    )
+    args_schema: Type[BaseModel] = CalendarUpdateInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        event_id: str,
+        title: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[list] = None,
+        calendar_name: str = "primary",
+        all_day: Optional[bool] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {"event_id": event_id, "calendar_name": calendar_name}
+            # Only include fields the user actually wants to change.
+            for k, v in (
+                ("title", title),
+                ("start_time", start_time),
+                ("end_time", end_time),
+                ("description", description),
+                ("location", location),
+                ("attendees", attendees),
+                ("all_day", all_day),
+            ):
+                if v is not None:
+                    payload[k] = v
+
+            result = await client.call_tool("calendar.update_event", payload)
+
+            if result.get("success"):
+                changes = result.get("changes_made") or []
+                msg = result.get("message", "Event updated.")
+                lines = [f"✅ {msg}"]
+                if changes:
+                    lines.append(f"Changed: {', '.join(changes)}")
+                if result.get("event_url"):
+                    lines.append(f"📅 View event: {result['event_url']}")
+                conflicts = result.get("conflicts") or []
+                if conflicts:
+                    lines.append("\n⚠️ Conflicts at the new time:")
+                    for c in conflicts:
+                        lines.append(f"  - {c.get('title','Unknown')} at {c.get('start_time','?')}")
+                return "\n".join(lines)
+            else:
+                return f"❌ Failed to update event: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error updating calendar event: {e}"
+
+    def _run(
+        self,
+        event_id: str,
+        title: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[list] = None,
+        calendar_name: str = "primary",
+        all_day: Optional[bool] = None,
+    ) -> str:
+        return asyncio.run(
+            self._arun(event_id, title, start_time, end_time, description,
+                       location, attendees, calendar_name, all_day)
+        )
+
+
+class CalendarDeleteTool(BaseTool):
+    """Tool to DELETE existing calendar events — use for 'remove', 'cancel', 'delete'."""
+
+    name: str = "delete_calendar_event"
+    description: str = (
+        "Delete an existing calendar event. Use this when the user wants to REMOVE, "
+        "CANCEL, or DELETE an event. Requires the event_id from calendar.list_events "
+        "or from a previous tool response. DO NOT create a 'cancellation' marker event "
+        "as a workaround — actually delete the original."
+    )
+    args_schema: Type[BaseModel] = CalendarDeleteInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(self, event_id: str, calendar_name: str = "primary") -> str:
+        try:
+            client = self._get_mcp_client()
+            result = await client.call_tool(
+                "calendar.delete_event",
+                {"event_id": event_id, "calendar_name": calendar_name},
+            )
+            if result.get("success"):
+                deleted = result.get("deleted_event") or {}
+                title = deleted.get("title", event_id)
+                start = deleted.get("start_time", "")
+                return f"✅ Deleted '{title}'{(' at ' + start) if start else ''}."
+            else:
+                return f"❌ Failed to delete event: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error deleting calendar event: {e}"
+
+    def _run(self, event_id: str, calendar_name: str = "primary") -> str:
+        return asyncio.run(self._arun(event_id, calendar_name))
 
 
 class TodoTool(BaseTool):
@@ -314,6 +508,78 @@ class TodoTool(BaseTool):
     def _run(self, bucket: Optional[str] = None) -> str:
         """Sync wrapper for async call."""
         return asyncio.run(self._arun(bucket))
+
+
+class TodoCreateTool(BaseTool):
+    """Tool to add new items to the user's todo list — used for write-back."""
+
+    name: str = "create_todo"
+    description: str = (
+        "Create a new todo item in the user's task list. Use this for write-back: "
+        "after suggesting prep work for a trip or weekend plan (research X, book Y, "
+        "pack Z), offer to add the items here, and call this tool once per item "
+        "after the user confirms. Supports natural language due dates ('tomorrow', "
+        "'next Friday')."
+    )
+    args_schema: Type[BaseModel] = TodoCreateInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        title: str,
+        priority: str = "medium",
+        bucket: str = "personal",
+        due_date: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "title": title,
+                "priority": priority,
+                "bucket": bucket,
+            }
+            if due_date:
+                payload["due_date"] = due_date
+            if tags:
+                payload["tags"] = tags
+            if description:
+                payload["description"] = description
+
+            result = await client.call_tool("todo.create", payload)
+
+            if result.get("success"):
+                todo = result.get("todo") or {}
+                todo_id = todo.get("id", "")
+                # Surface todo_id in output so the agent can reference it for
+                # later complete/delete calls if those tools get added.
+                lines = [
+                    f"✅ Todo added: {title}",
+                    f"   bucket: {bucket} | priority: {priority}"
+                    + (f" | due: {due_date}" if due_date else ""),
+                ]
+                if todo_id:
+                    lines.append(f"   [todo_id={todo_id}]")
+                return "\n".join(lines)
+            return f"❌ Failed to create todo: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error creating todo: {e}"
+
+    def _run(
+        self,
+        title: str,
+        priority: str = "medium",
+        bucket: str = "personal",
+        due_date: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(
+            self._arun(title, priority, bucket, due_date, tags, description)
+        )
 
 
 class CommuteTool(BaseTool):
@@ -573,6 +839,342 @@ class MorningBriefingTool(BaseTool):
         return asyncio.run(self._arun())
 
 
+class CreateTravelBlockTool(BaseTool):
+    """Deterministic travel-block placer — anchors the block to the destination's start.
+
+    Removes timing math from the LLM. The block always ends exactly when the
+    destination event starts, regardless of how long ago the previous event ended.
+    Fixes the "drive scheduled 6 hours before the concert" problem.
+    """
+
+    name: str = "create_travel_block"
+    description: str = (
+        "Create a 🚗 travel-time calendar event that ENDS exactly when a destination "
+        "event starts. Use this for ALL travel between itinerary stops — never use "
+        "create_calendar_event with manual time math for travel blocks. "
+        "The block's start_time is computed automatically as next_event_start_time "
+        "minus drive_minutes. Call get_commute first to get the drive_minutes value."
+    )
+    args_schema: Type[BaseModel] = CreateTravelBlockInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    @staticmethod
+    def _short_destination(title: str) -> str:
+        """Pick a concise destination name from the next event's title.
+
+        Strips emoji prefixes and "X at Y" / "X @ Y" patterns to extract the
+        venue/place. e.g. "🎵 Tycho Concert at The Fillmore" → "The Fillmore".
+        """
+        # Drop leading emoji + whitespace
+        clean = title.lstrip("🥾🎵🍽️🎯🏨🚗📅🎉🌲📍 ").strip()
+        # Prefer the part after " at " or " @ " if present
+        for sep in (" at ", " @ ", " — "):
+            if sep in clean:
+                return clean.split(sep, 1)[1].strip()
+        return clean
+
+    async def _arun(
+        self,
+        next_event_title: str,
+        next_event_start_time: str,
+        drive_minutes: int,
+        destination_address: str,
+        calendar_name: str = "primary",
+    ) -> str:
+        try:
+            # Parse the destination start time and compute backwards.
+            next_start = datetime.fromisoformat(next_event_start_time)
+            travel_start = next_start - timedelta(minutes=drive_minutes)
+
+            destination = self._short_destination(next_event_title)
+            travel_title = f"🚗 Drive to {destination}"
+
+            # The MCP server's calendar.create_event accepts naive ISO strings;
+            # the schema's localize() validator will stamp Pacific timezone.
+            payload: Dict[str, Any] = {
+                "title": travel_title,
+                "start_time": travel_start.isoformat(),
+                "end_time": next_start.isoformat(),
+                "description": f"Drive time: {drive_minutes} minutes to {destination}.",
+                "location": destination_address,
+                "calendar_name": calendar_name,
+                "all_day": False,
+            }
+
+            client = self._get_mcp_client()
+            result = await client.call_tool("calendar.create_event", payload)
+
+            if result.get("success"):
+                event_id = result.get("event_id", "")
+                lines = [
+                    f"✅ {travel_title} added: "
+                    f"{travel_start.strftime('%I:%M %p').lstrip('0')} - "
+                    f"{next_start.strftime('%I:%M %p').lstrip('0')} "
+                    f"({drive_minutes} min)"
+                ]
+                if event_id:
+                    lines.append(f"[event_id={event_id}]")
+                return "\n".join(lines)
+            return f"❌ Failed to create travel block: {result.get('message', 'Unknown error')}"
+        except ValueError as e:
+            return f"❌ Bad time format for next_event_start_time (expected ISO YYYY-MM-DDTHH:MM:SS): {e}"
+        except Exception as e:
+            return f"❌ Error creating travel block: {e}"
+
+    def _run(
+        self,
+        next_event_title: str,
+        next_event_start_time: str,
+        drive_minutes: int,
+        destination_address: str,
+        calendar_name: str = "primary",
+    ) -> str:
+        return asyncio.run(
+            self._arun(
+                next_event_title,
+                next_event_start_time,
+                drive_minutes,
+                destination_address,
+                calendar_name,
+            )
+        )
+
+
+class TrailScoutTool(BaseTool):
+    """Tool to scout outdoor trails near a location."""
+
+    name: str = "get_weekend_trails"
+    description: str = (
+        "Find outdoor trails near a location for hiking, running, or cycling. "
+        "Use when users ask about trails, hikes, outdoor activities, or 'something to do outside' "
+        "for the weekend. Filters by activity type, max distance, and difficulty."
+    )
+    args_schema: Type[BaseModel] = WeekendTrailsInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        location: str,
+        activity_type: str = "all",
+        max_distance_miles: int = 25,
+        difficulty: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "location": location,
+                "activity_type": activity_type,
+                "max_distance_miles": max_distance_miles,
+            }
+            if difficulty:
+                payload["difficulty"] = difficulty
+
+            data = await client.call_tool("weekend.get_trails", payload)
+            trails = data.get("trails", [])
+            source = data.get("source", "unknown")
+
+            if not trails:
+                return f"No trails found near {location} matching your criteria."
+
+            lines = [f"🥾 {len(trails)} trail(s) near {location} (source: {source}):"]
+            for t in trails[:5]:
+                name = t.get("name", "Unnamed")
+                # Distance can be None for providers that don't report trail length
+                # (e.g. Google Places returns parks but no trail distance).
+                distance = t.get("distance_miles")
+                distance_str = f"{distance} mi" if distance is not None else "distance not reported"
+
+                difficulty_str = t.get("difficulty") or "unrated"
+                rating_str = f"★ {t['rating']}" if t.get("rating") else ""
+                elevation = (
+                    f", {t['elevation_gain_ft']} ft gain"
+                    if t.get("elevation_gain_ft")
+                    else ""
+                )
+
+                # Surface the full address so the agent can use it for
+                # follow-up distance queries — passing just "Twin Peaks" to
+                # the directions tool would match a different landmark.
+                trail_location = t.get("location", "")
+                addr_part = (
+                    f"\n  📍 {trail_location}"
+                    if trail_location and trail_location.lower() != location.lower()
+                    else ""
+                )
+
+                lines.append(
+                    f"- {name}: {distance_str}, {difficulty_str}{elevation} {rating_str}{addr_part}"
+                )
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error getting trails: {str(e)}"
+
+    def _run(
+        self,
+        location: str,
+        activity_type: str = "all",
+        max_distance_miles: int = 25,
+        difficulty: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(self._arun(location, activity_type, max_distance_miles, difficulty))
+
+
+class ConcertAlertTool(BaseTool):
+    """Tool to find upcoming concerts and live music events."""
+
+    name: str = "get_weekend_concerts"
+    description: str = (
+        "Find upcoming concerts and live music events near a location. "
+        "Use when users ask about concerts, shows, live music, or specific artists touring nearby. "
+        "Can filter by specific artists or return all events in radius."
+    )
+    args_schema: Type[BaseModel] = WeekendConcertsInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        location: str,
+        artists: Optional[List[str]] = None,
+        radius_miles: int = 50,
+        date_range_days: int = 14,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "location": location,
+                "radius_miles": radius_miles,
+                "date_range_days": date_range_days,
+            }
+            if artists:
+                payload["artists"] = artists
+
+            data = await client.call_tool("weekend.get_concerts", payload)
+            events = data.get("events", [])
+            source = data.get("source", "unknown")
+
+            if not events:
+                artist_filter = f" for {', '.join(artists)}" if artists else ""
+                return f"No upcoming concerts found near {location}{artist_filter}."
+
+            lines = [f"🎵 {len(events)} concert(s) near {location} (source: {source}):"]
+            for e in events[:5]:
+                ticket_emoji = {"available": "🎟️", "sold_out": "❌", "unknown": "❓"}.get(
+                    e.get("ticket_status", "unknown"), "❓"
+                )
+                time_str = f" {e['time']}" if e.get("time") else ""
+                lines.append(
+                    f"- {e.get('artist', 'TBA')} @ {e.get('venue', 'TBA')} on "
+                    f"{e.get('date', 'TBA')}{time_str} {ticket_emoji}"
+                )
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error getting concerts: {str(e)}"
+
+    def _run(
+        self,
+        location: str,
+        artists: Optional[List[str]] = None,
+        radius_miles: int = 50,
+        date_range_days: int = 14,
+    ) -> str:
+        return asyncio.run(self._arun(location, artists, radius_miles, date_range_days))
+
+
+class ItineraryTool(BaseTool):
+    """Tool to generate a multi-day weekend trip itinerary."""
+
+    name: str = "generate_weekend_itinerary"
+    description: str = (
+        "Generate a multi-day weekend trip itinerary with points of interest and optional drive-time estimates. "
+        "Use when users want a full weekend or multi-day trip plan for a destination. "
+        "Returns POIs grouped by category (restaurants, attractions, outdoors, nightlife) — "
+        "you (the LLM) are responsible for stitching them into a day-by-day narrative."
+    )
+    args_schema: Type[BaseModel] = WeekendItineraryInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        destination: str,
+        duration_days: int,
+        interests: List[str] = [],
+        base_location: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "destination": destination,
+                "duration_days": duration_days,
+                "interests": interests,
+            }
+            if base_location:
+                payload["base_location"] = base_location
+
+            data = await client.call_tool("weekend.generate_itinerary", payload)
+            pois = data.get("points_of_interest", [])
+            transit = data.get("transit_estimates")
+            source = data.get("source", "unknown")
+
+            if not pois:
+                return f"No points of interest found for {destination}."
+
+            lines = [
+                f"🗺️ {duration_days}-day itinerary for {destination} "
+                f"({len(pois)} POIs, source: {source}):"
+            ]
+
+            # Group by category for readability
+            by_category: Dict[str, List[Dict[str, Any]]] = {}
+            for poi in pois:
+                cat = poi.get("category", "other")
+                by_category.setdefault(cat, []).append(poi)
+
+            category_emojis = {
+                "restaurant": "🍽️",
+                "outdoors": "🌲",
+                "attraction": "🎯",
+                "nightlife": "🎶",
+                "lodging": "🏨",
+                "other": "📍",
+            }
+            for cat, items in by_category.items():
+                emoji = category_emojis.get(cat, "📍")
+                lines.append(f"\n{emoji} {cat.title()}:")
+                for poi in items[:4]:
+                    rating_str = f" ★ {poi['rating']}" if poi.get("rating") else ""
+                    price_str = " " + "$" * poi["price_level"] if poi.get("price_level") else ""
+                    lines.append(f"  - {poi.get('name', 'Unnamed')}{rating_str}{price_str}")
+
+            if transit:
+                lines.append(f"\n🚗 Transit estimates from {transit[0].get('from_location')}:")
+                for t in transit[:3]:
+                    lines.append(
+                        f"  - To {t.get('to_location')}: "
+                        f"{t.get('drive_time_min')} min, {t.get('distance_miles')} mi"
+                    )
+
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error generating itinerary: {str(e)}"
+
+    def _run(
+        self,
+        destination: str,
+        duration_days: int,
+        interests: List[str] = [],
+        base_location: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(self._arun(destination, duration_days, interests, base_location))
+
+
 def get_all_tools():
     """Get all available tools for the agent."""
     return [
@@ -580,10 +1182,17 @@ def get_all_tools():
         CalendarTool(),
         CalendarRangeTool(),
         CalendarCreateTool(),
+        CalendarUpdateTool(),
+        CalendarDeleteTool(),
         TodoTool(),
+        TodoCreateTool(),
         CommuteTool(),
         CommuteOptionsTool(),
         ShuttleTool(),
         FinancialTool(),
-        MorningBriefingTool()
+        MorningBriefingTool(),
+        TrailScoutTool(),
+        ConcertAlertTool(),
+        ItineraryTool(),
+        CreateTravelBlockTool(),
     ]

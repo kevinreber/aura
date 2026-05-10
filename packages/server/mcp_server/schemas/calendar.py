@@ -4,6 +4,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import List, Optional
 from datetime import datetime, timezone
 import datetime as dt  # Import module to avoid name clash
+import pytz
+
+# Default IANA timezone used to interpret naive datetimes from the agent.
+# Matches GoogleCalendarClient.timezone — keep these in sync.
+_DEFAULT_TZ = pytz.timezone("America/Los_Angeles")
 
 
 class CalendarInput(BaseModel):
@@ -154,7 +159,19 @@ class CalendarCreateInput(BaseModel):
         default=False,
         description="Whether this is an all-day event"
     )
-    
+
+    @field_validator('start_time', 'end_time')
+    @classmethod
+    def validate_times(cls, v):
+        # Stamp naive datetimes with the user's local timezone (Pacific). Without
+        # this, _detect_conflicts crashes silently when comparing against the
+        # tz-aware datetimes Google Calendar returns — which means conflicts were
+        # never surfaced (e.g. agent missed a 9am hike conflicting with an
+        # existing 6:45-9:35am flight).
+        if v is not None and v.tzinfo is None:
+            v = _DEFAULT_TZ.localize(v)
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -231,8 +248,10 @@ class CalendarUpdateInput(BaseModel):
     @classmethod
     def validate_times(cls, v):
         if v is not None and v.tzinfo is None:
-            # Add UTC timezone if none specified
-            v = v.replace(tzinfo=timezone.utc)
+            # Naive datetimes from the agent are interpreted as the user's
+            # local timezone (Pacific). Stamping UTC here was the original
+            # behavior and caused 4pm to be saved as 9am Pacific.
+            v = _DEFAULT_TZ.localize(v)
         return v
 
     @model_validator(mode='after')

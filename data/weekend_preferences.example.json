@@ -1,0 +1,9 @@
+{
+  "enabled_categories": ["trails", "concerts", "itinerary"],
+  "pinned_artists": [],
+  "excluded_artists": [],
+  "activity_preferences": ["hiking", "cycling"],
+  "max_drive_hours": 4,
+  "budget_level": "moderate",
+  "home_base": "San Francisco, CA"
+}

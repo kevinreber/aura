@@ -1,0 +1,47 @@
+[
+  {
+    "artist": "Mock Artist: Khruangbin",
+    "venue": "The Fillmore (mock)",
+    "date": "2026-03-14",
+    "time": "20:00",
+    "ticket_url": "https://example.com/tickets/khruangbin-fillmore",
+    "ticket_status": "available",
+    "on_sale_date": null
+  },
+  {
+    "artist": "Mock Artist: Tycho",
+    "venue": "Greek Theatre (mock)",
+    "date": "2026-03-21",
+    "time": "19:30",
+    "ticket_url": "https://example.com/tickets/tycho-greek",
+    "ticket_status": "available",
+    "on_sale_date": null
+  },
+  {
+    "artist": "Mock Artist: Bonobo",
+    "venue": "The Independent (mock)",
+    "date": "2026-04-02",
+    "time": "21:00",
+    "ticket_url": null,
+    "ticket_status": "sold_out",
+    "on_sale_date": null
+  },
+  {
+    "artist": "Mock Artist: ODESZA",
+    "venue": "Red Rocks Amphitheatre (mock)",
+    "date": "2026-04-18",
+    "time": "20:00",
+    "ticket_url": "https://example.com/tickets/odesza-redrocks",
+    "ticket_status": "available",
+    "on_sale_date": null
+  },
+  {
+    "artist": "Mock Artist: Phantogram",
+    "venue": "Fox Theater (mock)",
+    "date": "2026-05-09",
+    "time": "20:30",
+    "ticket_url": null,
+    "ticket_status": "unknown",
+    "on_sale_date": "2026-05-15"
+  }
+]

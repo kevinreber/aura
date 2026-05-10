@@ -7,5 +7,6 @@ export default [
   route('api/v1/chat', 'routes/api.v1.chat.ts'),
   route('api/v1/chat/stream', 'routes/api.v1.chat.stream.ts'),
   route('api/v1/health', 'routes/api.v1.health.ts'),
+  route('api/v1/preferences', 'routes/api.v1.preferences.ts'),
   route('api', 'routes/api._index.ts'),
 ] satisfies RouteConfig;

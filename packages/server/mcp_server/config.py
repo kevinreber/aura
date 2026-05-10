@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # Optional todo integration (e.g., Todoist, Any.do)
     todoist_api_key: Optional[str] = None
 
+    # Weekend Orchestrator API keys (optional — tools fall back to mock data)
+    ticketmaster_api_key: Optional[str] = None  # Concert listings (Discovery API)
+    outdooractive_api_key: Optional[str] = None  # Trail data (falls back to Google Places)
+
     # Caching (optional)
     redis_url: Optional[str] = None
     cache_ttl: int = 300  # 5 minutes default

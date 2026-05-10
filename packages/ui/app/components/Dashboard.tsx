@@ -1,5 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+// Component overrides shared between the chat-history and streaming
+// ReactMarkdown instances. Tailwind classes match the chat bubble's `text-sm`.
+const MARKDOWN_COMPONENTS = {
+  p: ({ children }: { children?: React.ReactNode }) => (
+    <p className="mb-2 last:mb-0">{children}</p>
+  ),
+  h1: ({ children }: { children?: React.ReactNode }) => (
+    <h1 className="text-base font-semibold mt-3 mb-2 first:mt-0">{children}</h1>
+  ),
+  h2: ({ children }: { children?: React.ReactNode }) => (
+    <h2 className="text-sm font-semibold mt-3 mb-1.5 first:mt-0">{children}</h2>
+  ),
+  h3: ({ children }: { children?: React.ReactNode }) => (
+    <h3 className="text-sm font-semibold mt-2.5 mb-1 first:mt-0 text-gray-800 dark:text-gray-100">
+      {children}
+    </h3>
+  ),
+  h4: ({ children }: { children?: React.ReactNode }) => (
+    <h4 className="text-sm font-medium mt-2 mb-1 first:mt-0">{children}</h4>
+  ),
+  ul: ({ children }: { children?: React.ReactNode }) => (
+    <ul className="list-disc pl-4 mb-2 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }: { children?: React.ReactNode }) => (
+    <ol className="list-decimal pl-4 mb-2 space-y-0.5">{children}</ol>
+  ),
+  li: ({ children }: { children?: React.ReactNode }) => <li className="mb-1">{children}</li>,
+  strong: ({ children }: { children?: React.ReactNode }) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }: { children?: React.ReactNode }) => <em className="italic">{children}</em>,
+  code: ({ children }: { children?: React.ReactNode }) => (
+    <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
+  ),
+  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-600 dark:text-blue-400 hover:underline"
+    >
+      {children}
+    </a>
+  ),
+  hr: () => <hr className="my-2 border-gray-300 dark:border-gray-600" />,
+};
+
+const REMARK_PLUGINS = [remarkGfm];
+
+// LLMs (especially GPT-4o-mini) sometimes generate markdown without proper
+// line breaks between sections, e.g.:
+//   "intro:### Day 1:- item"        (header missing newline)
+//   "Adventures**Morning:**"        (bold section-header glued to prior text)
+//   "★ 4.8**Lunch:**"               (rating glued to next bold section header)
+// Markdown specs require headers and list items to start on their own line.
+// We defensively inject newlines so structured responses render correctly
+// even when the LLM emits concatenated output.
+function normalizeMarkdown(text: string): string {
+  if (!text) return text;
+  return (
+    text
+      // ATX headers that appear mid-line: "foo### Bar" → "foo\n\n### Bar"
+      .replace(/([^\n])(#{1,6} )/g, '$1\n\n$2')
+      // Bold "section header" patterns — **CapitalStart...colonEnd** —
+      // when preceded by non-newline non-asterisk content. Catches the
+      // "Adventures**Morning:**" and "4.8**Lunch:**" cases without
+      // breaking valid mid-sentence bold (which usually doesn't end in ":").
+      .replace(/([^\n*])(\*\*[A-Z][^*\n]{1,50}:\*\*)/g, '$1\n\n$2')
+      // List items: "text- Item" → "text\n- Item"
+      .replace(/([^\n\s])(- (?=[A-Z*_]))/g, '$1\n$2')
+  );
+}
 import { useDarkMode } from '../hooks/useDarkMode';
 import { usePolling } from '../hooks/usePolling';
 import {
@@ -26,24 +100,9 @@ import Clock from './Clock';
 import { CommuteDashboard } from './CommuteDashboard';
 import { HabitsWidget } from './HabitsWidget';
 import { NotesWidget } from './NotesWidget';
-import type { Components } from 'react-markdown';
 import { PomodoroWidget } from './PomodoroWidget';
-
-const markdownComponents: Components = {
-  h1: ({ children }) => <h1 className="text-xl font-bold mb-2">{children}</h1>,
-  h2: ({ children }) => <h2 className="text-lg font-bold mb-2">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-base font-semibold mb-1">{children}</h3>,
-  h4: ({ children }) => <h4 className="text-sm font-semibold mb-1">{children}</h4>,
-  p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-  ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-  li: ({ children }) => <li className="mb-1">{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-  code: ({ children }) => (
-    <code className="bg-gray-200 dark:bg-gray-600 px-1 py-0.5 rounded text-xs">{children}</code>
-  ),
-  hr: () => <hr className="my-2 border-gray-300 dark:border-gray-600" />,
-};
+import { WeekendPlannerWidget } from './WeekendPlannerWidget';
+import { WeekendSettings } from './WeekendSettings';
 
 interface DashboardProps {
   userName?: string;
@@ -80,6 +139,9 @@ export default function Dashboard({
     return (saved as TodoBucket | 'all') || 'all';
   });
   const [chatMessage, setChatMessage] = useState('');
+  const [weekendSettingsOpen, setWeekendSettingsOpen] = useState(false);
+  // Bumped whenever weekend prefs change so the planner widget refetches.
+  const [weekendPrefsVersion, setWeekendPrefsVersion] = useState(0);
   const [chatHistory, setChatHistory] = useState<
     Array<{ type: 'user' | 'ai'; message: string; timestamp: string }>
   >(() => loadChatHistory());
@@ -191,6 +253,7 @@ export default function Dashboard({
       notes: isMobile,
       habits: isMobile,
       pomodoro: isMobile,
+      weekendPlanner: isMobile,
       chat: false, // Chat starts expanded
     };
   });
@@ -1107,12 +1170,37 @@ export default function Dashboard({
             collapsed={collapsedWidgets.pomodoro}
             onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, pomodoro: !prev.pomodoro }))}
           />
+
+          {/* Weekend Planner — quick-prompt buttons that drop a message into chat.
+              Settings opens as a modal via the gear icon in the header. */}
+          <WeekendPlannerWidget
+            collapsed={collapsedWidgets.weekendPlanner}
+            onToggle={() =>
+              setCollapsedWidgets((prev) => ({ ...prev, weekendPlanner: !prev.weekendPlanner }))
+            }
+            onQuickPrompt={(prompt) => {
+              setChatMessage(prompt);
+              // Open the chat panel on mobile so the user sees the prefilled message.
+              if (collapsedWidgets.chat) {
+                setCollapsedWidgets((prev) => ({ ...prev, chat: false }));
+              }
+            }}
+            onOpenSettings={() => setWeekendSettingsOpen(true)}
+            preferencesVersion={weekendPrefsVersion}
+          />
         </div>
 
         {/* Commute Dashboard - Full Width */}
         <div className="mb-6">
           <CommuteDashboard />
         </div>
+
+        {/* Weekend Settings modal — opened from the WeekendPlannerWidget gear button */}
+        <WeekendSettings
+          isOpen={weekendSettingsOpen}
+          onClose={() => setWeekendSettingsOpen(false)}
+          onPreferencesChanged={() => setWeekendPrefsVersion((v) => v + 1)}
+        />
 
         {/* Mobile Chat Overlay - Creates depth effect behind chat */}
         {!collapsedWidgets.chat && (
@@ -1228,8 +1316,11 @@ export default function Dashboard({
                         </div>
                       ) : (
                         // Regular markdown rendering for non-slash-command messages
-                        <ReactMarkdown components={markdownComponents}>
-                          {message.message}
+                        <ReactMarkdown
+                          components={MARKDOWN_COMPONENTS}
+                          remarkPlugins={REMARK_PLUGINS}
+                        >
+                          {normalizeMarkdown(message.message)}
                         </ReactMarkdown>
                       )}
                     </div>
@@ -1253,8 +1344,11 @@ export default function Dashboard({
                         </div>
                       )}
                       {streamingMessage ? (
-                        <ReactMarkdown components={markdownComponents}>
-                          {streamingMessage}
+                        <ReactMarkdown
+                          components={MARKDOWN_COMPONENTS}
+                          remarkPlugins={REMARK_PLUGINS}
+                        >
+                          {normalizeMarkdown(streamingMessage)}
                         </ReactMarkdown>
                       ) : (
                         <span className="text-gray-600 dark:text-gray-300 animate-pulse">

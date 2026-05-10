@@ -9,13 +9,25 @@ from .todo import (
     TodoDeleteInput, TodoDeleteOutput
 )
 from .financial import FinancialInput, FinancialOutput
+from .weekend import (
+    TrailSearchInput, TrailSearchOutput,
+    ConcertSearchInput, ConcertSearchOutput,
+    ItineraryInput, ItineraryOutput,
+    Trail, ConcertEvent, POI, TransitEstimate,
+    ActivityType, TrailDifficulty, TicketStatus, POICategory,
+)
 
 __all__ = [
     "WeatherInput", "WeatherOutput",
     "MobilityInput", "MobilityOutput", "CommuteInput", "CommuteOutput", "ShuttleScheduleInput", "ShuttleScheduleOutput",
     "CalendarInput", "CalendarOutput", "CalendarRangeInput", "CalendarRangeOutput", "CalendarCreateInput", "CalendarCreateOutput", "CalendarUpdateInput", "CalendarUpdateOutput", "CalendarDeleteInput", "CalendarDeleteOutput", "CalendarFindFreeTimeInput", "CalendarFindFreeTimeOutput", "FreeTimeSlot",
-    "TodoInput", "TodoOutput", "TodoCreateInput", "TodoCreateOutput", 
+    "TodoInput", "TodoOutput", "TodoCreateInput", "TodoCreateOutput",
     "TodoUpdateInput", "TodoUpdateOutput", "TodoCompleteInput", "TodoCompleteOutput",
     "TodoDeleteInput", "TodoDeleteOutput",
-    "FinancialInput", "FinancialOutput"
+    "FinancialInput", "FinancialOutput",
+    "TrailSearchInput", "TrailSearchOutput",
+    "ConcertSearchInput", "ConcertSearchOutput",
+    "ItineraryInput", "ItineraryOutput",
+    "Trail", "ConcertEvent", "POI", "TransitEstimate",
+    "ActivityType", "TrailDifficulty", "TicketStatus", "POICategory",
 ]

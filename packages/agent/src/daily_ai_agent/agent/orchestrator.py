@@ -12,7 +12,52 @@ from datetime import datetime
 from .tools import get_all_tools
 from ..models.config import get_settings
 from ..services.llm import LLMService
+from ..services.preferences import get_enabled_categories
 from ..utils.tracing import setup_langsmith_tracing, is_tracing_active
+
+# Map weekend category IDs (from /weekend/categories) to the LangChain tool names
+# that implement them. Disabled categories are filtered out before tool selection.
+_CATEGORY_TO_TOOL_NAMES = {
+    "trails": ["get_weekend_trails"],
+    "concerts": ["get_weekend_concerts"],
+    "itinerary": ["generate_weekend_itinerary"],
+}
+
+# All weekend tool names, regardless of category. Used to identify which tools
+# are subject to category-based filtering vs. always-on tools (weather, calendar, etc).
+_ALL_WEEKEND_TOOL_NAMES = {
+    name for tools in _CATEGORY_TO_TOOL_NAMES.values() for name in tools
+}
+
+
+def _filter_tools_by_enabled_categories(tools: List, enabled: List[str]) -> List:
+    """Drop weekend tools whose category isn't in the user's enabled list.
+
+    Non-weekend tools (weather, calendar, todos, etc) pass through unchanged —
+    the toggle system only gates the weekend orchestrator's category-mapped tools.
+    """
+    enabled_tool_names = set()
+    for category in enabled:
+        enabled_tool_names.update(_CATEGORY_TO_TOOL_NAMES.get(category, []))
+
+    filtered: List = []
+    dropped: List[str] = []
+    for tool in tools:
+        # Always-on tools (everything outside the weekend category map)
+        if tool.name not in _ALL_WEEKEND_TOOL_NAMES:
+            filtered.append(tool)
+            continue
+        # Weekend tools — only include if their category is enabled
+        if tool.name in enabled_tool_names:
+            filtered.append(tool)
+        else:
+            dropped.append(tool.name)
+
+    if dropped:
+        logger.debug(
+            f"Weekend prefs filtered out {len(dropped)} disabled tools: {dropped}"
+        )
+    return filtered
 
 # Module-level tool cache for performance
 _cached_tools: Optional[List] = None
@@ -62,10 +107,12 @@ class AgentOrchestrator:
             logger.info("Conversation memory disabled")
 
         # Use cached tools by default for better performance
-        if use_cached_tools:
-            self.tools = get_cached_tools()
-        else:
-            self.tools = get_all_tools()
+        self._use_cached_tools = use_cached_tools
+        # Track the prefs we last built tools+agent against so we can detect
+        # changes and rebuild only when needed (cheap to compare a tuple).
+        self._last_enabled_categories: Optional[tuple] = None
+        self.tools: List = []
+        self._refresh_tools_from_preferences()
 
         # Determine which LLM provider to use
         self.llm_provider = self.settings.effective_llm_provider
@@ -76,6 +123,31 @@ class AgentOrchestrator:
         else:
             self.agent: Optional[AgentExecutor] = None
             logger.warning("No LLM API key configured - conversational features disabled")
+
+    def _refresh_tools_from_preferences(self) -> bool:
+        """Re-read prefs and rebuild self.tools if enabled categories changed.
+
+        Returns True if a rebuild happened (so callers can also rebuild the
+        LangChain agent), False otherwise. Cheap when prefs haven't changed.
+        """
+        enabled_categories = get_enabled_categories()
+        signature = tuple(sorted(enabled_categories))
+
+        if signature == self._last_enabled_categories and self.tools:
+            return False  # Already in sync, no work needed
+
+        all_tools = (
+            get_cached_tools() if self._use_cached_tools else get_all_tools()
+        )
+        self.tools = _filter_tools_by_enabled_categories(
+            all_tools, enabled_categories
+        )
+        self._last_enabled_categories = signature
+        logger.info(
+            f"Agent tools refreshed: {len(self.tools)} available "
+            f"(weekend categories enabled: {enabled_categories})"
+        )
+        return True
 
     def _setup_tracing(self) -> None:
         """Set up LangSmith tracing if configured."""
@@ -134,6 +206,22 @@ class AgentOrchestrator:
             current_date = datetime.now().strftime("%Y-%m-%d")
             current_day = datetime.now().strftime("%A, %B %d, %Y")
 
+            # Compute disabled weekend categories so the prompt can tell the agent
+            # to short-circuit ("concerts are disabled — suggest enabling them")
+            # instead of looping through other tools when asked about a disabled
+            # category. See WEEKEND_ORCHESTRATOR_SPEC.md Section 20.
+            all_weekend_categories = set(_CATEGORY_TO_TOOL_NAMES.keys())
+            enabled_categories = set(get_enabled_categories())
+            disabled_categories = sorted(all_weekend_categories - enabled_categories)
+            disabled_categories_note = (
+                f"\n\nDISABLED WEEKEND CATEGORIES: {', '.join(disabled_categories)}. "
+                f"If the user asks about any of these categories, do NOT try to call other "
+                f"tools to substitute — instead reply briefly that the category is disabled "
+                f"in their preferences and suggest they enable it in settings."
+                if disabled_categories
+                else ""
+            )
+
             # Build prompt messages - include chat_history placeholder if memory is enabled
             prompt_messages = [
                 ("system", f"""You are {self.settings.user_name}'s personal morning assistant.
@@ -155,6 +243,163 @@ You have access to these tools:
 - get_commute_options: Get comprehensive work commute analysis with driving vs transit (Caltrain + shuttle) options, real-time traffic, and AI recommendations
 - get_shuttle_schedule: Get MV Connector shuttle schedules for LinkedIn campus transportation
 - get_morning_briefing: Get complete morning summary
+- get_weekend_trails: Find outdoor trails (hiking/running/cycling) near a location for weekend planning
+- get_weekend_concerts: Find upcoming concerts and live music events near a location, optionally filtered by artists
+- generate_weekend_itinerary: Generate a multi-day trip itinerary with points of interest grouped by category
+- create_calendar_event: Create a new calendar event (used for write-back — see WEEKEND CALENDAR WRITE-BACK below)
+- update_calendar_event: MOVE or EDIT an existing calendar event — use for "move", "reschedule", "change time"
+- delete_calendar_event: REMOVE or CANCEL an existing calendar event — use for "remove", "delete", "cancel"
+- create_todo: Add a task to the user's todo list — use for "remind me to X", "add X to my list", or proactively after itineraries (see TODO WRITE-BACK)
+
+WEEKEND PLANNING: When users ask about weekend plans, "things to do this weekend", trip ideas, or
+multi-day getaways, combine the weekend tools intelligently. For example, check the weather first
+to decide between outdoor trails (good weather) and indoor concerts (rainy). Use get_calendar_range
+to find which days are actually free before recommending plans. For multi-day trips, use
+generate_weekend_itinerary as the primary tool and supplement with get_weekend_trails or
+get_weekend_concerts for richer recommendations.
+
+TRAIL DISTANCE FOLLOW-UPS: After get_weekend_trails returns results, each trail line includes
+the trail name AND a 📍 line with the full address (e.g. "Twin Peaks, San Francisco, CA 94114").
+If the user asks how far each trail is from somewhere, use get_commute with the FULL ADDRESS
+from the 📍 line — NOT the trail name alone. Trail names like "Twin Peaks" or "Mission Peak"
+are ambiguous and may match the wrong landmark.
+
+MARKDOWN FORMATTING: When you produce structured responses (multi-day itineraries, lists of
+trails, daily plans), use proper markdown with newlines between sections. Put a blank line
+before each ATX header (### Day 1, ### Day 2, etc) and start each list item on a new line.
+The chat UI parses your output as markdown — headers without leading newlines render as
+plain text "###" instead of formatted headers.
+
+WEEKEND CALENDAR WRITE-BACK — IMPORTANT NEW CAPABILITY: After you generate a weekend
+itinerary, multi-day plan, or any time-blocked recommendation (e.g. "Saturday: hike at 9am,
+lunch at noon, concert at 8pm"), you MUST end your reply with an explicit offer to add
+the events to the user's calendar. Use phrasing like:
+
+  "Want me to add these to your calendar with travel time blocked off? Just say yes and
+   I'll create the events."
+
+Do NOT proactively create events without explicit confirmation. Wait for the user to say
+"yes" / "do it" / "add them" / similar.
+
+When the user confirms, follow this protocol:
+
+1. For each itinerary item, call create_calendar_event with:
+   - title: emoji-prefixed and concise. Use 🥾 for hikes/outdoors, 🎵 for concerts,
+     🍽️ for restaurants/meals, 🎯 for attractions, 🏨 for lodging, 🚗 for travel/drive
+     time blocks. Example: "🥾 Marin Headlands Hike", "🎵 Tycho @ The Fillmore".
+   - start_time / end_time in ISO format (YYYY-MM-DDTHH:MM:SS). Use the dates and
+     times from your generated plan; if you only suggested rough times like "morning",
+     pick concrete defaults (morning=9-11am, lunch=12-1:30pm, afternoon=2-5pm,
+     dinner=6:30-8:30pm, evening=8-10:30pm) and mention them in the confirmation.
+   - description: include relevant details — full street address (from 📍 lines),
+     trail length / difficulty, ticket URL, restaurant rating + price level, drive
+     time + distance to the next stop. The description is what the user will see
+     when they tap the event.
+   - location: the full street address (from 📍 line) — NOT just the place name.
+     This makes Google Calendar's "Get Directions" button work correctly.
+   - calendar_name: "primary" unless the user has specified otherwise.
+
+2. Insert TRAVEL TIME blocks between consecutive events using the
+   create_travel_block tool — NOT create_calendar_event. The helper handles
+   the timing math automatically: it places the block so it ENDS exactly when
+   the destination event starts.
+
+   Workflow per gap:
+     a. Call get_commute with FULL addresses to get drive_minutes
+     b. If drive_minutes <= 5, skip — no travel block needed
+     c. Otherwise call create_travel_block with:
+          - next_event_title: the destination event's title
+          - next_event_start_time: ISO start of the destination event
+          - drive_minutes: from step (a)
+          - destination_address: full street address
+
+   The tool computes start_time = next_event_start - drive_minutes and creates
+   the event. Do NOT call create_calendar_event for travel blocks — you'll get
+   the timing wrong and place the block hours before it should be.
+
+3. HONOR USER-SPECIFIED EVENT TIMES. If the user gave you exact start/end times
+   for events (e.g. "lunch 12-1:30pm"), use those exactly — do not shift them
+   to make travel blocks fit. Travel blocks fit into the natural gaps between
+   user-specified events. Only auto-pick times when the user gave fuzzy guidance
+   ("morning hike", "dinner").
+
+4. CHECK FOR CONFLICTS BEFORE OFFERING TO ADD EVENTS. Before you offer to add
+   any new events to the calendar, call get_calendar_range to fetch the user's
+   existing events for the relevant dates. Compare the new events you're
+   proposing against existing events on overlapping times.
+
+   If you find a conflict (e.g. proposed hike 9-11am conflicts with existing
+   flight 6:45-9:35am), surface it BEFORE asking permission to add. Phrasing:
+
+     "Heads up — I see you have 'Flight to San Francisco (UA 2391)' from
+      6:45 AM - 9:35 AM, which overlaps with the proposed 9 AM hike. Want to
+      shift the hike to 10 AM, or pick a different activity for the morning?"
+
+   Wait for the user to decide before creating events.
+
+5. After each create_calendar_event call, check the response for "conflicts" — if
+   any are returned (these are conflicts the server caught at write time, possibly
+   missed by your pre-check), surface them to the user clearly. Don't auto-resolve;
+   tell the user what conflicts exist and ask whether to shift, skip, or keep both.
+
+6. Once all events are created, summarize what you added in the chat:
+   "Done — added 8 events to your calendar between Saturday 8am and Sunday 9pm.
+    Travel time blocked between each. One conflict found: your existing 'Hiking'
+    event at 9am Sunday — I left it as-is and built around it."
+
+If the user says "no" or only wants part of the plan added (e.g. "just the hikes"),
+honor that — only create events for the subset they specified.
+
+TODO WRITE-BACK — symmetric with calendar write-back: After generating a trip plan
+or weekend itinerary that implies prep work (research flights, book Airbnb, pack
+gear, make reservations, buy tickets), offer to add those tasks to the user's
+todo list. Phrasing template:
+
+  "Want me to add prep tasks to your todo list? I'd add:
+   - Research and book Airbnb in Denver
+   - Pack hiking gear (trail shoes, water bottle, layers)
+   - Make reservation at Hop Alley
+   Reply yes and I'll create them."
+
+Do NOT proactively create todos without explicit confirmation — same rule as
+calendar. When the user confirms, call create_todo once per item with:
+- title: short, action-oriented ("Research Denver Airbnbs" not "Airbnbs")
+- bucket: pick the most natural — 'personal' for travel/leisure, 'home' for
+  household errands, 'work' for job, 'errands' for short-form to-dos
+- priority: 'medium' default; use 'high' for time-sensitive items (book
+  flights soon, ticket sale ending) and 'low' for nice-to-haves
+- due_date: only set if the user explicitly mentioned a date or there's an
+  obvious deadline (e.g. "before the trip"). Use natural language ('next
+  Friday', 'tomorrow') — the server parses it.
+- tags: include a tag for the trip or context ('denver-trip', 'weekend')
+  so todos group together for later filtering.
+
+Calendar events and todos serve different purposes — events go in the calendar
+when the user has a specific time slot, todos go in the list when something
+needs to happen but doesn't have a fixed time. Don't double-add (one or the
+other, not both).
+
+EDITING AND DELETING EVENTS — CRITICAL: When the user asks you to MOVE, RESCHEDULE,
+or CHANGE the time of an event, use update_calendar_event with the event_id from the
+prior create response (or look it up via get_calendar / get_calendar_range first).
+DO NOT call create_calendar_event for a moved event — that leaves the original AND
+the new one, creating duplicates.
+
+When the user asks you to REMOVE, DELETE, or CANCEL an event, use delete_calendar_event
+with the event_id. DO NOT create a "Cancel: ..." marker event as a workaround — that
+just adds another event next to the one you were supposed to delete. The
+delete_calendar_event tool actually removes the event from Google Calendar.
+
+Common patterns:
+- "Move it to 4pm" → update_calendar_event (not create)
+- "Reschedule the hike to Sunday" → update_calendar_event (not create)
+- "Remove the original" / "delete the 2pm hike" → delete_calendar_event (not create)
+- "Cancel the lunch" → delete_calendar_event (not create-with-cancel-prefix)
+- "I want to switch the hike and the lunch" → two update_calendar_event calls
+
+When the user asks where an event is or to confirm a change, the previous tool
+responses are in your conversation context. The event_id is in the response from
+create_calendar_event ("event_id": "abc123..."). Reuse it; don't make up new IDs.
 
 IMPORTANT: For week/multi-day queries, ALWAYS use get_calendar_range instead of multiple get_calendar calls.
 Use get_calendar_range when users ask about "this week", "next week", "upcoming days", or any date range.
@@ -168,7 +413,7 @@ If asked about work meetings specifically, explain that work calendar integratio
 
 CONVERSATION MEMORY: You have access to the conversation history. When users say things like "yes", "proceed",
 "do it", "go ahead", or reference previous messages, use the chat history to understand what they're referring to.
-Always maintain context from earlier in the conversation."""),
+Always maintain context from earlier in the conversation.{disabled_categories_note}"""),
             ]
 
             # Add chat history placeholder if memory is enabled
@@ -207,6 +452,11 @@ Always maintain context from earlier in the conversation."""),
         if not self.agent:
             return "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
 
+        # If the user toggled weekend prefs since last chat, rebuild the agent
+        # so the LLM sees the new tool list + updated disabled-category note.
+        if self._refresh_tools_from_preferences():
+            self._init_langchain_agent()
+
         try:
             logger.info(f"Processing user input: {user_input}")
 
@@ -235,6 +485,11 @@ Always maintain context from earlier in the conversation."""),
             logger.error(f"Error in chat processing: {e}")
             return f"Sorry, I encountered an error: {str(e)}"
 
+    async def _refresh_agent_for_chat(self) -> None:
+        """Helper for streaming chat — rebuild LangChain agent if prefs changed."""
+        if self._refresh_tools_from_preferences():
+            self._init_langchain_agent()
+
     async def chat_stream(self, user_input: str) -> AsyncIterator[str]:
         """
         Handle a conversational input with streaming response.
@@ -251,6 +506,10 @@ Always maintain context from earlier in the conversation."""),
         if not self.agent:
             yield "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
             return
+
+        # If weekend prefs changed since last chat, rebuild the agent so
+        # streaming responses pick up the new tool list immediately.
+        await self._refresh_agent_for_chat()
 
         try:
             logger.info(f"Processing user input (streaming): {user_input}")
