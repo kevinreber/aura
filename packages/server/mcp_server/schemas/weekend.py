@@ -52,7 +52,10 @@ class Trail(BaseModel):
     """A single trail recommendation."""
 
     name: str = Field(description="Trail name")
-    distance_miles: float = Field(description="Trail distance in miles")
+    distance_miles: Optional[float] = Field(
+        default=None,
+        description="Trail distance in miles (None when provider doesn't report it — e.g. Google Places returns parks but not trail length)",
+    )
     elevation_gain_ft: Optional[int] = Field(
         default=None, description="Elevation gain in feet (None when provider doesn't report it)"
     )

@@ -24,6 +24,20 @@ def _clear_cache():
     cache_module._cache_service = None
 
 
+@pytest.fixture(autouse=True)
+def _force_mock_mode(monkeypatch):
+    """Force mock-mode regardless of what's in the developer's `.env`.
+
+    Without this, tests would attempt real API calls if the developer happens
+    to have GOOGLE_MAPS_API_KEY or TICKETMASTER_API_KEY set in their environment.
+    """
+    from mcp_server.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "google_maps_api_key", "")
+    monkeypatch.setattr(settings, "ticketmaster_api_key", None)
+
+
 @pytest.fixture
 def weekend_tools():
     return WeekendTools()
