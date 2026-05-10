@@ -47,6 +47,25 @@ class CalendarCreateInput(BaseModel):
     all_day: bool = Field(default=False, description="Whether this is an all-day event")
 
 
+class CalendarUpdateInput(BaseModel):
+    """Input schema for calendar update tool — used to MOVE/EDIT existing events."""
+    event_id: str = Field(description="Google Calendar event ID to update (get this from calendar.list_events or from a previous create_calendar_event response)")
+    title: Optional[str] = Field(default=None, description="New event title — only set if changing")
+    start_time: Optional[str] = Field(default=None, description="New start time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
+    end_time: Optional[str] = Field(default=None, description="New end time in ISO format (YYYY-MM-DDTHH:MM:SS) — only set if moving")
+    description: Optional[str] = Field(default=None, description="New description — only set if changing")
+    location: Optional[str] = Field(default=None, description="New location — only set if changing")
+    attendees: Optional[list] = Field(default=None, description="New attendee list — only set if changing")
+    calendar_name: str = Field(default="primary", description="Calendar containing the event")
+    all_day: Optional[bool] = Field(default=None, description="Whether to convert to/from all-day")
+
+
+class CalendarDeleteInput(BaseModel):
+    """Input schema for calendar delete tool — used to REMOVE/CANCEL existing events."""
+    event_id: str = Field(description="Google Calendar event ID to delete (get this from calendar.list_events or from a previous tool response)")
+    calendar_name: str = Field(default="primary", description="Calendar containing the event")
+
+
 class TodoInput(BaseModel):
     """Input schema for todo tool.""" 
     bucket: Optional[str] = Field(default=None, description="Todo bucket: 'work', 'home', 'errands', 'personal', or leave empty for all todos")
@@ -280,13 +299,131 @@ class CalendarCreateTool(BaseTool):
         except Exception as e:
             return f"❌ Error creating calendar event: {str(e)}"
     
-    def _run(self, title: str, start_time: str, end_time: str, 
+    def _run(self, title: str, start_time: str, end_time: str,
              description: Optional[str] = None, location: Optional[str] = None,
              attendees: Optional[list] = None, calendar_name: str = "primary",
              all_day: bool = False) -> str:
         """Sync wrapper for async call."""
-        return asyncio.run(self._arun(title, start_time, end_time, description, 
+        return asyncio.run(self._arun(title, start_time, end_time, description,
                                     location, attendees, calendar_name, all_day))
+
+
+class CalendarUpdateTool(BaseTool):
+    """Tool to UPDATE/MOVE existing calendar events — use for 'move', 'reschedule', 'change time', etc."""
+
+    name: str = "update_calendar_event"
+    description: str = (
+        "Update an existing calendar event. Use this when the user wants to MOVE, "
+        "RESCHEDULE, or EDIT an event they already have. Requires the event_id from "
+        "calendar.list_events or from a previous create response. DO NOT create a new "
+        "event when the user wants to move an existing one — that would leave both."
+    )
+    args_schema: Type[BaseModel] = CalendarUpdateInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        event_id: str,
+        title: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[list] = None,
+        calendar_name: str = "primary",
+        all_day: Optional[bool] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {"event_id": event_id, "calendar_name": calendar_name}
+            # Only include fields the user actually wants to change.
+            for k, v in (
+                ("title", title),
+                ("start_time", start_time),
+                ("end_time", end_time),
+                ("description", description),
+                ("location", location),
+                ("attendees", attendees),
+                ("all_day", all_day),
+            ):
+                if v is not None:
+                    payload[k] = v
+
+            result = await client.call_tool("calendar.update_event", payload)
+
+            if result.get("success"):
+                changes = result.get("changes_made") or []
+                msg = result.get("message", "Event updated.")
+                lines = [f"✅ {msg}"]
+                if changes:
+                    lines.append(f"Changed: {', '.join(changes)}")
+                if result.get("event_url"):
+                    lines.append(f"📅 View event: {result['event_url']}")
+                conflicts = result.get("conflicts") or []
+                if conflicts:
+                    lines.append("\n⚠️ Conflicts at the new time:")
+                    for c in conflicts:
+                        lines.append(f"  - {c.get('title','Unknown')} at {c.get('start_time','?')}")
+                return "\n".join(lines)
+            else:
+                return f"❌ Failed to update event: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error updating calendar event: {e}"
+
+    def _run(
+        self,
+        event_id: str,
+        title: Optional[str] = None,
+        start_time: Optional[str] = None,
+        end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        location: Optional[str] = None,
+        attendees: Optional[list] = None,
+        calendar_name: str = "primary",
+        all_day: Optional[bool] = None,
+    ) -> str:
+        return asyncio.run(
+            self._arun(event_id, title, start_time, end_time, description,
+                       location, attendees, calendar_name, all_day)
+        )
+
+
+class CalendarDeleteTool(BaseTool):
+    """Tool to DELETE existing calendar events — use for 'remove', 'cancel', 'delete'."""
+
+    name: str = "delete_calendar_event"
+    description: str = (
+        "Delete an existing calendar event. Use this when the user wants to REMOVE, "
+        "CANCEL, or DELETE an event. Requires the event_id from calendar.list_events "
+        "or from a previous tool response. DO NOT create a 'cancellation' marker event "
+        "as a workaround — actually delete the original."
+    )
+    args_schema: Type[BaseModel] = CalendarDeleteInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(self, event_id: str, calendar_name: str = "primary") -> str:
+        try:
+            client = self._get_mcp_client()
+            result = await client.call_tool(
+                "calendar.delete_event",
+                {"event_id": event_id, "calendar_name": calendar_name},
+            )
+            if result.get("success"):
+                deleted = result.get("deleted_event") or {}
+                title = deleted.get("title", event_id)
+                start = deleted.get("start_time", "")
+                return f"✅ Deleted '{title}'{(' at ' + start) if start else ''}."
+            else:
+                return f"❌ Failed to delete event: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error deleting calendar event: {e}"
+
+    def _run(self, event_id: str, calendar_name: str = "primary") -> str:
+        return asyncio.run(self._arun(event_id, calendar_name))
 
 
 class TodoTool(BaseTool):
@@ -837,6 +974,8 @@ def get_all_tools():
         CalendarTool(),
         CalendarRangeTool(),
         CalendarCreateTool(),
+        CalendarUpdateTool(),
+        CalendarDeleteTool(),
         TodoTool(),
         CommuteTool(),
         CommuteOptionsTool(),
