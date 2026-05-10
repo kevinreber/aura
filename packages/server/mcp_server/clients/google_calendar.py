@@ -172,15 +172,20 @@ class GoogleCalendarClient:
             return []
         
         try:
-            # Set up time range for the query date (start of day to end of day)
-            start_time = datetime.combine(query_date, datetime.min.time())
+            # Set up time range for the query date in the user's local timezone
+            # (not UTC). Bug history: was using start_time.isoformat() + 'Z' which
+                # treats midnight as UTC — events at 8pm PT (3am UTC next day) fell
+            # outside the window and were silently excluded from results.
+            import pytz
+            tz = pytz.timezone(self.timezone)
+            start_time = tz.localize(datetime.combine(query_date, datetime.min.time()))
             end_time = start_time + timedelta(days=1)
-            
-            # Convert to RFC3339 timestamp format required by Google Calendar API
-            time_min = start_time.isoformat() + 'Z'
-            time_max = end_time.isoformat() + 'Z'
-            
-            logger.info(f"Fetching Google Calendar events for {query_date} (calendar: {calendar_id})")
+
+            # RFC3339 with offset (e.g. 2026-05-16T00:00:00-07:00). Google accepts.
+            time_min = start_time.isoformat()
+            time_max = end_time.isoformat()
+
+            logger.info(f"Fetching Google Calendar events for {query_date} (calendar: {calendar_id}, tz: {self.timezone})")
             
             # Call the Calendar API
             events_result = self.service.events().list(
@@ -403,15 +408,18 @@ class GoogleCalendarClient:
             return []
         
         try:
-            # Set up time range for the entire date range
-            start_time = datetime.combine(start_date, datetime.min.time())
-            end_time = datetime.combine(end_date + timedelta(days=1), datetime.min.time())  # Include end_date
-            
-            # Convert to RFC3339 timestamp format required by Google Calendar API
-            time_min = start_time.isoformat() + 'Z'
-            time_max = end_time.isoformat() + 'Z'
-            
-            logger.info(f"Fetching Google Calendar events from {start_date} to {end_date} (calendar: {calendar_id})")
+            # Localize to user's timezone (not UTC) so date boundaries match
+            # how the user thinks about days. See get_events_for_date for the
+            # original bug context.
+            import pytz
+            tz = pytz.timezone(self.timezone)
+            start_time = tz.localize(datetime.combine(start_date, datetime.min.time()))
+            end_time = tz.localize(datetime.combine(end_date + timedelta(days=1), datetime.min.time()))
+
+            time_min = start_time.isoformat()
+            time_max = end_time.isoformat()
+
+            logger.info(f"Fetching Google Calendar events from {start_date} to {end_date} (calendar: {calendar_id}, tz: {self.timezone})")
             
             # Call the Calendar API - single request for entire range!
             events_result = self.service.events().list(
