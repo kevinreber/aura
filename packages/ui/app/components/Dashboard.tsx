@@ -27,6 +27,8 @@ import { CommuteDashboard } from './CommuteDashboard';
 import { HabitsWidget } from './HabitsWidget';
 import { NotesWidget } from './NotesWidget';
 import { PomodoroWidget } from './PomodoroWidget';
+import { WeekendPlannerWidget } from './WeekendPlannerWidget';
+import { WeekendSettings } from './WeekendSettings';
 
 interface DashboardProps {
   userName?: string;
@@ -63,6 +65,9 @@ export default function Dashboard({
     return (saved as TodoBucket | 'all') || 'all';
   });
   const [chatMessage, setChatMessage] = useState('');
+  const [weekendSettingsOpen, setWeekendSettingsOpen] = useState(false);
+  // Bumped whenever weekend prefs change so the planner widget refetches.
+  const [weekendPrefsVersion, setWeekendPrefsVersion] = useState(0);
   const [chatHistory, setChatHistory] = useState<
     Array<{ type: 'user' | 'ai'; message: string; timestamp: string }>
   >(() => loadChatHistory());
@@ -174,6 +179,7 @@ export default function Dashboard({
       notes: isMobile,
       habits: isMobile,
       pomodoro: isMobile,
+      weekendPlanner: isMobile,
       chat: false, // Chat starts expanded
     };
   });
@@ -1090,12 +1096,37 @@ export default function Dashboard({
             collapsed={collapsedWidgets.pomodoro}
             onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, pomodoro: !prev.pomodoro }))}
           />
+
+          {/* Weekend Planner — quick-prompt buttons that drop a message into chat.
+              Settings opens as a modal via the gear icon in the header. */}
+          <WeekendPlannerWidget
+            collapsed={collapsedWidgets.weekendPlanner}
+            onToggle={() =>
+              setCollapsedWidgets((prev) => ({ ...prev, weekendPlanner: !prev.weekendPlanner }))
+            }
+            onQuickPrompt={(prompt) => {
+              setChatMessage(prompt);
+              // Open the chat panel on mobile so the user sees the prefilled message.
+              if (collapsedWidgets.chat) {
+                setCollapsedWidgets((prev) => ({ ...prev, chat: false }));
+              }
+            }}
+            onOpenSettings={() => setWeekendSettingsOpen(true)}
+            preferencesVersion={weekendPrefsVersion}
+          />
         </div>
 
         {/* Commute Dashboard - Full Width */}
         <div className="mb-6">
           <CommuteDashboard />
         </div>
+
+        {/* Weekend Settings modal — opened from the WeekendPlannerWidget gear button */}
+        <WeekendSettings
+          isOpen={weekendSettingsOpen}
+          onClose={() => setWeekendSettingsOpen(false)}
+          onPreferencesChanged={() => setWeekendPrefsVersion((v) => v + 1)}
+        />
 
         {/* Mobile Chat Overlay - Creates depth effect behind chat */}
         {!collapsedWidgets.chat && (

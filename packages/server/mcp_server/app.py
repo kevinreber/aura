@@ -413,6 +413,99 @@ def create_app() -> FastAPI:
 
     # ==================== Weekend Endpoints ====================
 
+    @app.get("/weekend/preferences", tags=["Weekend"])
+    async def weekend_preferences_get():
+        """Return current weekend preferences from data/weekend_preferences.json.
+
+        Falls back to defaults (all categories enabled, empty pinned/excluded
+        artists) when the file is missing or unparseable.
+        """
+        import json
+        from pathlib import Path
+
+        # Resolve data/ at the monorepo root (this file lives at
+        # packages/server/mcp_server/app.py so we walk up 3 levels).
+        prefs_path = (
+            Path(__file__).resolve().parents[3] / "data" / "weekend_preferences.json"
+        )
+        defaults = {
+            "enabled_categories": ["trails", "concerts", "itinerary"],
+            "pinned_artists": [],
+            "excluded_artists": [],
+            "activity_preferences": [],
+            "max_drive_hours": 4,
+            "budget_level": "moderate",
+            "home_base": None,
+        }
+        try:
+            with prefs_path.open() as f:
+                raw = json.load(f)
+            return {**defaults, **raw}
+        except (FileNotFoundError, json.JSONDecodeError):
+            return defaults
+
+    @app.put("/weekend/preferences", tags=["Weekend"])
+    async def weekend_preferences_put(payload: dict):
+        """Persist weekend preferences to data/weekend_preferences.json.
+
+        Validates the payload against the WeekendPreferences shape (extra fields
+        are dropped) then writes atomically (temp file + rename) so a crashed
+        write can never corrupt the prefs file.
+        """
+        import json
+        import os
+        from pathlib import Path
+
+        # Allowed keys mirror the WeekendPreferences pydantic model in the
+        # agent. We coerce to known fields to drop any unexpected keys
+        # rather than 422'ing — the UI is the only writer and we trust it.
+        ALLOWED_KEYS = {
+            "enabled_categories",
+            "pinned_artists",
+            "excluded_artists",
+            "activity_preferences",
+            "max_drive_hours",
+            "budget_level",
+            "home_base",
+        }
+        # Validate enabled_categories specifically since invalid values would
+        # silently disable everything.
+        VALID_CATEGORIES = {"trails", "concerts", "itinerary"}
+
+        cleaned = {k: v for k, v in payload.items() if k in ALLOWED_KEYS}
+
+        if "enabled_categories" in cleaned:
+            invalid = [
+                c for c in cleaned["enabled_categories"] if c not in VALID_CATEGORIES
+            ]
+            if invalid:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid category IDs: {invalid}. Valid: {sorted(VALID_CATEGORIES)}",
+                )
+
+        prefs_path = (
+            Path(__file__).resolve().parents[3] / "data" / "weekend_preferences.json"
+        )
+        prefs_path.parent.mkdir(exist_ok=True)
+
+        # Atomic write: stage to temp file, then rename. This is POSIX-atomic
+        # so a process crash mid-write can't leave the file half-written.
+        tmp_path = prefs_path.with_suffix(".json.tmp")
+        try:
+            with tmp_path.open("w") as f:
+                json.dump(cleaned, f, indent=2)
+                f.write("\n")
+            os.replace(tmp_path, prefs_path)
+        except Exception as e:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            logger.error(f"Failed to write weekend preferences: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to save preferences: {e}")
+
+        logger.info(f"Updated weekend preferences: {cleaned}")
+        return {"status": "ok", "preferences": cleaned}
+
     @app.get("/weekend/categories", tags=["Weekend"])
     async def weekend_categories():
         """Discover the catalog of available weekend categories.

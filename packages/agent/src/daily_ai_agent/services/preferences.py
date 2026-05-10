@@ -8,7 +8,6 @@ out-of-the-box for new installs.
 """
 
 import json
-from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional
 
@@ -48,12 +47,12 @@ def _find_prefs_path() -> Path:
     return Path(__file__).resolve().parents[5] / "data" / "weekend_preferences.json"
 
 
-@lru_cache(maxsize=1)
 def load_preferences() -> WeekendPreferences:
     """Load weekend preferences with defaults on missing file or parse error.
 
-    Cached for the process lifetime — if the file changes mid-process the
-    cache won't reflect it. Restart the agent to pick up edits.
+    Reads the file fresh on every call so live UI toggles take effect immediately
+    without an agent restart. The file is small (<1KB) — JSON parsing cost is
+    negligible.
     """
     path = _find_prefs_path()
 
@@ -85,5 +84,10 @@ def get_enabled_categories() -> List[str]:
 
 
 def clear_preferences_cache() -> None:
-    """Clear the prefs cache (useful for tests + after live edits)."""
-    load_preferences.cache_clear()
+    """No-op kept for backwards compatibility with existing tests.
+
+    The cache was removed so that UI toggles take effect immediately. This
+    function used to invalidate the lru_cache; now it does nothing because
+    every load_preferences() call reads the file fresh.
+    """
+    return None

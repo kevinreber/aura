@@ -107,20 +107,12 @@ class AgentOrchestrator:
             logger.info("Conversation memory disabled")
 
         # Use cached tools by default for better performance
-        if use_cached_tools:
-            all_tools = get_cached_tools()
-        else:
-            all_tools = get_all_tools()
-
-        # Apply user weekend-category preferences. Disabled categories' tools
-        # are filtered out before the LLM ever sees them. See
-        # WEEKEND_ORCHESTRATOR_SPEC.md Section 20 for the design.
-        enabled_categories = get_enabled_categories()
-        self.tools = _filter_tools_by_enabled_categories(all_tools, enabled_categories)
-        logger.info(
-            f"Agent has {len(self.tools)} tools available "
-            f"(weekend categories enabled: {enabled_categories})"
-        )
+        self._use_cached_tools = use_cached_tools
+        # Track the prefs we last built tools+agent against so we can detect
+        # changes and rebuild only when needed (cheap to compare a tuple).
+        self._last_enabled_categories: Optional[tuple] = None
+        self.tools: List = []
+        self._refresh_tools_from_preferences()
 
         # Determine which LLM provider to use
         self.llm_provider = self.settings.effective_llm_provider
@@ -131,6 +123,31 @@ class AgentOrchestrator:
         else:
             self.agent: Optional[AgentExecutor] = None
             logger.warning("No LLM API key configured - conversational features disabled")
+
+    def _refresh_tools_from_preferences(self) -> bool:
+        """Re-read prefs and rebuild self.tools if enabled categories changed.
+
+        Returns True if a rebuild happened (so callers can also rebuild the
+        LangChain agent), False otherwise. Cheap when prefs haven't changed.
+        """
+        enabled_categories = get_enabled_categories()
+        signature = tuple(sorted(enabled_categories))
+
+        if signature == self._last_enabled_categories and self.tools:
+            return False  # Already in sync, no work needed
+
+        all_tools = (
+            get_cached_tools() if self._use_cached_tools else get_all_tools()
+        )
+        self.tools = _filter_tools_by_enabled_categories(
+            all_tools, enabled_categories
+        )
+        self._last_enabled_categories = signature
+        logger.info(
+            f"Agent tools refreshed: {len(self.tools)} available "
+            f"(weekend categories enabled: {enabled_categories})"
+        )
+        return True
 
     def _setup_tracing(self) -> None:
         """Set up LangSmith tracing if configured."""
@@ -288,6 +305,11 @@ Always maintain context from earlier in the conversation.{disabled_categories_no
         if not self.agent:
             return "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
 
+        # If the user toggled weekend prefs since last chat, rebuild the agent
+        # so the LLM sees the new tool list + updated disabled-category note.
+        if self._refresh_tools_from_preferences():
+            self._init_langchain_agent()
+
         try:
             logger.info(f"Processing user input: {user_input}")
 
@@ -316,6 +338,11 @@ Always maintain context from earlier in the conversation.{disabled_categories_no
             logger.error(f"Error in chat processing: {e}")
             return f"Sorry, I encountered an error: {str(e)}"
 
+    async def _refresh_agent_for_chat(self) -> None:
+        """Helper for streaming chat — rebuild LangChain agent if prefs changed."""
+        if self._refresh_tools_from_preferences():
+            self._init_langchain_agent()
+
     async def chat_stream(self, user_input: str) -> AsyncIterator[str]:
         """
         Handle a conversational input with streaming response.
@@ -332,6 +359,10 @@ Always maintain context from earlier in the conversation.{disabled_categories_no
         if not self.agent:
             yield "I need an LLM API key to have conversations. Try the specific commands like 'briefing' or 'weather' instead!"
             return
+
+        # If weekend prefs changed since last chat, rebuild the agent so
+        # streaming responses pick up the new tool list immediately.
+        await self._refresh_agent_for_chat()
 
         try:
             logger.info(f"Processing user input (streaming): {user_input}")
