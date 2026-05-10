@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     todoist_api_key: Optional[str] = None
 
     # Weekend Orchestrator API keys (optional — tools fall back to mock data)
-    bandsintown_app_id: Optional[str] = None  # Concert listings
+    ticketmaster_api_key: Optional[str] = None  # Concert listings (Discovery API)
     outdooractive_api_key: Optional[str] = None  # Trail data (falls back to Google Places)
 
     # Caching (optional)

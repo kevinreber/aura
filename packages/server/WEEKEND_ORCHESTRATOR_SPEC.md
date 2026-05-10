@@ -84,9 +84,9 @@ Output:
 
 Find upcoming concerts and live music events for tracked artists or by location.
 
-**Primary Provider**: [Bandsintown API](https://artists.bandsintown.com/support/api-installation)
+**Primary Provider**: [Ticketmaster Discovery API](https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/)
 
-> **Note on Songkick**: Songkick's public API was deprecated. Bandsintown is the actively maintained alternative with a free developer API.
+> **Note on provider history**: Songkick's public API was deprecated years ago. Bandsintown was initially considered, but as of 2024 their API requires partnership-program approval (`API@bandsintown.com`) — each API key is now linked to a single artist, and third-party use requires written authorization. Ticketmaster Discovery API is self-serve, free up to 5000 calls/day, and explicitly designed for third-party event search by location + classification + date range. SeatGeek is a viable backup if Ticketmaster ever rate-limits us.
 
 ```
 Input:
@@ -241,15 +241,15 @@ Stored as a local JSON file, exposed as an MCP resource the agent can read.
 
 | Service | Key Required | Free Tier | Notes |
 |---------|-------------|-----------|-------|
-| Bandsintown | App ID | Yes (free) | Register at artists.bandsintown.com |
-| Outdooractive | API Key | Yes (limited) | Developer program application |
-| Google Maps Places | API Key | $200/mo credit | Already integrated in Aura |
+| Ticketmaster Discovery | Consumer Key | 5000 calls/day, 5/sec | Self-serve at developer.ticketmaster.com — instant signup |
+| Outdooractive | API Key | N/A — partnership required | Email `business@outdooractive.com`. Not viable for v1 — see Section 18. |
+| Google Maps Places | API Key | $200/mo credit | Already integrated in Aura. **Used as primary trail provider for v1.** |
 | Google Maps Directions | API Key | $200/mo credit | Already integrated in Aura |
 
 **New `.env` variables**:
 ```bash
-BANDSINTOWN_APP_ID=your_app_id
-OUTDOORACTIVE_API_KEY=your_key    # Optional if using Google Places fallback
+TICKETMASTER_API_KEY=your_consumer_key
+OUTDOORACTIVE_API_KEY=your_key    # Optional — partnership-required, deferred past v1
 ```
 
 ---
@@ -290,12 +290,12 @@ Follow existing patterns:
 
 ## 9. Mock Data for Local Development
 
-Following the existing pattern (see `weather.py` `_get_mock_weather_data()`), each weekend tool should return realistic mock data when API keys are missing. This enables frontend and agent development without requiring every developer to have Bandsintown/Outdooractive keys.
+Following the existing pattern (see `weather.py` `_get_mock_weather_data()`), each weekend tool should return realistic mock data when API keys are missing. This enables frontend and agent development without requiring every developer to have Ticketmaster keys.
 
 ```python
 # Pattern from existing weather tool:
-if not self.settings.bandsintown_app_id:
-    logger.warning("No Bandsintown API key configured, returning mock data")
+if not self.settings.ticketmaster_api_key:
+    logger.warning("No Ticketmaster API key configured, returning mock data")
     return self._get_mock_concert_data(city)
 ```
 
@@ -310,7 +310,7 @@ if not self.settings.bandsintown_app_id:
 
 | Provider | Rate Limit | Strategy |
 |----------|-----------|----------|
-| Bandsintown | 1 req/sec (undocumented soft limit) | Cache aggressively (1hr TTL), add 1s delay between batch artist lookups |
+| Ticketmaster Discovery | 5 req/sec, 5000/day (free tier) | Cache aggressively (1hr TTL); 5000 calls/day is plenty for personal use |
 | Outdooractive | 1000 req/day (free tier) | Cache 24hr, batch requests where possible |
 | Google Maps Places | Pay-per-use ($17/1000 calls for Nearby Search) | Cache 12hr, limit POI results to `duration_days * 8` max |
 | Google Maps Directions | Pay-per-use ($5/1000 calls) | Cache 15min, reuse existing mobility tool infrastructure |
@@ -424,7 +424,7 @@ What happens when things go wrong:
 
 | Failure | Impact | Fallback Behavior |
 |---------|--------|-------------------|
-| Bandsintown API down | No concert data | Return empty events list with `error: "Concert data temporarily unavailable"`. Agent can still plan around trails + POIs. |
+| Ticketmaster API down | No concert data | Return empty events list with `error: "Concert data temporarily unavailable"`. Agent can still plan around trails + POIs. |
 | Outdooractive API down | No trail data | Fall back to Google Places search for "hiking trails near {city}". Less rich data (no elevation/difficulty) but functional. |
 | Google Places API down | No POI data for itinerary | Return error. Itinerary tool cannot function without POIs. Agent should inform user and offer trail/concert-only plan. |
 | Google Directions API down | No transit estimates | Return POIs without transit data (`transit_estimates: null`). Agent can still present the itinerary without drive times. |
@@ -465,7 +465,7 @@ The agent should ask for confirmation before creating events, and include releva
 - [ ] **Spotify integration for concert matching**: Phase 3 mentions cross-referencing "Recently Played" with concert listings. This would require Spotify API OAuth. See Section 19 for the full design proposal — recommendation is to ship JSON-based v1, then add Spotify in v1.5.
 - [ ] **Proactive notifications**: Should the "Friday Morning Routine" run on a cron schedule and push notifications, or only trigger when the user asks? Cron requires infrastructure changes (task scheduler).
 - [ ] **Multi-destination / road trips**: Should `generate_itinerary` support multi-city routes (e.g., "SF → Tahoe → Reno")? This significantly increases complexity. Could be a v2 feature.
-- [ ] **Budget tracking**: Should tools return price estimates (concert tickets, gas cost, restaurant price levels)? Google Places returns `price_level` (1-4), Bandsintown sometimes returns ticket prices. Worth surfacing?
+- [ ] **Budget tracking**: Should tools return price estimates (concert tickets, gas cost, restaurant price levels)? Google Places returns `price_level` (1-4), Ticketmaster returns `priceRanges` arrays per event. Worth surfacing?
 - [ ] **Shareable plans**: Should accepted itineraries be exportable (e.g., as a shareable link, PDF, or .ics file)? Nice-to-have for v2.
 
 ---
@@ -520,7 +520,7 @@ packages/ui/
 data/
   weekend_preferences.json      # NEW - User preferences (MCP Resource, Phase 3)
 
-.env.example                    # MODIFY - Add BANDSINTOWN_APP_ID, OUTDOORACTIVE_API_KEY
+.env.example                    # MODIFY - Add TICKETMASTER_API_KEY, OUTDOORACTIVE_API_KEY
 ```
 
 ---
@@ -531,18 +531,22 @@ These are the manual steps you need to complete before development can begin.
 
 ### API Keys & Accounts to Set Up
 
-- [ ] **Bandsintown App ID** (Required for concerts)
-  1. Go to https://www.bandsintown.com/for-artists
-  2. Sign up for a developer/artist account
-  3. Navigate to API settings and create an App ID
-  4. Add `BANDSINTOWN_APP_ID=your_app_id` to your `.env`
+- [ ] **Ticketmaster Consumer Key** (Required for concerts)
+  1. Go to https://developer.ticketmaster.com/
+  2. Sign up — self-serve, free, no approval wait
+  3. Verify email, log in, go to "My Apps" → "Add New App"
+  4. Copy the **Consumer Key** (NOT Consumer Secret — that's only for OAuth flows we don't use)
+  5. Add `TICKETMASTER_API_KEY=your_consumer_key` to your `.env`
+  6. Free tier: 5000 calls/day, 5 req/sec — plenty for personal use
 
-- [ ] **Outdooractive API Key** (Optional - only if using as primary trail provider)
-  1. Go to https://developers.outdooractive.com/
-  2. Apply for the developer program (may take a few days for approval)
-  3. Create a project and generate an API key
-  4. Add `OUTDOORACTIVE_API_KEY=your_key` to your `.env`
-  5. **Note**: If skipping this, Google Places will be used as the trail provider — it's already configured via your `GOOGLE_MAPS_API_KEY`
+- [ ] **Outdooractive API Key** (DEFERRED past v1 — partnership-required)
+  1. Outdooractive has no self-serve developer signup. Access requires emailing `business@outdooractive.com` and going through a partnership/business inquiry process.
+  2. **For v1, skip this entirely.** Google Places (already configured via your `GOOGLE_MAPS_API_KEY`) handles trail data.
+  3. Only revisit if Google Places trail data proves too thin AND you want to negotiate a partnership.
+  4. Free / lower-friction alternatives if richer trail data becomes essential later:
+     - **OpenStreetMap / Overpass API**: free, has hiking trail geometry, no auth required, but data quality varies.
+     - **National Park Service API** (US-only): free, US national parks coverage, decent trail metadata.
+     - **AllTrails / Komoot**: NO public API — scraping is fragile and TOS-risky. Avoid.
 
 - [ ] **Google Maps Places API** (Likely already enabled)
   1. Go to https://console.cloud.google.com/apis/library
@@ -569,13 +573,13 @@ Add these to your `.env` (and `.env.example` will be updated during implementati
 
 ```bash
 # Weekend Orchestrator (add to MCP Server section)
-BANDSINTOWN_APP_ID=your_bandsintown_app_id
-OUTDOORACTIVE_API_KEY=your_outdooractive_key  # Optional, falls back to Google Places
+TICKETMASTER_API_KEY=your_ticketmaster_consumer_key
+OUTDOORACTIVE_API_KEY=your_outdooractive_key  # DEFERRED past v1 — partnership-required
 ```
 
 ### Render / Production Deployment
 
-- [ ] Add `BANDSINTOWN_APP_ID` to Render environment variables for `aura-server-sxxd` service
+- [ ] Add `TICKETMASTER_API_KEY` to Render environment variables for `aura-server-sxxd` service
 - [ ] Add `OUTDOORACTIVE_API_KEY` to Render environment variables (if using)
 - [ ] Verify Google Places API is enabled on the production GCP project (may be a different project than local dev)
 
@@ -658,7 +662,7 @@ This means Spotify should **augment, not replace**, explicit user preferences.
 │         ↓                                                        │
 │  De-duplicated, ranked artist list                               │
 │         ↓                                                        │
-│  Bandsintown lookup per artist                                   │
+│  Ticketmaster lookup per artist (or by location classification)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

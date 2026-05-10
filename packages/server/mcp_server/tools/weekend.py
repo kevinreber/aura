@@ -1,9 +1,9 @@
 """Weekend orchestrator tools: trail scouting, concert lookup, itinerary generation.
 
 Phase 1 ships with mock-data fallbacks for every method. Real provider integrations
-(Bandsintown for concerts, Google Places for trails + POIs) are stubbed and called only
-when the corresponding API key is configured. This keeps Phase 1 testable end-to-end
-without API keys and mirrors the pattern used by `weather.py`.
+(Ticketmaster Discovery API for concerts, Google Places for trails + POIs) are stubbed
+and called only when the corresponding API key is configured. This keeps Phase 1
+testable end-to-end without API keys and mirrors the pattern used by `weather.py`.
 """
 
 import asyncio
@@ -55,7 +55,7 @@ class WeekendTools:
 
     def __init__(self) -> None:
         self.settings = get_settings()
-        self.bandsintown_base_url = "https://rest.bandsintown.com"
+        self.ticketmaster_base_url = "https://app.ticketmaster.com/discovery/v2"
         self.places_base_url = "https://maps.googleapis.com/maps/api/place"
         self.directions_base_url = "https://maps.googleapis.com/maps/api/directions/json"
 
@@ -146,7 +146,7 @@ class WeekendTools:
     async def get_concerts(self, input_data: ConcertSearchInput) -> ConcertSearchOutput:
         """Find concerts in a location for tracked artists or all artists in radius.
 
-        v1 strategy: Bandsintown when `bandsintown_app_id` is set; otherwise mock data.
+        v1 strategy: Ticketmaster Discovery API when `ticketmaster_api_key` is set; otherwise mock data.
         """
         start_time = asyncio.get_event_loop().time()
         try:
@@ -171,14 +171,14 @@ class WeekendTools:
                 cached["cached"] = True
                 return ConcertSearchOutput(**cached)
 
-            if not self.settings.bandsintown_app_id:
-                logger.warning("No bandsintown_app_id configured, returning mock concerts")
+            if not self.settings.ticketmaster_api_key:
+                logger.warning("No ticketmaster_api_key configured, returning mock concerts")
                 events = self._mock_concerts(input_data)
                 source = "mock"
             else:
-                # Real Bandsintown integration goes here in a follow-up commit.
+                # Real Ticketmaster Discovery API integration goes here in a follow-up commit.
                 logger.info(
-                    "Bandsintown provider not yet implemented in Phase 1, "
+                    "Ticketmaster provider not yet implemented in Phase 1, "
                     "returning mock concerts"
                 )
                 events = self._mock_concerts(input_data)
