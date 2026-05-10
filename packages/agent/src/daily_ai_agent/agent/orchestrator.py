@@ -155,6 +155,16 @@ You have access to these tools:
 - get_commute_options: Get comprehensive work commute analysis with driving vs transit (Caltrain + shuttle) options, real-time traffic, and AI recommendations
 - get_shuttle_schedule: Get MV Connector shuttle schedules for LinkedIn campus transportation
 - get_morning_briefing: Get complete morning summary
+- get_weekend_trails: Find outdoor trails (hiking/running/cycling) near a location for weekend planning
+- get_weekend_concerts: Find upcoming concerts and live music events near a location, optionally filtered by artists
+- generate_weekend_itinerary: Generate a multi-day trip itinerary with points of interest grouped by category
+
+WEEKEND PLANNING: When users ask about weekend plans, "things to do this weekend", trip ideas, or
+multi-day getaways, combine the weekend tools intelligently. For example, check the weather first
+to decide between outdoor trails (good weather) and indoor concerts (rainy). Use get_calendar_range
+to find which days are actually free before recommending plans. For multi-day trips, use
+generate_weekend_itinerary as the primary tool and supplement with get_weekend_trails or
+get_weekend_concerts for richer recommendations.
 
 IMPORTANT: For week/multi-day queries, ALWAYS use get_calendar_range instead of multiple get_calendar calls.
 Use get_calendar_range when users ask about "this week", "next week", "upcoming days", or any date range.

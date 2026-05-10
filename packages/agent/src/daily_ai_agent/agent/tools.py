@@ -80,6 +80,30 @@ class FinancialInput(BaseModel):
     data_type: str = Field(default="mixed", description="Type: 'stocks', 'crypto', or 'mixed'")
 
 
+class WeekendTrailsInput(BaseModel):
+    """Input schema for weekend trail scouting tool."""
+    location: str = Field(description="City or region to search near, e.g. 'Boulder, CO' or 'San Francisco, CA'")
+    activity_type: str = Field(default="all", description="Activity type: 'hiking', 'running', 'cycling', or 'all'")
+    max_distance_miles: int = Field(default=25, description="Maximum trail distance in miles (1-200)")
+    difficulty: Optional[str] = Field(default=None, description="Optional difficulty filter: 'easy', 'moderate', 'hard', or omit for any")
+
+
+class WeekendConcertsInput(BaseModel):
+    """Input schema for weekend concert lookup tool."""
+    location: str = Field(description="City to search around, e.g. 'San Francisco, CA' or 'Denver, CO'")
+    artists: Optional[List[str]] = Field(default=None, description="Specific artists to track. Omit to find any events in radius.")
+    radius_miles: int = Field(default=50, description="Search radius in miles (1-500)")
+    date_range_days: int = Field(default=14, description="How far ahead to look in days (1-90)")
+
+
+class WeekendItineraryInput(BaseModel):
+    """Input schema for weekend multi-day itinerary tool."""
+    destination: str = Field(description="City or region for the trip, e.g. 'Denver, CO' or 'Asheville, NC'")
+    duration_days: int = Field(description="Number of days for the trip (1-7)")
+    interests: List[str] = Field(default=[], description="Interest tags like ['outdoors', 'live music', 'food', 'craft beer']")
+    base_location: Optional[str] = Field(default=None, description="Hotel/Airbnb address — used to compute drive-time estimates between POIs")
+
+
 class WeatherTool(BaseTool):
     """Tool to get weather forecasts."""
     
@@ -573,6 +597,219 @@ class MorningBriefingTool(BaseTool):
         return asyncio.run(self._arun())
 
 
+class TrailScoutTool(BaseTool):
+    """Tool to scout outdoor trails near a location."""
+
+    name: str = "get_weekend_trails"
+    description: str = (
+        "Find outdoor trails near a location for hiking, running, or cycling. "
+        "Use when users ask about trails, hikes, outdoor activities, or 'something to do outside' "
+        "for the weekend. Filters by activity type, max distance, and difficulty."
+    )
+    args_schema: Type[BaseModel] = WeekendTrailsInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        location: str,
+        activity_type: str = "all",
+        max_distance_miles: int = 25,
+        difficulty: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "location": location,
+                "activity_type": activity_type,
+                "max_distance_miles": max_distance_miles,
+            }
+            if difficulty:
+                payload["difficulty"] = difficulty
+
+            data = await client.call_tool("weekend.get_trails", payload)
+            trails = data.get("trails", [])
+            source = data.get("source", "unknown")
+
+            if not trails:
+                return f"No trails found near {location} matching your criteria."
+
+            lines = [f"🥾 {len(trails)} trail(s) near {location} (source: {source}):"]
+            for t in trails[:5]:
+                difficulty_str = t.get("difficulty") or "unrated"
+                rating_str = f"★ {t['rating']}" if t.get("rating") else ""
+                elevation = f", {t['elevation_gain_ft']} ft gain" if t.get("elevation_gain_ft") else ""
+                lines.append(
+                    f"- {t.get('name', 'Unnamed')}: {t.get('distance_miles', 0)} mi, "
+                    f"{difficulty_str}{elevation} {rating_str}"
+                )
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error getting trails: {str(e)}"
+
+    def _run(
+        self,
+        location: str,
+        activity_type: str = "all",
+        max_distance_miles: int = 25,
+        difficulty: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(self._arun(location, activity_type, max_distance_miles, difficulty))
+
+
+class ConcertAlertTool(BaseTool):
+    """Tool to find upcoming concerts and live music events."""
+
+    name: str = "get_weekend_concerts"
+    description: str = (
+        "Find upcoming concerts and live music events near a location. "
+        "Use when users ask about concerts, shows, live music, or specific artists touring nearby. "
+        "Can filter by specific artists or return all events in radius."
+    )
+    args_schema: Type[BaseModel] = WeekendConcertsInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        location: str,
+        artists: Optional[List[str]] = None,
+        radius_miles: int = 50,
+        date_range_days: int = 14,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "location": location,
+                "radius_miles": radius_miles,
+                "date_range_days": date_range_days,
+            }
+            if artists:
+                payload["artists"] = artists
+
+            data = await client.call_tool("weekend.get_concerts", payload)
+            events = data.get("events", [])
+            source = data.get("source", "unknown")
+
+            if not events:
+                artist_filter = f" for {', '.join(artists)}" if artists else ""
+                return f"No upcoming concerts found near {location}{artist_filter}."
+
+            lines = [f"🎵 {len(events)} concert(s) near {location} (source: {source}):"]
+            for e in events[:5]:
+                ticket_emoji = {"available": "🎟️", "sold_out": "❌", "unknown": "❓"}.get(
+                    e.get("ticket_status", "unknown"), "❓"
+                )
+                time_str = f" {e['time']}" if e.get("time") else ""
+                lines.append(
+                    f"- {e.get('artist', 'TBA')} @ {e.get('venue', 'TBA')} on "
+                    f"{e.get('date', 'TBA')}{time_str} {ticket_emoji}"
+                )
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error getting concerts: {str(e)}"
+
+    def _run(
+        self,
+        location: str,
+        artists: Optional[List[str]] = None,
+        radius_miles: int = 50,
+        date_range_days: int = 14,
+    ) -> str:
+        return asyncio.run(self._arun(location, artists, radius_miles, date_range_days))
+
+
+class ItineraryTool(BaseTool):
+    """Tool to generate a multi-day weekend trip itinerary."""
+
+    name: str = "generate_weekend_itinerary"
+    description: str = (
+        "Generate a multi-day weekend trip itinerary with points of interest and optional drive-time estimates. "
+        "Use when users want a full weekend or multi-day trip plan for a destination. "
+        "Returns POIs grouped by category (restaurants, attractions, outdoors, nightlife) — "
+        "you (the LLM) are responsible for stitching them into a day-by-day narrative."
+    )
+    args_schema: Type[BaseModel] = WeekendItineraryInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        destination: str,
+        duration_days: int,
+        interests: List[str] = [],
+        base_location: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "destination": destination,
+                "duration_days": duration_days,
+                "interests": interests,
+            }
+            if base_location:
+                payload["base_location"] = base_location
+
+            data = await client.call_tool("weekend.generate_itinerary", payload)
+            pois = data.get("points_of_interest", [])
+            transit = data.get("transit_estimates")
+            source = data.get("source", "unknown")
+
+            if not pois:
+                return f"No points of interest found for {destination}."
+
+            lines = [
+                f"🗺️ {duration_days}-day itinerary for {destination} "
+                f"({len(pois)} POIs, source: {source}):"
+            ]
+
+            # Group by category for readability
+            by_category: Dict[str, List[Dict[str, Any]]] = {}
+            for poi in pois:
+                cat = poi.get("category", "other")
+                by_category.setdefault(cat, []).append(poi)
+
+            category_emojis = {
+                "restaurant": "🍽️",
+                "outdoors": "🌲",
+                "attraction": "🎯",
+                "nightlife": "🎶",
+                "lodging": "🏨",
+                "other": "📍",
+            }
+            for cat, items in by_category.items():
+                emoji = category_emojis.get(cat, "📍")
+                lines.append(f"\n{emoji} {cat.title()}:")
+                for poi in items[:4]:
+                    rating_str = f" ★ {poi['rating']}" if poi.get("rating") else ""
+                    price_str = " " + "$" * poi["price_level"] if poi.get("price_level") else ""
+                    lines.append(f"  - {poi.get('name', 'Unnamed')}{rating_str}{price_str}")
+
+            if transit:
+                lines.append(f"\n🚗 Transit estimates from {transit[0].get('from_location')}:")
+                for t in transit[:3]:
+                    lines.append(
+                        f"  - To {t.get('to_location')}: "
+                        f"{t.get('drive_time_min')} min, {t.get('distance_miles')} mi"
+                    )
+
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error generating itinerary: {str(e)}"
+
+    def _run(
+        self,
+        destination: str,
+        duration_days: int,
+        interests: List[str] = [],
+        base_location: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(self._arun(destination, duration_days, interests, base_location))
+
+
 def get_all_tools():
     """Get all available tools for the agent."""
     return [
@@ -585,5 +822,8 @@ def get_all_tools():
         CommuteOptionsTool(),
         ShuttleTool(),
         FinancialTool(),
-        MorningBriefingTool()
+        MorningBriefingTool(),
+        TrailScoutTool(),
+        ConcertAlertTool(),
+        ItineraryTool(),
     ]
