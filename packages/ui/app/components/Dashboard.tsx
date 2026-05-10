@@ -51,16 +51,25 @@ const MARKDOWN_COMPONENTS = {
 const REMARK_PLUGINS = [remarkGfm];
 
 // LLMs (especially GPT-4o-mini) sometimes generate markdown without proper
-// line breaks before headers and list items, e.g. "intro:### Day 1:- item".
-// Markdown specs require headers and list items to start on their own line,
-// so we insert newlines before these tokens when they appear mid-line.
+// line breaks between sections, e.g.:
+//   "intro:### Day 1:- item"        (header missing newline)
+//   "Adventures**Morning:**"        (bold section-header glued to prior text)
+//   "★ 4.8**Lunch:**"               (rating glued to next bold section header)
+// Markdown specs require headers and list items to start on their own line.
+// We defensively inject newlines so structured responses render correctly
+// even when the LLM emits concatenated output.
 function normalizeMarkdown(text: string): string {
   if (!text) return text;
   return (
     text
-      // Insert blank lines before ATX headers that appear mid-line.
+      // ATX headers that appear mid-line: "foo### Bar" → "foo\n\n### Bar"
       .replace(/([^\n])(#{1,6} )/g, '$1\n\n$2')
-      // Insert a newline before "- " bullets that follow non-bullet text.
+      // Bold "section header" patterns — **CapitalStart...colonEnd** —
+      // when preceded by non-newline non-asterisk content. Catches the
+      // "Adventures**Morning:**" and "4.8**Lunch:**" cases without
+      // breaking valid mid-sentence bold (which usually doesn't end in ":").
+      .replace(/([^\n*])(\*\*[A-Z][^*\n]{1,50}:\*\*)/g, '$1\n\n$2')
+      // List items: "text- Item" → "text\n- Item"
       .replace(/([^\n\s])(- (?=[A-Z*_]))/g, '$1\n$2')
   );
 }
