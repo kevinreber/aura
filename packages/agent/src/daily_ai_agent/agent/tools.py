@@ -3,7 +3,7 @@
 from langchain_core.tools import BaseTool
 from typing import Dict, Any, Optional, Type, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 
 from ..services.mcp_client import MCPClient
@@ -67,8 +67,18 @@ class CalendarDeleteInput(BaseModel):
 
 
 class TodoInput(BaseModel):
-    """Input schema for todo tool.""" 
+    """Input schema for todo tool."""
     bucket: Optional[str] = Field(default=None, description="Todo bucket: 'work', 'home', 'errands', 'personal', or leave empty for all todos")
+
+
+class TodoCreateInput(BaseModel):
+    """Input schema for todo create tool."""
+    title: str = Field(description="Todo item title/description, e.g. 'Research Denver Airbnbs' or 'Pack hiking gear'")
+    priority: str = Field(default="medium", description="Priority level: 'low', 'medium', 'high'")
+    bucket: str = Field(default="personal", description="Category: 'work', 'home', 'errands', 'personal'")
+    due_date: Optional[str] = Field(default=None, description="Due date in natural language ('tomorrow', 'next Friday', '2026-05-15') or omit for no due date")
+    tags: Optional[List[str]] = Field(default=None, description="Tags for grouping, e.g. ['travel', 'denver']")
+    description: Optional[str] = Field(default=None, description="Optional longer-form notes or details")
 
 
 class CommuteInput(BaseModel):
@@ -97,6 +107,15 @@ class FinancialInput(BaseModel):
     """Input schema for financial tool."""
     symbols: list = Field(description="List of stock/crypto symbols like ['MSFT', 'BTC', 'ETH']")
     data_type: str = Field(default="mixed", description="Type: 'stocks', 'crypto', or 'mixed'")
+
+
+class CreateTravelBlockInput(BaseModel):
+    """Input schema for the deterministic travel-block helper."""
+    next_event_title: str = Field(description="Title of the destination event being travelled to (e.g. 'Tycho Concert at The Fillmore'). Used to generate the travel block's title.")
+    next_event_start_time: str = Field(description="ISO start time of the destination event (YYYY-MM-DDTHH:MM:SS). The travel block will end exactly at this time.")
+    drive_minutes: int = Field(description="Drive duration in minutes from the previous location to the destination. Get this from get_commute first.")
+    destination_address: str = Field(description="Full street address of the destination — used as the event location so Google Calendar's Get Directions works correctly.")
+    calendar_name: str = Field(default="primary", description="Calendar to add the event to.")
 
 
 class WeekendTrailsInput(BaseModel):
@@ -491,6 +510,78 @@ class TodoTool(BaseTool):
         return asyncio.run(self._arun(bucket))
 
 
+class TodoCreateTool(BaseTool):
+    """Tool to add new items to the user's todo list — used for write-back."""
+
+    name: str = "create_todo"
+    description: str = (
+        "Create a new todo item in the user's task list. Use this for write-back: "
+        "after suggesting prep work for a trip or weekend plan (research X, book Y, "
+        "pack Z), offer to add the items here, and call this tool once per item "
+        "after the user confirms. Supports natural language due dates ('tomorrow', "
+        "'next Friday')."
+    )
+    args_schema: Type[BaseModel] = TodoCreateInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self,
+        title: str,
+        priority: str = "medium",
+        bucket: str = "personal",
+        due_date: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            payload: Dict[str, Any] = {
+                "title": title,
+                "priority": priority,
+                "bucket": bucket,
+            }
+            if due_date:
+                payload["due_date"] = due_date
+            if tags:
+                payload["tags"] = tags
+            if description:
+                payload["description"] = description
+
+            result = await client.call_tool("todo.create", payload)
+
+            if result.get("success"):
+                todo = result.get("todo") or {}
+                todo_id = todo.get("id", "")
+                # Surface todo_id in output so the agent can reference it for
+                # later complete/delete calls if those tools get added.
+                lines = [
+                    f"✅ Todo added: {title}",
+                    f"   bucket: {bucket} | priority: {priority}"
+                    + (f" | due: {due_date}" if due_date else ""),
+                ]
+                if todo_id:
+                    lines.append(f"   [todo_id={todo_id}]")
+                return "\n".join(lines)
+            return f"❌ Failed to create todo: {result.get('message', 'Unknown error')}"
+        except Exception as e:
+            return f"❌ Error creating todo: {e}"
+
+    def _run(
+        self,
+        title: str,
+        priority: str = "medium",
+        bucket: str = "personal",
+        due_date: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> str:
+        return asyncio.run(
+            self._arun(title, priority, bucket, due_date, tags, description)
+        )
+
+
 class CommuteTool(BaseTool):
     """Tool to get basic commute information between any two locations."""
     
@@ -748,6 +839,109 @@ class MorningBriefingTool(BaseTool):
         return asyncio.run(self._arun())
 
 
+class CreateTravelBlockTool(BaseTool):
+    """Deterministic travel-block placer — anchors the block to the destination's start.
+
+    Removes timing math from the LLM. The block always ends exactly when the
+    destination event starts, regardless of how long ago the previous event ended.
+    Fixes the "drive scheduled 6 hours before the concert" problem.
+    """
+
+    name: str = "create_travel_block"
+    description: str = (
+        "Create a 🚗 travel-time calendar event that ENDS exactly when a destination "
+        "event starts. Use this for ALL travel between itinerary stops — never use "
+        "create_calendar_event with manual time math for travel blocks. "
+        "The block's start_time is computed automatically as next_event_start_time "
+        "minus drive_minutes. Call get_commute first to get the drive_minutes value."
+    )
+    args_schema: Type[BaseModel] = CreateTravelBlockInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    @staticmethod
+    def _short_destination(title: str) -> str:
+        """Pick a concise destination name from the next event's title.
+
+        Strips emoji prefixes and "X at Y" / "X @ Y" patterns to extract the
+        venue/place. e.g. "🎵 Tycho Concert at The Fillmore" → "The Fillmore".
+        """
+        # Drop leading emoji + whitespace
+        clean = title.lstrip("🥾🎵🍽️🎯🏨🚗📅🎉🌲📍 ").strip()
+        # Prefer the part after " at " or " @ " if present
+        for sep in (" at ", " @ ", " — "):
+            if sep in clean:
+                return clean.split(sep, 1)[1].strip()
+        return clean
+
+    async def _arun(
+        self,
+        next_event_title: str,
+        next_event_start_time: str,
+        drive_minutes: int,
+        destination_address: str,
+        calendar_name: str = "primary",
+    ) -> str:
+        try:
+            # Parse the destination start time and compute backwards.
+            next_start = datetime.fromisoformat(next_event_start_time)
+            travel_start = next_start - timedelta(minutes=drive_minutes)
+
+            destination = self._short_destination(next_event_title)
+            travel_title = f"🚗 Drive to {destination}"
+
+            # The MCP server's calendar.create_event accepts naive ISO strings;
+            # the schema's localize() validator will stamp Pacific timezone.
+            payload: Dict[str, Any] = {
+                "title": travel_title,
+                "start_time": travel_start.isoformat(),
+                "end_time": next_start.isoformat(),
+                "description": f"Drive time: {drive_minutes} minutes to {destination}.",
+                "location": destination_address,
+                "calendar_name": calendar_name,
+                "all_day": False,
+            }
+
+            client = self._get_mcp_client()
+            result = await client.call_tool("calendar.create_event", payload)
+
+            if result.get("success"):
+                event_id = result.get("event_id", "")
+                lines = [
+                    f"✅ {travel_title} added: "
+                    f"{travel_start.strftime('%I:%M %p').lstrip('0')} - "
+                    f"{next_start.strftime('%I:%M %p').lstrip('0')} "
+                    f"({drive_minutes} min)"
+                ]
+                if event_id:
+                    lines.append(f"[event_id={event_id}]")
+                return "\n".join(lines)
+            return f"❌ Failed to create travel block: {result.get('message', 'Unknown error')}"
+        except ValueError as e:
+            return f"❌ Bad time format for next_event_start_time (expected ISO YYYY-MM-DDTHH:MM:SS): {e}"
+        except Exception as e:
+            return f"❌ Error creating travel block: {e}"
+
+    def _run(
+        self,
+        next_event_title: str,
+        next_event_start_time: str,
+        drive_minutes: int,
+        destination_address: str,
+        calendar_name: str = "primary",
+    ) -> str:
+        return asyncio.run(
+            self._arun(
+                next_event_title,
+                next_event_start_time,
+                drive_minutes,
+                destination_address,
+                calendar_name,
+            )
+        )
+
+
 class TrailScoutTool(BaseTool):
     """Tool to scout outdoor trails near a location."""
 
@@ -991,6 +1185,7 @@ def get_all_tools():
         CalendarUpdateTool(),
         CalendarDeleteTool(),
         TodoTool(),
+        TodoCreateTool(),
         CommuteTool(),
         CommuteOptionsTool(),
         ShuttleTool(),
@@ -999,4 +1194,5 @@ def get_all_tools():
         TrailScoutTool(),
         ConcertAlertTool(),
         ItineraryTool(),
+        CreateTravelBlockTool(),
     ]
