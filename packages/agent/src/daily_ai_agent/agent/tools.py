@@ -637,12 +637,32 @@ class TrailScoutTool(BaseTool):
 
             lines = [f"🥾 {len(trails)} trail(s) near {location} (source: {source}):"]
             for t in trails[:5]:
+                name = t.get("name", "Unnamed")
+                # Distance can be None for providers that don't report trail length
+                # (e.g. Google Places returns parks but no trail distance).
+                distance = t.get("distance_miles")
+                distance_str = f"{distance} mi" if distance is not None else "distance not reported"
+
                 difficulty_str = t.get("difficulty") or "unrated"
                 rating_str = f"★ {t['rating']}" if t.get("rating") else ""
-                elevation = f", {t['elevation_gain_ft']} ft gain" if t.get("elevation_gain_ft") else ""
+                elevation = (
+                    f", {t['elevation_gain_ft']} ft gain"
+                    if t.get("elevation_gain_ft")
+                    else ""
+                )
+
+                # Surface the full address so the agent can use it for
+                # follow-up distance queries — passing just "Twin Peaks" to
+                # the directions tool would match a different landmark.
+                trail_location = t.get("location", "")
+                addr_part = (
+                    f"\n  📍 {trail_location}"
+                    if trail_location and trail_location.lower() != location.lower()
+                    else ""
+                )
+
                 lines.append(
-                    f"- {t.get('name', 'Unnamed')}: {t.get('distance_miles', 0)} mi, "
-                    f"{difficulty_str}{elevation} {rating_str}"
+                    f"- {name}: {distance_str}, {difficulty_str}{elevation} {rating_str}{addr_part}"
                 )
             return "\n".join(lines)
         except Exception as e:

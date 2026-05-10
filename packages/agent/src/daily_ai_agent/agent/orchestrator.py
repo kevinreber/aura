@@ -254,6 +254,18 @@ to find which days are actually free before recommending plans. For multi-day tr
 generate_weekend_itinerary as the primary tool and supplement with get_weekend_trails or
 get_weekend_concerts for richer recommendations.
 
+TRAIL DISTANCE FOLLOW-UPS: After get_weekend_trails returns results, each trail line includes
+the trail name AND a 📍 line with the full address (e.g. "Twin Peaks, San Francisco, CA 94114").
+If the user asks how far each trail is from somewhere, use get_commute with the FULL ADDRESS
+from the 📍 line — NOT the trail name alone. Trail names like "Twin Peaks" or "Mission Peak"
+are ambiguous and may match the wrong landmark.
+
+MARKDOWN FORMATTING: When you produce structured responses (multi-day itineraries, lists of
+trails, daily plans), use proper markdown with newlines between sections. Put a blank line
+before each ATX header (### Day 1, ### Day 2, etc) and start each list item on a new line.
+The chat UI parses your output as markdown — headers without leading newlines render as
+plain text "###" instead of formatted headers.
+
 IMPORTANT: For week/multi-day queries, ALWAYS use get_calendar_range instead of multiple get_calendar calls.
 Use get_calendar_range when users ask about "this week", "next week", "upcoming days", or any date range.
 
