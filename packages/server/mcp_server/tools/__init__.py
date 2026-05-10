@@ -5,11 +5,13 @@ from .mobility import MobilityTool
 from .calendar import CalendarTool
 from .todo import TodoTool
 from .financial import FinancialTool
+from .weekend import WeekendTools
 
 __all__ = [
     "WeatherTool",
-    "MobilityTool", 
+    "MobilityTool",
     "CalendarTool",
     "TodoTool",
-    "FinancialTool"
+    "FinancialTool",
+    "WeekendTools",
 ]

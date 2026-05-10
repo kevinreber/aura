@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Mock Trail: Coyote Creek Loop",
+    "distance_miles": 8.4,
+    "elevation_gain_ft": 420,
+    "difficulty": "easy",
+    "rating": 4.6,
+    "url": "https://example.com/trails/coyote-creek-loop",
+    "location": "{location}"
+  },
+  {
+    "name": "Mock Trail: Sierra Vista Ridge",
+    "distance_miles": 12.7,
+    "elevation_gain_ft": 1850,
+    "difficulty": "hard",
+    "rating": 4.8,
+    "url": "https://example.com/trails/sierra-vista-ridge",
+    "location": "{location}"
+  },
+  {
+    "name": "Mock Trail: Lakeside Path",
+    "distance_miles": 4.2,
+    "elevation_gain_ft": 180,
+    "difficulty": "easy",
+    "rating": 4.3,
+    "url": "https://example.com/trails/lakeside-path",
+    "location": "{location}"
+  },
+  {
+    "name": "Mock Trail: Marin Headlands Loop",
+    "distance_miles": 6.9,
+    "elevation_gain_ft": 1100,
+    "difficulty": "moderate",
+    "rating": 4.7,
+    "url": "https://example.com/trails/marin-headlands-loop",
+    "location": "{location}"
+  },
+  {
+    "name": "Mock Trail: Aspen Grove Trail",
+    "distance_miles": 9.3,
+    "elevation_gain_ft": 720,
+    "difficulty": "moderate",
+    "rating": 4.5,
+    "url": "https://example.com/trails/aspen-grove",
+    "location": "{location}"
+  }
+]

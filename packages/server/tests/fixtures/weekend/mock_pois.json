@@ -1,0 +1,110 @@
+[
+  {
+    "name": "Mock POI: The Wolf's Tailor",
+    "category": "restaurant",
+    "rating": 4.7,
+    "address": "Sunnyside, {destination}",
+    "hours": "Tue-Sat 5:30 PM - 10:00 PM",
+    "price_level": 4,
+    "description": "Tasting-menu restaurant with seasonal small plates."
+  },
+  {
+    "name": "Mock POI: Snooze AM Eatery",
+    "category": "restaurant",
+    "rating": 4.3,
+    "address": "Downtown, {destination}",
+    "hours": "Daily 6:30 AM - 2:30 PM",
+    "price_level": 2,
+    "description": "Brunch spot known for inventive pancake flights."
+  },
+  {
+    "name": "Mock POI: Hop Alley",
+    "category": "restaurant",
+    "rating": 4.5,
+    "address": "RiNo District, {destination}",
+    "hours": "Wed-Sun 5:00 PM - 10:00 PM",
+    "price_level": 3,
+    "description": "Modern Chinese cuisine in a converted warehouse."
+  },
+  {
+    "name": "Mock POI: RiNo Art District",
+    "category": "attraction",
+    "rating": 4.6,
+    "address": "RiNo, {destination}",
+    "hours": "Open daily",
+    "price_level": null,
+    "description": "Outdoor murals, galleries, and breweries across a few blocks."
+  },
+  {
+    "name": "Mock POI: Bear Creek Trail",
+    "category": "outdoors",
+    "rating": 4.8,
+    "address": "Bear Creek Park, {destination}",
+    "hours": "Sunrise to sunset",
+    "price_level": null,
+    "description": "5.4 mi loop with moderate climb, 1,100 ft gain."
+  },
+  {
+    "name": "Mock POI: Chautauqua Park",
+    "category": "outdoors",
+    "rating": 4.9,
+    "address": "Chautauqua, {destination}",
+    "hours": "Daily 5:00 AM - 11:00 PM",
+    "price_level": null,
+    "description": "Iconic flatiron views with easy and moderate trail options."
+  },
+  {
+    "name": "Mock POI: Red Rocks Amphitheatre",
+    "category": "nightlife",
+    "rating": 4.9,
+    "address": "Morrison, near {destination}",
+    "hours": "Show-dependent",
+    "price_level": 3,
+    "description": "Open-air concert venue carved into red sandstone."
+  },
+  {
+    "name": "Mock POI: Avanti Food & Beverage",
+    "category": "nightlife",
+    "rating": 4.4,
+    "address": "Lower Highlands, {destination}",
+    "hours": "Daily 11:00 AM - midnight",
+    "price_level": 2,
+    "description": "Rooftop food hall with skyline views and rotating vendors."
+  },
+  {
+    "name": "Mock POI: The Crawford Hotel",
+    "category": "lodging",
+    "rating": 4.7,
+    "address": "Union Station, {destination}",
+    "hours": "24/7",
+    "price_level": 4,
+    "description": "Boutique hotel inside a restored historic train station."
+  },
+  {
+    "name": "Mock POI: Larimer Square",
+    "category": "attraction",
+    "rating": 4.5,
+    "address": "Larimer St, {destination}",
+    "hours": "Open daily",
+    "price_level": 2,
+    "description": "Historic block with restaurants, bars, and boutique shopping."
+  },
+  {
+    "name": "Mock POI: Cherry Creek Trail",
+    "category": "outdoors",
+    "rating": 4.6,
+    "address": "Cherry Creek, {destination}",
+    "hours": "Sunrise to sunset",
+    "price_level": null,
+    "description": "Flat paved bike + run path along the creek."
+  },
+  {
+    "name": "Mock POI: Mercury Cafe",
+    "category": "nightlife",
+    "rating": 4.4,
+    "address": "Five Points, {destination}",
+    "hours": "Wed-Sun 5:00 PM - 1:00 AM",
+    "price_level": 2,
+    "description": "Long-running music venue with live jazz and dance nights."
+  }
+]

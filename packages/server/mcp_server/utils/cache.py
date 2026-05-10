@@ -308,6 +308,11 @@ class CacheTTL:
     # Calendar data (events don't change frequently)
     CALENDAR_EVENTS = 600  # 10 minutes
     CALENDAR_FREE_TIME = 300  # 5 minutes
-    
+
+    # Weekend orchestrator data
+    WEEKEND_TRAILS = 24 * 3600  # 24 hours (trails don't change day-to-day)
+    WEEKEND_CONCERTS = 3600  # 1 hour (ticket status updates frequently)
+    WEEKEND_POIS = 12 * 3600  # 12 hours (places + hours are relatively stable)
+
     # Default fallback
     DEFAULT = 300  # 5 minutes

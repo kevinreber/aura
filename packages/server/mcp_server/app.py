@@ -29,6 +29,7 @@ from .schemas import (
     CalendarUpdateInput, CalendarDeleteInput, CalendarFindFreeTimeInput,
     TodoInput, TodoCreateInput, TodoUpdateInput, TodoCompleteInput, TodoDeleteInput,
     FinancialInput,
+    TrailSearchInput, ConcertSearchInput, ItineraryInput,
 )
 
 # Initialize logger
@@ -408,6 +409,51 @@ def create_app() -> FastAPI:
             return result
         except Exception as e:
             logger.error(f"Error in financial.get_data: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ==================== Weekend Endpoints ====================
+
+    @app.post("/tools/weekend.get_trails", response_model=None, tags=["Weekend"])
+    async def weekend_get_trails(input_data: TrailSearchInput):
+        """Scout outdoor trails near a location.
+
+        Returns matching trails filtered by activity type, max distance, and difficulty.
+        Phase 1: returns mock data when no API key is configured.
+        """
+        try:
+            result = await mcp_server.call_tool("weekend.get_trails", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in weekend.get_trails: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/tools/weekend.get_concerts", response_model=None, tags=["Weekend"])
+    async def weekend_get_concerts(input_data: ConcertSearchInput):
+        """Find upcoming concerts and live music events.
+
+        Returns events for tracked artists or all events within radius. Filters by
+        date range. Phase 1: returns mock data when Bandsintown is not configured.
+        """
+        try:
+            result = await mcp_server.call_tool("weekend.get_concerts", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in weekend.get_concerts: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/tools/weekend.generate_itinerary", response_model=None, tags=["Weekend"])
+    async def weekend_generate_itinerary(input_data: ItineraryInput):
+        """Generate a multi-day itinerary with points of interest.
+
+        Returns POIs grouped by category plus optional drive-time estimates from a
+        base location. The agent's LLM is responsible for stitching these into a
+        day-by-day narrative. Phase 1: returns mock data.
+        """
+        try:
+            result = await mcp_server.call_tool("weekend.generate_itinerary", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in weekend.generate_itinerary: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Error Handlers ====================

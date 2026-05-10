@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 import json
 from datetime import datetime
 
-from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool
+from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool, WeekendTools
 from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, CommuteInput, CommuteOutput,
@@ -19,7 +19,10 @@ from .schemas import (
     TodoInput, TodoOutput, TodoCreateInput, TodoCreateOutput,
     TodoUpdateInput, TodoUpdateOutput, TodoCompleteInput, TodoCompleteOutput,
     TodoDeleteInput, TodoDeleteOutput,
-    FinancialInput, FinancialOutput
+    FinancialInput, FinancialOutput,
+    TrailSearchInput, TrailSearchOutput,
+    ConcertSearchInput, ConcertSearchOutput,
+    ItineraryInput, ItineraryOutput,
 )
 from .utils.logging import get_logger
 
@@ -148,6 +151,27 @@ class MCPServer:
                 "output_schema": FinancialOutput,
                 "description": "Get financial data for stocks and cryptocurrencies",
                 "method": "get_financial_data"
+            },
+            "weekend.get_trails": {
+                "tool": WeekendTools(),
+                "input_schema": TrailSearchInput,
+                "output_schema": TrailSearchOutput,
+                "description": "Scout outdoor trails near a location, filtered by activity type and difficulty",
+                "method": "get_trails"
+            },
+            "weekend.get_concerts": {
+                "tool": WeekendTools(),
+                "input_schema": ConcertSearchInput,
+                "output_schema": ConcertSearchOutput,
+                "description": "Find upcoming concerts and live music events for tracked artists or by location",
+                "method": "get_concerts"
+            },
+            "weekend.generate_itinerary": {
+                "tool": WeekendTools(),
+                "input_schema": ItineraryInput,
+                "output_schema": ItineraryOutput,
+                "description": "Generate a structured multi-day itinerary with points of interest and transit estimates",
+                "method": "generate_itinerary"
             }
         }
     
