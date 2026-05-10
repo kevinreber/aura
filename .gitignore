@@ -12,3 +12,4 @@ venv/
 .DS_Store
 credentials.json
 token.json
+data/weekend_preferences.json

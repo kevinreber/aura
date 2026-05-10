@@ -12,7 +12,52 @@ from datetime import datetime
 from .tools import get_all_tools
 from ..models.config import get_settings
 from ..services.llm import LLMService
+from ..services.preferences import get_enabled_categories
 from ..utils.tracing import setup_langsmith_tracing, is_tracing_active
+
+# Map weekend category IDs (from /weekend/categories) to the LangChain tool names
+# that implement them. Disabled categories are filtered out before tool selection.
+_CATEGORY_TO_TOOL_NAMES = {
+    "trails": ["get_weekend_trails"],
+    "concerts": ["get_weekend_concerts"],
+    "itinerary": ["generate_weekend_itinerary"],
+}
+
+# All weekend tool names, regardless of category. Used to identify which tools
+# are subject to category-based filtering vs. always-on tools (weather, calendar, etc).
+_ALL_WEEKEND_TOOL_NAMES = {
+    name for tools in _CATEGORY_TO_TOOL_NAMES.values() for name in tools
+}
+
+
+def _filter_tools_by_enabled_categories(tools: List, enabled: List[str]) -> List:
+    """Drop weekend tools whose category isn't in the user's enabled list.
+
+    Non-weekend tools (weather, calendar, todos, etc) pass through unchanged —
+    the toggle system only gates the weekend orchestrator's category-mapped tools.
+    """
+    enabled_tool_names = set()
+    for category in enabled:
+        enabled_tool_names.update(_CATEGORY_TO_TOOL_NAMES.get(category, []))
+
+    filtered: List = []
+    dropped: List[str] = []
+    for tool in tools:
+        # Always-on tools (everything outside the weekend category map)
+        if tool.name not in _ALL_WEEKEND_TOOL_NAMES:
+            filtered.append(tool)
+            continue
+        # Weekend tools — only include if their category is enabled
+        if tool.name in enabled_tool_names:
+            filtered.append(tool)
+        else:
+            dropped.append(tool.name)
+
+    if dropped:
+        logger.debug(
+            f"Weekend prefs filtered out {len(dropped)} disabled tools: {dropped}"
+        )
+    return filtered
 
 # Module-level tool cache for performance
 _cached_tools: Optional[List] = None
@@ -63,9 +108,19 @@ class AgentOrchestrator:
 
         # Use cached tools by default for better performance
         if use_cached_tools:
-            self.tools = get_cached_tools()
+            all_tools = get_cached_tools()
         else:
-            self.tools = get_all_tools()
+            all_tools = get_all_tools()
+
+        # Apply user weekend-category preferences. Disabled categories' tools
+        # are filtered out before the LLM ever sees them. See
+        # WEEKEND_ORCHESTRATOR_SPEC.md Section 20 for the design.
+        enabled_categories = get_enabled_categories()
+        self.tools = _filter_tools_by_enabled_categories(all_tools, enabled_categories)
+        logger.info(
+            f"Agent has {len(self.tools)} tools available "
+            f"(weekend categories enabled: {enabled_categories})"
+        )
 
         # Determine which LLM provider to use
         self.llm_provider = self.settings.effective_llm_provider
@@ -134,6 +189,22 @@ class AgentOrchestrator:
             current_date = datetime.now().strftime("%Y-%m-%d")
             current_day = datetime.now().strftime("%A, %B %d, %Y")
 
+            # Compute disabled weekend categories so the prompt can tell the agent
+            # to short-circuit ("concerts are disabled — suggest enabling them")
+            # instead of looping through other tools when asked about a disabled
+            # category. See WEEKEND_ORCHESTRATOR_SPEC.md Section 20.
+            all_weekend_categories = set(_CATEGORY_TO_TOOL_NAMES.keys())
+            enabled_categories = set(get_enabled_categories())
+            disabled_categories = sorted(all_weekend_categories - enabled_categories)
+            disabled_categories_note = (
+                f"\n\nDISABLED WEEKEND CATEGORIES: {', '.join(disabled_categories)}. "
+                f"If the user asks about any of these categories, do NOT try to call other "
+                f"tools to substitute — instead reply briefly that the category is disabled "
+                f"in their preferences and suggest they enable it in settings."
+                if disabled_categories
+                else ""
+            )
+
             # Build prompt messages - include chat_history placeholder if memory is enabled
             prompt_messages = [
                 ("system", f"""You are {self.settings.user_name}'s personal morning assistant.
@@ -178,7 +249,7 @@ If asked about work meetings specifically, explain that work calendar integratio
 
 CONVERSATION MEMORY: You have access to the conversation history. When users say things like "yes", "proceed",
 "do it", "go ahead", or reference previous messages, use the chat history to understand what they're referring to.
-Always maintain context from earlier in the conversation."""),
+Always maintain context from earlier in the conversation.{disabled_categories_note}"""),
             ]
 
             # Add chat history placeholder if memory is enabled

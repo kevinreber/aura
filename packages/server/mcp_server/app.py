@@ -413,6 +413,43 @@ def create_app() -> FastAPI:
 
     # ==================== Weekend Endpoints ====================
 
+    @app.get("/weekend/categories", tags=["Weekend"])
+    async def weekend_categories():
+        """Discover the catalog of available weekend categories.
+
+        Returned by the server so the UI can render toggles dynamically without
+        hardcoding category names. Adding a new category later (e.g. food_tours,
+        festivals) only requires updating this endpoint — the UI picks it up
+        automatically.
+
+        See WEEKEND_ORCHESTRATOR_SPEC.md Section 20 for the design rationale.
+        """
+        return {
+            "categories": [
+                {
+                    "id": "trails",
+                    "label": "Trails & Outdoors",
+                    "description": "Hiking, running, and cycling trails near a location",
+                    "default_enabled": True,
+                    "tools": ["weekend.get_trails"],
+                },
+                {
+                    "id": "concerts",
+                    "label": "Live Music",
+                    "description": "Upcoming concerts and live music events",
+                    "default_enabled": True,
+                    "tools": ["weekend.get_concerts"],
+                },
+                {
+                    "id": "itinerary",
+                    "label": "Multi-day Trips",
+                    "description": "Full weekend trip planning with points of interest",
+                    "default_enabled": True,
+                    "tools": ["weekend.generate_itinerary"],
+                },
+            ]
+        }
+
     @app.post("/tools/weekend.get_trails", response_model=None, tags=["Weekend"])
     async def weekend_get_trails(input_data: TrailSearchInput):
         """Scout outdoor trails near a location.
