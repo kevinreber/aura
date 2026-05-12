@@ -636,8 +636,9 @@ export const apiClient = new AIAgentAPI();
 // Server-side API client (uses Node.js environment variables)
 export class ServerAIAgentAPI {
   private baseURL: string;
+  private userEmail?: string;
 
-  constructor() {
+  constructor(userEmail?: string) {
     // Use Node.js environment variables for server-side
     // Only access process.env on server-side (Node.js environment)
     if (typeof window === 'undefined') {
@@ -650,6 +651,15 @@ export class ServerAIAgentAPI {
       // Fallback for browser (shouldn't be used)
       this.baseURL = 'http://localhost:8001';
     }
+    this.userEmail = userEmail;
+  }
+
+  private authHeaders(): Record<string, string> {
+    if (!this.userEmail || typeof window !== 'undefined') return {};
+    const secret = process.env.INTERNAL_AUTH_SECRET;
+    const headers: Record<string, string> = { 'X-User-Email': this.userEmail };
+    if (secret) headers['X-Internal-Auth'] = secret;
+    return headers;
   }
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}): Promise<any> {
@@ -657,6 +667,7 @@ export class ServerAIAgentAPI {
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        ...this.authHeaders(),
         ...options.headers,
       },
       ...options,
@@ -812,5 +823,9 @@ export class ServerAIAgentAPI {
   }
 }
 
-// Server-side instance
+// Server-side instance.
+// Note: this default instance does NOT attest a user identity. Loaders that
+// hit the Agent (which enforces an allowlist + shared secret in prod) should
+// instead create a per-request client with the authenticated user's email:
+//   const client = new ServerAIAgentAPI(user.email);
 export const serverApiClient = new ServerAIAgentAPI();

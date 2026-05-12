@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     allowed_origins_env: Optional[str] = None
     rate_limit_per_minute: int = 60
 
+    # Auth: shared secret with the UI proxy (the only legitimate caller).
+    # If set, requests to protected endpoints must include the matching
+    # X-Internal-Auth header. The UI's session layer is the source of truth
+    # for the user's verified Google identity, forwarded in X-User-Email.
+    internal_auth_secret: Optional[str] = None
+
+    # Auth: allowlist of Google email addresses permitted to use the app.
+    # Comma-separated. Empty/unset means fail-closed (nobody allowed) when
+    # internal_auth_secret is set, so always configure these together.
+    allowed_emails_env: Optional[str] = None
+
     # User Preferences
     user_name: str = "Kevin"
     user_location: str = "San Francisco"
@@ -67,6 +78,8 @@ class Settings(BaseSettings):
         # Map environment variables to field names
         fields = {
             "allowed_origins_env": {"env": "ALLOWED_ORIGINS"},
+            "allowed_emails_env": {"env": "ALLOWED_EMAILS"},
+            "internal_auth_secret": {"env": "INTERNAL_AUTH_SECRET"},
         }
 
     @property
@@ -92,6 +105,22 @@ class Settings(BaseSettings):
             origins = origins + extras
 
         return origins
+
+    @property
+    def allowed_emails(self) -> List[str]:
+        """Lowercased list of Google emails allowed to use the app."""
+        if not self.allowed_emails_env:
+            return []
+        return [
+            email.strip().lower()
+            for email in self.allowed_emails_env.split(",")
+            if email.strip()
+        ]
+
+    @property
+    def auth_enabled(self) -> bool:
+        """Auth is enforced when a shared secret is configured."""
+        return bool(self.internal_auth_secret)
 
     @property
     def is_production(self) -> bool:
@@ -137,6 +166,10 @@ class Settings(BaseSettings):
             kwargs["port"] = int(os.getenv("PORT", "8001"))
         if "allowed_origins_env" not in kwargs:
             kwargs["allowed_origins_env"] = os.getenv("ALLOWED_ORIGINS")
+        if "allowed_emails_env" not in kwargs:
+            kwargs["allowed_emails_env"] = os.getenv("ALLOWED_EMAILS")
+        if "internal_auth_secret" not in kwargs:
+            kwargs["internal_auth_secret"] = os.getenv("INTERNAL_AUTH_SECRET")
 
         super().__init__(**kwargs)
 

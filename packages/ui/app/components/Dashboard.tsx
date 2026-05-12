@@ -106,6 +106,8 @@ import { WeekendSettings } from './WeekendSettings';
 
 interface DashboardProps {
   userName?: string;
+  userEmail?: string;
+  userPicture?: string;
   // Server-side loaded data (no CORS issues!)
   initialWeather?: WeatherData | null;
   initialFinancial?: FinancialData | null;
@@ -123,6 +125,8 @@ interface DashboardProps {
 
 export default function Dashboard({
   userName = 'Kevin',
+  userEmail,
+  userPicture,
   initialWeather,
   initialFinancial,
   initialCalendar,
@@ -780,6 +784,30 @@ export default function Dashboard({
                 )}
               </button>
               <Clock userName={userName} className="font-mono" />
+              {/* User menu / logout */}
+              <a
+                href="/auth/logout"
+                title={userEmail ? `Sign out (${userEmail})` : 'Sign out'}
+                className="flex items-center gap-1.5 p-1 sm:px-2 sm:py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs text-gray-700 dark:text-gray-300 transition-colors"
+                aria-label="Sign out"
+              >
+                {userPicture ? (
+                  <img
+                    src={userPicture}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="w-6 h-6 rounded-full"
+                  />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold"
+                  >
+                    {(userName || '?').slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="hidden sm:inline">Sign out</span>
+              </a>
             </div>
           </div>
         </div>

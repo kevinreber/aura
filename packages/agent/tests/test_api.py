@@ -385,3 +385,112 @@ class TestChatStreamEndpoint:
             )
 
             assert response.status_code == 503
+
+
+class TestAuthMiddleware:
+    """Tests for the X-Internal-Auth + X-User-Email allowlist enforcement."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_settings(self):
+        """Reset the settings singleton before AND after each test so the
+        auth_enabled flag doesn't leak across tests."""
+        from daily_ai_agent.models import config as config_module
+        config_module._settings = None
+        yield
+        config_module._settings = None
+
+    def _build_authed_app(self, secret: str, allowed: str):
+        """Build an app with auth enabled. Reset the settings singleton first."""
+        from daily_ai_agent.models import config as config_module
+        from daily_ai_agent.api import create_app
+
+        # Reset the cached settings so our env vars are picked up.
+        config_module._settings = None
+        with patch.dict(
+            "os.environ",
+            {"INTERNAL_AUTH_SECRET": secret, "ALLOWED_EMAILS": allowed},
+        ):
+            config_module._settings = None  # ensure re-read inside patch
+            app = create_app(testing=True)
+        return app
+
+    def test_health_remains_public_when_auth_enabled(self):
+        """Health endpoint must stay reachable for healthchecks."""
+        app = self._build_authed_app("test-secret", "kevin@example.com")
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch:
+            mock_orch.return_value.is_conversational.return_value = True
+            response = app.test_client().get("/health")
+            assert response.status_code == 200
+
+    def test_protected_endpoint_rejects_missing_secret(self):
+        """Requests without X-Internal-Auth get 401 when auth is enabled."""
+        app = self._build_authed_app("test-secret", "kevin@example.com")
+        response = app.test_client().post(
+            "/chat",
+            data=json.dumps({"message": "hi"}),
+            content_type="application/json",
+        )
+        assert response.status_code == 401
+
+    def test_protected_endpoint_rejects_wrong_secret(self):
+        """Wrong shared secret → 401."""
+        app = self._build_authed_app("test-secret", "kevin@example.com")
+        response = app.test_client().post(
+            "/chat",
+            data=json.dumps({"message": "hi"}),
+            content_type="application/json",
+            headers={
+                "X-Internal-Auth": "wrong-secret",
+                "X-User-Email": "kevin@example.com",
+            },
+        )
+        assert response.status_code == 401
+
+    def test_protected_endpoint_rejects_non_allowlisted_email(self):
+        """Right secret but non-allowlisted email → 403."""
+        app = self._build_authed_app("test-secret", "kevin@example.com")
+        response = app.test_client().post(
+            "/chat",
+            data=json.dumps({"message": "hi"}),
+            content_type="application/json",
+            headers={
+                "X-Internal-Auth": "test-secret",
+                "X-User-Email": "intruder@example.com",
+            },
+        )
+        assert response.status_code == 403
+
+    def test_protected_endpoint_accepts_valid_attestation(self):
+        """Right secret + allowlisted email passes the auth gate."""
+        app = self._build_authed_app("test-secret", "kevin@example.com")
+        with patch("daily_ai_agent.api.AgentOrchestrator") as mock_orch_class:
+            mock_orch = MagicMock()
+            mock_orch.is_conversational.return_value = True
+            mock_orch.chat = AsyncMock(return_value="ok")
+            mock_orch_class.return_value = mock_orch
+
+            response = app.test_client().post(
+                "/chat",
+                data=json.dumps({"message": "hi"}),
+                content_type="application/json",
+                headers={
+                    "X-Internal-Auth": "test-secret",
+                    "X-User-Email": "kevin@example.com",
+                },
+            )
+            # Should at least clear the auth gate (not 401/403).
+            assert response.status_code not in (401, 403)
+
+    def test_email_match_is_case_insensitive(self):
+        """Allowlist comparison must be case-insensitive."""
+        app = self._build_authed_app("test-secret", "Kevin@Example.com")
+        response = app.test_client().post(
+            "/chat",
+            data=json.dumps({"message": "hi"}),
+            content_type="application/json",
+            headers={
+                "X-Internal-Auth": "test-secret",
+                "X-User-Email": "KEVIN@example.com",
+            },
+        )
+        assert response.status_code not in (401, 403)

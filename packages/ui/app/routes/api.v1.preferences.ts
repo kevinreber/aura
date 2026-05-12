@@ -8,6 +8,8 @@
  * pattern.
  */
 
+import { requireUserJson } from '../lib/auth.server';
+
 const MCP_SERVER_URL = process.env.VITE_MCP_SERVER_URL || 'http://localhost:8000';
 
 const COMMON_HEADERS = {
@@ -15,7 +17,13 @@ const COMMON_HEADERS = {
   'API-Version': 'v1',
 };
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
+  try {
+    await requireUserJson(request);
+  } catch (resp) {
+    if (resp instanceof Response) return resp;
+    throw resp;
+  }
   try {
     const response = await fetch(`${MCP_SERVER_URL}/weekend/preferences`);
 
@@ -46,6 +54,12 @@ export async function loader() {
 }
 
 export async function action({ request }: { request: Request }) {
+  try {
+    await requireUserJson(request);
+  } catch (resp) {
+    if (resp instanceof Response) return resp;
+    throw resp;
+  }
   if (request.method !== 'PUT') {
     return new Response(
       JSON.stringify({ error: 'Method not allowed — use PUT to update' }),

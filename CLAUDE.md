@@ -124,7 +124,45 @@ ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
 # Personal addresses for commute features
 HOME_ADDRESS=your_home_address
 WORK_ADDRESS=your_work_address
+
+# Auth (Google OAuth, single-user allowlist) — see "Authentication" section
+ALLOWED_EMAILS=you@example.com
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+SESSION_SECRET=...           # openssl rand -hex 32
+INTERNAL_AUTH_SECRET=...     # openssl rand -hex 32
 ```
+
+## Authentication
+
+Aura is currently a **single-user app** gated by Google OAuth + an email
+allowlist. The UI is the auth boundary; the Agent is an internal service.
+
+**Flow:**
+
+1. User visits the UI → unauthenticated → redirected to `/login`
+2. Clicks "Sign in with Google" → `/auth/google` builds the consent URL
+3. Google redirects to `/auth/google/callback` → UI verifies CSRF state,
+   exchanges code for tokens, fetches userinfo, checks `ALLOWED_EMAILS`
+4. On success, the UI sets a signed session cookie (`aura_session`) and
+   redirects home. Otherwise → back to `/login` with an error code.
+5. Every Agent call from the UI proxy attaches:
+   - `X-Internal-Auth: <INTERNAL_AUTH_SECRET>` (shared secret)
+   - `X-User-Email: <verified-google-email>`
+6. The Agent's `before_request` hook re-checks both headers against its
+   own `INTERNAL_AUTH_SECRET` + `ALLOWED_EMAILS` (defense in depth).
+
+**Adding/removing users:** edit `ALLOWED_EMAILS` and restart both services.
+Allowlist is checked on every request, so removing an email immediately
+invalidates that user's existing session.
+
+**Bypassing for local dev:** leave `INTERNAL_AUTH_SECRET` unset on the
+Agent — it will skip auth entirely. The UI still enforces login. Never
+deploy with this unset.
+
+**Future multi-tenant migration:** when you actually have a second user,
+this scheme becomes per-user OAuth tokens for Todoist/Calendar plus a
+`user_id` on cached data.
 
 ## Docker Architecture
 

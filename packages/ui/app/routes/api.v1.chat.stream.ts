@@ -1,5 +1,16 @@
+import { buildAgentAuthHeaders } from '../lib/agent-auth.server';
+import { requireUserJson } from '../lib/auth.server';
+
 export async function action({ request }: { request: Request }) {
   console.log('🤖 API v1 Chat Stream: Processing request...');
+
+  let user;
+  try {
+    user = await requireUserJson(request);
+  } catch (resp) {
+    if (resp instanceof Response) return resp;
+    throw resp;
+  }
 
   try {
     const body = await request.json();
@@ -15,7 +26,7 @@ export async function action({ request }: { request: Request }) {
       });
     }
 
-    console.log(`💬 v1 API: Streaming message: ${message}`);
+    console.log(`💬 v1 API: Streaming message from ${user.email}: ${message}`);
 
     // Get AI Agent API URL from environment
     const aiAgentUrl = process.env.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
@@ -25,6 +36,7 @@ export async function action({ request }: { request: Request }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAgentAuthHeaders(user.email),
       },
       body: JSON.stringify({ message: message.trim() }),
     });
