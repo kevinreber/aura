@@ -7,16 +7,18 @@
  * without the shared secret AND an allowlisted email.
  */
 
+const INTERNAL_AUTH_SECRET = process.env.INTERNAL_AUTH_SECRET;
+
+// Warn once at module load instead of per-request — this fires on every
+// outbound Agent call otherwise and floods dev logs.
+if (!INTERNAL_AUTH_SECRET) {
+  console.warn(
+    'INTERNAL_AUTH_SECRET not set — Agent will reject calls if it requires it'
+  );
+}
+
 export function buildAgentAuthHeaders(userEmail: string): Record<string, string> {
-  const secret = process.env.INTERNAL_AUTH_SECRET;
-  if (!secret) {
-    // In dev we still send the email so the Agent can log it, but the Agent
-    // will reject the request unless INTERNAL_AUTH_SECRET is also unset there.
-    console.warn('INTERNAL_AUTH_SECRET not set — Agent calls will fail if Agent requires it');
-  }
-  const headers: Record<string, string> = {
-    'X-User-Email': userEmail,
-  };
-  if (secret) headers['X-Internal-Auth'] = secret;
+  const headers: Record<string, string> = { 'X-User-Email': userEmail };
+  if (INTERNAL_AUTH_SECRET) headers['X-Internal-Auth'] = INTERNAL_AUTH_SECRET;
   return headers;
 }

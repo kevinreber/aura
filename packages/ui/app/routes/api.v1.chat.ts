@@ -4,13 +4,9 @@ import { requireUserJson } from '../lib/auth.server';
 export async function action({ request }: { request: Request }) {
   console.log('🤖 API v1 Chat: Processing request...');
 
-  let user;
-  try {
-    user = await requireUserJson(request);
-  } catch (resp) {
-    if (resp instanceof Response) return resp;
-    throw resp;
-  }
+  // requireUserJson throws a 401 Response on missing/invalid session;
+  // React Router auto-forwards thrown Responses as the HTTP response.
+  const user = await requireUserJson(request);
 
   try {
     const body = await request.json();

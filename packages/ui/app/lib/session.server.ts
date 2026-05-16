@@ -20,6 +20,12 @@ if (!SESSION_SECRET && process.env.NODE_ENV === 'production') {
   throw new Error('SESSION_SECRET must be set in production');
 }
 
+// Default to Secure cookies; explicit opt-out for local HTTP dev only.
+// NODE_ENV is unreliable for runtime security decisions (some platforms set
+// it only at build time, custom envs like 'staging'/'preview' would also
+// silently strip Secure). Dedicated env keeps the signal explicit.
+const SECURE_COOKIES = process.env.SESSION_COOKIE_SECURE !== 'false';
+
 export const sessionStorage = createCookieSessionStorage<{
   user: SessionUser;
   oauthState: string;
@@ -30,7 +36,7 @@ export const sessionStorage = createCookieSessionStorage<{
     path: '/',
     sameSite: 'lax',
     secrets: [SESSION_SECRET || 'dev-only-insecure-secret-change-me'],
-    secure: process.env.NODE_ENV === 'production',
+    secure: SECURE_COOKIES,
     maxAge: 60 * 60 * 24 * 7, // 1 week
   },
 });

@@ -18,12 +18,8 @@ const COMMON_HEADERS = {
 };
 
 export async function loader({ request }: { request: Request }) {
-  try {
-    await requireUserJson(request);
-  } catch (resp) {
-    if (resp instanceof Response) return resp;
-    throw resp;
-  }
+  // requireUserJson throws a 401 Response that React Router forwards.
+  await requireUserJson(request);
   try {
     const response = await fetch(`${MCP_SERVER_URL}/weekend/preferences`);
 
@@ -54,12 +50,8 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export async function action({ request }: { request: Request }) {
-  try {
-    await requireUserJson(request);
-  } catch (resp) {
-    if (resp instanceof Response) return resp;
-    throw resp;
-  }
+  // requireUserJson throws a 401 Response that React Router forwards.
+  await requireUserJson(request);
   if (request.method !== 'PUT') {
     return new Response(
       JSON.stringify({ error: 'Method not allowed — use PUT to update' }),

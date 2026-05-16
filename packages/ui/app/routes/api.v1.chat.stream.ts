@@ -4,13 +4,8 @@ import { requireUserJson } from '../lib/auth.server';
 export async function action({ request }: { request: Request }) {
   console.log('🤖 API v1 Chat Stream: Processing request...');
 
-  let user;
-  try {
-    user = await requireUserJson(request);
-  } catch (resp) {
-    if (resp instanceof Response) return resp;
-    throw resp;
-  }
+  // requireUserJson throws a 401 Response that React Router forwards.
+  const user = await requireUserJson(request);
 
   try {
     const body = await request.json();

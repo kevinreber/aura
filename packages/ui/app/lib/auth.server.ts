@@ -26,9 +26,22 @@ function requiredEnv(name: string): string {
 }
 
 function getRedirectUri(request: Request): string {
-  // Allow explicit override (useful behind a proxy / in production).
+  // Explicit override always wins — required behind a reverse proxy where
+  // the request's internal origin doesn't match the public URL Google sees.
   const override = process.env.GOOGLE_REDIRECT_URI;
   if (override) return override;
+
+  if (process.env.NODE_ENV === 'production') {
+    // Fail loud rather than send a broken redirect_uri to Google and get a
+    // confusing redirect_uri_mismatch. Anything running in production behind
+    // a proxy (Vercel, Cloudflare, nginx with TLS termination) must set this.
+    throw new Error(
+      'GOOGLE_REDIRECT_URI must be set in production. ' +
+        'Set it to the full public callback URL, e.g. ' +
+        'https://your-domain.com/auth/google/callback'
+    );
+  }
+
   const url = new URL(request.url);
   return `${url.origin}/auth/google/callback`;
 }
@@ -111,16 +124,27 @@ export async function handleGoogleCallback(request: Request): Promise<Response> 
   const session = await getSession(request.headers.get('Cookie'));
   const expectedState = session.get('oauthState');
 
+  // Clear the one-shot state up front so every redirect out of this function
+  // (success or error) actually persists the unset via the helper below.
+  // Otherwise an error path that returned a bare `redirect()` would leave the
+  // stale state token sitting in the cookie until the next /auth/google call.
+  session.unset('oauthState');
+
+  // Always commit the session on the way out so the unset above lands in the
+  // user's cookie. Use `destroySession` instead when we explicitly want to
+  // sign the user out (e.g. rejected-by-allowlist).
+  const redirectWithSession = async (to: string) =>
+    redirect(to, { headers: { 'Set-Cookie': await commitSession(session) } });
+  const redirectWithDestroy = async (to: string) =>
+    redirect(to, { headers: { 'Set-Cookie': await destroySession(session) } });
+
   if (errorParam) {
-    return redirect(`/login?error=${encodeURIComponent(errorParam)}`);
+    return redirectWithSession(`/login?error=${encodeURIComponent(errorParam)}`);
   }
 
   if (!code || !state || !expectedState || state !== expectedState) {
-    return redirect('/login?error=invalid_state');
+    return redirectWithSession('/login?error=invalid_state');
   }
-
-  // One-shot: clear the state regardless of success.
-  session.unset('oauthState');
 
   const clientId = requiredEnv('GOOGLE_CLIENT_ID');
   const clientSecret = requiredEnv('GOOGLE_CLIENT_SECRET');
@@ -140,7 +164,7 @@ export async function handleGoogleCallback(request: Request): Promise<Response> 
 
   if (!tokenResp.ok) {
     console.error('Google token exchange failed:', await tokenResp.text());
-    return redirect('/login?error=token_exchange_failed');
+    return redirectWithSession('/login?error=token_exchange_failed');
   }
 
   const tokens = (await tokenResp.json()) as GoogleTokenResponse;
@@ -151,21 +175,19 @@ export async function handleGoogleCallback(request: Request): Promise<Response> 
 
   if (!userResp.ok) {
     console.error('Google userinfo fetch failed:', await userResp.text());
-    return redirect('/login?error=userinfo_failed');
+    return redirectWithSession('/login?error=userinfo_failed');
   }
 
   const userInfo = (await userResp.json()) as GoogleUserInfo;
 
   if (!userInfo.verified_email) {
-    return redirect('/login?error=unverified_email');
+    return redirectWithSession('/login?error=unverified_email');
   }
 
   if (!isEmailAllowed(userInfo.email)) {
     console.warn(`Login rejected for non-allowlisted email: ${userInfo.email}`);
     // Don't set the session — force a logout-state redirect.
-    return redirect('/login?error=not_authorized', {
-      headers: { 'Set-Cookie': await destroySession(session) },
-    });
+    return redirectWithDestroy('/login?error=not_authorized');
   }
 
   const user: SessionUser = {
@@ -175,9 +197,7 @@ export async function handleGoogleCallback(request: Request): Promise<Response> 
   };
   session.set('user', user);
 
-  return redirect('/', {
-    headers: { 'Set-Cookie': await commitSession(session) },
-  });
+  return redirectWithSession('/');
 }
 
 export async function logout(request: Request): Promise<Response> {
