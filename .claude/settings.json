@@ -1,3 +1,33 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json"
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Bash(cat .env*)",
+      "Bash(cat ./.env*)",
+      "Bash(cat ../.env*)",
+      "Bash(cat packages/*/.env*)",
+      "Bash(cat **/.env*)",
+      "Bash(head .env*)",
+      "Bash(head ./.env*)",
+      "Bash(head packages/*/.env*)",
+      "Bash(tail .env*)",
+      "Bash(tail ./.env*)",
+      "Bash(tail packages/*/.env*)",
+      "Bash(less .env*)",
+      "Bash(less ./.env*)",
+      "Bash(less packages/*/.env*)",
+      "Bash(more .env*)",
+      "Bash(more ./.env*)",
+      "Bash(more packages/*/.env*)",
+      "Bash(grep * .env*)",
+      "Bash(grep * ./.env*)",
+      "Bash(grep * packages/*/.env*)",
+      "Bash(awk * .env*)",
+      "Bash(sed * .env*)"
+    ]
+  }
 }

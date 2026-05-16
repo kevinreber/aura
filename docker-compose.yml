@@ -51,6 +51,8 @@ services:
       - PORT=8001
       - MCP_SERVER_URL=http://server:8000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS:-}
+      - INTERNAL_AUTH_SECRET=${INTERNAL_AUTH_SECRET:-}
     volumes:
       - ./packages/agent/src:/app/src
     depends_on:
@@ -77,6 +79,12 @@ services:
       - VITE_MCP_SERVER_URL=http://localhost:8000
       - VITE_AGENT_URL=http://localhost:8001
       - VITE_AI_AGENT_API_URL=http://agent:8001
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS:-}
+      - INTERNAL_AUTH_SECRET=${INTERNAL_AUTH_SECRET:-}
     volumes:
       - ./packages/ui/app:/app/app
       - ./packages/ui/public:/app/public

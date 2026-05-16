@@ -1,5 +1,12 @@
+import { buildAgentAuthHeaders } from '../lib/agent-auth.server';
+import { requireUserJson } from '../lib/auth.server';
+
 export async function action({ request }: { request: Request }) {
   console.log('🤖 API v1 Chat: Processing request...');
+
+  // requireUserJson throws a 401 Response on missing/invalid session;
+  // React Router auto-forwards thrown Responses as the HTTP response.
+  const user = await requireUserJson(request);
 
   try {
     const body = await request.json();
@@ -15,7 +22,7 @@ export async function action({ request }: { request: Request }) {
       });
     }
 
-    console.log(`💬 v1 API: Proxying message: ${message}`);
+    console.log(`💬 v1 API: Proxying message from ${user.email}: ${message}`);
 
     // Get AI Agent API URL from environment
     const aiAgentUrl = process.env.VITE_AI_AGENT_API_URL || 'http://localhost:8001';
@@ -25,6 +32,7 @@ export async function action({ request }: { request: Request }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAgentAuthHeaders(user.email),
       },
       body: JSON.stringify({ message: message.trim() }),
     });

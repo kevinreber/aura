@@ -1,6 +1,7 @@
 """Flask API for the AI agent - provides web endpoints for all agent functionality."""
 
 import asyncio
+import hmac
 import uuid
 import time
 from datetime import datetime
@@ -89,9 +90,21 @@ def create_app(testing: bool = False) -> Flask:
 
     # ==================== Middleware ====================
 
+    # Endpoints reachable without auth even when INTERNAL_AUTH_SECRET is set.
+    # Health/version/docs need to stay open so Docker healthchecks, the UI
+    # loader, and ops tools can probe the service. Everything else (chat,
+    # briefing, tool endpoints) requires the shared secret + allowlisted email.
+    PUBLIC_PATH_PREFIXES = (
+        "/health",
+        "/version",
+        "/docs",
+        "/apispec_1.json",
+        "/flasgger_static",
+    )
+
     @app.before_request
     def before_request():
-        """Add request ID and start timing for each request."""
+        """Add request ID, enforce auth, and start timing for each request."""
         # Generate or use existing request ID
         g.request_id = request.headers.get(REQUEST_ID_HEADER, str(uuid.uuid4()))
         g.start_time = time.time()
@@ -101,6 +114,45 @@ def create_app(testing: bool = False) -> Flask:
             f"[{g.request_id}] {request.method} {request.path} "
             f"- Client: {request.remote_addr}"
         )
+
+        # Defense-in-depth auth check. The UI proxy verifies the user's Google
+        # identity, then attests it to us via X-Internal-Auth + X-User-Email.
+        # If INTERNAL_AUTH_SECRET is unset we skip — useful for local dev with
+        # the UI bypassed. In production it should always be set.
+        if not settings.auth_enabled:
+            return None
+
+        path = request.path or ""
+        if request.method == "OPTIONS" or any(
+            path.startswith(prefix) for prefix in PUBLIC_PATH_PREFIXES
+        ):
+            return None
+
+        provided_secret = request.headers.get("X-Internal-Auth", "")
+        # Constant-time comparison to avoid timing attacks.
+        if not hmac.compare_digest(provided_secret, settings.internal_auth_secret or ""):
+            logger.warning(
+                f"[{g.request_id}] Rejecting {request.method} {path}: "
+                f"missing/invalid X-Internal-Auth"
+            )
+            return jsonify({
+                "error": "Unauthorized",
+                "request_id": g.request_id,
+            }), 401
+
+        user_email = (request.headers.get("X-User-Email") or "").strip().lower()
+        allowed = settings.allowed_emails
+        if not allowed or user_email not in allowed:
+            logger.warning(
+                f"[{g.request_id}] Rejecting {request.method} {path}: "
+                f"email '{user_email}' not in allowlist"
+            )
+            return jsonify({
+                "error": "Forbidden",
+                "request_id": g.request_id,
+            }), 403
+
+        g.user_email = user_email
 
     @app.after_request
     def after_request(response):

@@ -1,5 +1,6 @@
 import Dashboard from '../components/Dashboard';
-import { serverApiClient } from '../lib/api';
+import { ServerAIAgentAPI } from '../lib/api';
+import { requireUser } from '../lib/auth.server';
 import type { Route } from './+types/home';
 
 export function meta({}: Route.MetaArgs) {
@@ -12,24 +13,31 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
-  console.log('🔄 Server-side loader: Fetching dashboard data...');
+export async function loader({ request }: Route.LoaderArgs) {
+  const user = await requireUser(request);
+  const displayName = user.name?.split(' ')[0] || user.email;
+  console.log(`🔄 Server-side loader: Fetching dashboard data for ${user.email}...`);
+
+  // Per-request client that attests the authenticated user to the Agent.
+  const apiClient = new ServerAIAgentAPI(user.email);
 
   try {
     // Fetch all dashboard data on the server-side (no CORS issues!)
     const [weatherData, financialData, calendarData, todoData, commuteData] =
       await Promise.allSettled([
-        serverApiClient.getWeather('San Francisco'),
-        serverApiClient.getFinancialData(['MSFT', 'BTC', 'ETH', 'NVDA']),
-        serverApiClient.getCalendar(),
-        serverApiClient.getTodos(),
-        serverApiClient.getCommuteOptions('to_work'), // Add commute data
+        apiClient.getWeather('San Francisco'),
+        apiClient.getFinancialData(['MSFT', 'BTC', 'ETH', 'NVDA']),
+        apiClient.getCalendar(),
+        apiClient.getTodos(),
+        apiClient.getCommuteOptions('to_work'), // Add commute data
       ]);
 
     console.log('✅ Server-side loader: Dashboard data fetched successfully');
 
     return {
-      userName: 'Kevin',
+      userName: displayName,
+      userEmail: user.email,
+      userPicture: user.picture,
       lastUpdated: new Date().toISOString(),
       // Extract data from Promise.allSettled results
       weather: weatherData.status === 'fulfilled' ? weatherData.value : null,
@@ -51,7 +59,9 @@ export async function loader({ context }: Route.LoaderArgs) {
 
     // Return default data if server-side fetch fails
     return {
-      userName: 'Kevin',
+      userName: displayName,
+      userEmail: user.email,
+      userPicture: user.picture,
       lastUpdated: new Date().toISOString(),
       weather: null,
       financial: null,
@@ -73,6 +83,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <Dashboard
       userName={loaderData.userName}
+      userEmail={loaderData.userEmail}
+      userPicture={loaderData.userPicture}
       initialWeather={loaderData.weather}
       initialFinancial={loaderData.financial}
       initialCalendar={loaderData.calendar}

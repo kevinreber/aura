@@ -1,3 +1,6 @@
+// Public by design — used by uptime checks, Docker healthchecks, and
+// platform probes that can't carry a session cookie. Do NOT add an auth
+// gate here without also providing a probe-friendly bypass.
 export async function loader() {
   return new Response(
     JSON.stringify({
