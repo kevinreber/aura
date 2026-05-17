@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Aura** is a unified monorepo for a personal AI productivity platform. It combines three services into a full-stack application:
 
-- **Server** (MCP Server) - Python/FastAPI backend providing productivity tools via Model Context Protocol
-- **Agent** (AI Agent) - Python/LangChain orchestrator with conversational AI powered by GPT-4o-mini
-- **UI** (Web Frontend) - React Router v7 application with real-time dashboard and chat interface
+- **Server** (MCP Server) - Python/FastAPI backend providing productivity tools via Model Context Protocol. Weather, calendar CRUD, todos, commute intelligence, financial data, **weekend orchestrator** (trails / concerts / itineraries).
+- **Agent** (AI Agent) - Python/LangChain orchestrator with conversational AI powered by GPT-4o-mini. Wraps MCP tools as LangChain tools; exposes a Flask REST API.
+- **UI** (Web Frontend) - React Router v7 application with real-time dashboard, AI chat, weekend planner, and Google-OAuth login. The UI server is the **auth boundary** — browser fetches go through its `/api/v1/*` proxy routes, never directly to the Agent.
 
 ### Architecture
 
@@ -131,6 +131,13 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 SESSION_SECRET=...           # openssl rand -hex 32
 INTERNAL_AUTH_SECRET=...     # openssl rand -hex 32
+
+# Weekend Orchestrator (optional — falls back to JSON fixtures if unset)
+TICKETMASTER_API_KEY=...     # Concert listings via Discovery API
+# Google Maps key (above) doubles as the trails/POIs provider via Places API.
+
+# Path to weekend prefs JSON (production). Defaults to data/weekend_preferences.example.json
+WEEKEND_PREFS_PATH=/data/weekend_preferences.json
 ```
 
 ## Authentication
@@ -195,10 +202,13 @@ Development mode mounts source code for hot-reloading:
 
 ### Service Communication
 
-1. **UI → Agent**: HTTP requests to `/api/v1/*` endpoints
-2. **Agent → Server**: MCP protocol via SSE transport (`/mcp/sse`)
-3. **MCP Clients → Server**: Direct MCP/SSE connection for Claude Desktop, Cursor
-4. **Server → External APIs**: Direct HTTP calls with caching
+1. **Browser → UI server**: HTTP requests to `/api/v1/*` route handlers on the React Router server
+2. **UI server → Agent**: The proxy routes attach `X-Internal-Auth` + `X-User-Email` and forward to the Agent. The browser **never** holds these secrets.
+3. **Agent → Server**: MCP protocol via SSE transport (`/mcp/sse`)
+4. **MCP Clients → Server**: Direct MCP/SSE connection for Claude Desktop, Cursor
+5. **Server → External APIs**: Direct HTTP calls with caching
+
+The UI proxy routes are: `chat`, `chat/stream`, `health`, `preferences`, `commute-options`, `shuttle`, `todos`, `financial`. SSR loaders on `home.tsx` go server-to-server directly. Anything that polls (financial, etc.) **must** go through a proxy route — bare browser fetches to the Agent will 401.
 
 ### Data Flow Example
 
@@ -314,11 +324,18 @@ The monorepo uses separate git subtrees for packages that were previously indepe
 
 ## Deployment
 
-Currently configured for local development. Each package has deployment configurations:
+- **Server**: Fly.io (`aura-mcp-server`) — see `packages/server/fly.toml`
+- **Agent**: Fly.io (`aura-agent`) — see `packages/agent/fly.toml`
+- **UI**: Vercel — auto-deploys on push to `main`
 
-- **Server**: Railway.app (see `packages/server/README.md`)
-- **Agent**: Railway.app (see `packages/agent/README.md`)
-- **UI**: Vercel (see `packages/ui/README.md`)
+Both Fly apps deploy from the monorepo root (build context needs paths from `packages/*/`):
+
+```bash
+fly deploy --config packages/server/fly.toml --dockerfile docker/server.Dockerfile --app aura-mcp-server
+fly deploy --config packages/agent/fly.toml  --dockerfile docker/agent.Dockerfile  --app aura-agent
+```
+
+Set Fly secrets (per-app) for everything in the env-var section above. The Agent and Server share Redis via `REDIS_URL`.
 
 ## Troubleshooting
 

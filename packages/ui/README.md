@@ -1,346 +1,111 @@
-# 🖥️ Daily Agent UI
+# Aura UI
 
-A modern, interactive web interface for your **Daily AI Assistant**. Features real-time dashboards, conversational AI chat, and **lightning-fast data** through intelligent caching. Built with Remix (React Router) and Tailwind CSS for optimal performance and user experience.
+The web frontend for Aura — a real-time dashboard, conversational AI chat, weekend planner, and Google-OAuth login. Built with **React Router v7** (SSR), TypeScript, and Tailwind CSS, deployed to Vercel.
 
-## 🚀 **ENHANCED: Lightning-Fast Performance!**
+This package lives inside the [Aura monorepo](../../README.md). The UI server is the **auth boundary** for the system: all browser requests to the Agent go through `/api/v1/*` proxy routes here, which inject the shared-secret + verified-email headers before forwarding.
 
-✨ **NEW**: **Instant responses** with advanced caching - no more waiting for external APIs!
-
-### ⚡ **Performance Improvements**
-
-- 🔥 **60-90% faster loading** for weather, calendar, and financial data
-- 🚀 **Instant dashboard updates** for frequently requested data
-- 🛡️ **Zero rate limiting issues** - smooth user experience guaranteed
-- 📊 **Smart data freshness** - always up-to-date when it matters
-
-## ✨ Key Features
-
-### 🗣️ **Conversational AI Interface**
-
-- **✅ FIXED: Calendar Queries** - "What's on my calendar tomorrow?" now shows real events
-- **Natural Language Calendar Creation** - "Schedule lunch with John tomorrow at noon"
-- **🆕 Smart Time Finding** - "Find me 60 minutes free tomorrow afternoon" with AI-powered scheduling
-- **🆕 Multi-Day Scheduling** - "When can I schedule a 2-hour meeting this week?"
-- **Smart Conflict Warnings** - AI alerts you about overlapping meetings
-- **Context-Aware Conversations** - Remembers your preferences and history
-- **Slash Commands** - Quick access with `/weather`, `/calendar`, `/tasks`
-
-### 📊 **Live Data Dashboards** - Now with **Lightning Speed**
-
-- **📅 Calendar Widget** - ✅ **ENHANCED**: Instant loading from cache + real Google Calendar data
-- **🌤️ Weather Widget** - ⚡ **FASTER**: Cached forecasts with 30min freshness
-- **💰 Financial Widget** - 🚀 **OPTIMIZED**: Smart caching prevents rate limits, instant price updates
-- **✅ Todo Widget** - Task management with priority filtering
-- **🕐 Live Clock** - Personalized time display
-
-> **Performance Note**: Most dashboard data loads **instantly** thanks to intelligent caching while staying fresh and accurate!
-
-### 🎨 **Modern User Experience**
-
-- **Mobile-First Design** - Optimized for phone, tablet, and desktop
-- **Server-Side Rendering** - Fast initial page loads with SEO benefits
-- **Progressive Enhancement** - Works without JavaScript for reliability
-- **Smart Collapsing** - Widgets auto-hide on mobile for better UX
-- **Error Boundaries** - Graceful error handling and recovery
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- Running [Daily AI Agent](../daily-ai-agent/) at `http://localhost:8001`
-- Running [Daily MCP Server](../daily-mcp-server/) at `http://localhost:8000`
-
-### Installation
+## Quick Start
 
 ```bash
-# Clone and setup
-git clone <your-repo-url>
-cd daily-agent-ui
+cd packages/ui
 
-# Install dependencies
 npm install
-
-# Setup environment (optional - has good defaults)
-cp .env.example .env
-# Edit .env if you need custom API endpoints
-```
-
-### Development
-
-```bash
-# Start development server
 npm run dev
-
-# Your app will be available at http://localhost:3000
+# → http://localhost:5173
 ```
 
-### Production Build
+Or from the monorepo root: `make dev` runs everything in Docker.
+
+## Required environment variables
 
 ```bash
-# Create optimized production build
-npm run build
+# Backend
+AGENT_API_URL=http://localhost:8001       # where the Agent is reachable from the UI server
 
-# Preview production build
-npm run preview
+# Auth (Google OAuth — see root CLAUDE.md → Authentication)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+SESSION_SECRET=<openssl rand -hex 32>     # cookie signing
+INTERNAL_AUTH_SECRET=<openssl rand -hex 32>  # shared secret with Agent
+
+# Allowlist (comma-separated emails)
+ALLOWED_EMAILS=you@example.com
+
+# Optional
+ENVIRONMENT=development
 ```
 
-## 🌐 Live Demo
+`SESSION_SECRET` and `INTERNAL_AUTH_SECRET` are **required in production** — the app crashes on startup if either is missing in a production build.
 
-**Production URL**: https://daily-agent-ui.vercel.app
+## Routes
 
-- ✅ **Live Dashboard** - Real data from deployed services
-- 🗣️ **AI Chat** - Conversational interface with calendar creation
-- 📱 **Mobile Optimized** - Try it on your phone!
+| Path | Purpose |
+| --- | --- |
+| `/` | Dashboard (SSR-loaded data + chat) — requires login |
+| `/login` | Google OAuth sign-in |
+| `/auth/google` | Initiates OAuth consent |
+| `/auth/google/callback` | Exchanges code, sets session cookie |
+| `/auth/logout` | Clears the session |
+| `/api/v1/chat` (POST) | Proxies to Agent `/chat` with auth headers |
+| `/api/v1/chat/stream` (POST) | SSE streaming chat proxy |
+| `/api/v1/preferences` (GET/PUT) | Weekend orchestrator preferences proxy |
+| `/api/v1/todos` (GET) | Proxies to Agent `/tools/todos` |
+| `/api/v1/financial` (POST) | Proxies to Agent `/tools/financial` |
+| `/api/v1/commute-options` (POST) | Proxies to Agent `/tools/commute-options` |
+| `/api/v1/shuttle` (POST) | Proxies to Agent `/tools/shuttle` |
+| `/api/v1/health` (GET) | Liveness check |
 
-## 🧪 Try These Features
+Anything that polls (e.g. the financial widget) **must** go through these proxy routes — bare browser fetches to the Agent will 401.
 
-### 📅 **Calendar Event Creation Examples**
+## Key files
 
-In the chat interface, try these natural language commands:
+- `app/routes/home.tsx` — SSR loader fetches dashboard data via the server-side API client
+- `app/routes/login.tsx` — Aura-branded login screen
+- `app/components/Dashboard.tsx` — main dashboard layout, chat, slash commands
+- `app/components/WeekendPlannerWidget.tsx` — weekend itinerary preview
+- `app/components/WeekendSettings.tsx` — weekend preferences modal
+- `app/lib/api.ts` — `AIAgentAPI` (client, with mock fallback) and `ServerAIAgentAPI` (server, no fallback)
+- `app/lib/auth.server.ts` — Google OAuth flow + allowlist check
+- `app/lib/session.server.ts` — signed session cookie
+- `app/lib/agent-auth.server.ts` — header injection for the Agent
+- `app/lib/agent-proxy.server.ts` — shared proxy implementation used by the `/api/v1/*` routes
+
+## Slash commands
+
+In the chat, type `/help` to see all available commands. Highlights:
 
 ```
-Schedule lunch with John tomorrow at 1pm
-Book dentist appointment next Tuesday at 3pm
-Create team meeting Friday 2-3pm in Conference Room A
-Set up workout session this weekend
-```
-
-### 🔥 **Slash Commands**
-
-Quick access to specific features:
-
-```
-/summary    # Complete daily briefing
-/weather    # Current weather and forecast
-/finance    # Market updates and portfolio
+/summary    # Daily morning briefing
+/weather    # Current weather + forecast
+/finance    # Portfolio update
 /calendar   # Today's schedule
-/tasks      # Todo list and pending items
-/help       # Available commands
+/tasks      # Todo list
+/commute    # Traffic / transit
+/help       # All commands
 ```
 
-### 💬 **Conversational Queries**
-
-Natural language questions the AI can answer:
-
-```
-What's my day looking like?
-Should I wear a jacket today?
-How's Microsoft stock doing?
-Do I have any conflicts at 2pm?
-What's the weather like for my commute?
-```
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────┐    HTTP/API     ┌─────────────────────┐    HTTP/REST    ┌─────────────────────┐
-│   React Frontend    │ ──────────────> │    AI Agent         │ ──────────────> │    MCP Server       │
-│   (This Project)    │                 │   (Port 8001)       │                 │   (Port 8000)       │
-│                     │                 │                     │                 │                     │
-│ • Remix Framework   │                 │ • FastAPI Server    │                 │ • Flask Server      │
-│ • React Components  │                 │ • LangChain Agent   │                 │ • 6 Tools (5R+1W)   │
-│ • Dashboard Widgets │                 │ • GPT-4o-mini       │                 │ • Google Calendar    │
-│ • Chat Interface    │                 │ • Tool Orchestrator │                 │ • OpenWeatherMap    │
-│ • Server-Side Data  │                 │ • MCP Client        │                 │ • Financial APIs    │
-└─────────────────────┘                 └─────────────────────┘                 └─────────────────────┘
-```
-
-## 🔧 Development
-
-### Project Structure
-
-```
-daily-agent-ui/
-├── app/                          # Remix application code
-│   ├── components/              # Reusable UI components
-│   │   ├── Clock.tsx           # Live time display
-│   │   └── Dashboard.tsx       # Main dashboard layout
-│   ├── lib/                    # Utilities and API clients
-│   │   └── api.ts             # API client for backend services
-│   ├── routes/                 # Page routes and API endpoints
-│   │   ├── api.v1.chat.ts     # Chat API endpoint
-│   │   ├── api.v1.health.ts   # Health check endpoint
-│   │   └── home.tsx           # Main dashboard page
-│   ├── app.css               # Global styles and Tailwind
-│   ├── root.tsx              # Application root and layout
-│   └── routes.ts             # Route configuration
-├── public/                    # Static assets (favicons, logos)
-├── package.json              # Dependencies and scripts
-└── README.md                # This file
-```
-
-### Key Technologies
-
-- **Remix Framework** - Full-stack React with SSR
-- **React Router** - Client-side navigation and data loading
-- **TypeScript** - Type safety throughout the application
-- **Tailwind CSS** - Utility-first styling system
-- **Vite** - Build tool and development server
-
-### Adding New Features
-
-#### Adding a New Widget
-
-1. Create component in `app/components/`
-2. Add data fetching in `app/routes/home.tsx`
-3. Include in dashboard layout
-
-#### Adding New API Routes
-
-```typescript
-// app/routes/api.v1.new-feature.ts
-import type { ActionFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
-
-export async function action({ request }: ActionFunctionArgs) {
-  // Your API logic here
-  return json({ result: "success" });
-}
-```
-
-## 📊 Available Data
-
-### 🔄 **Real-Time Data Sources**
-
-- **Weather**: OpenWeatherMap API with current conditions
-- **Financial**: Alpha Vantage (stocks) + CoinGecko (crypto)
-- **Calendar**: Google Calendar API (Primary, Runna, Family)
-- **Commute**: Google Maps Directions API
-
-### 📅 **Calendar Operations**
-
-- **✅ Read Events** - Multi-calendar support
-- **✅ Create Events** - Through AI chat with conflict detection
-- **🔄 Update Events** - Coming in Phase 2
-- **🔄 Delete Events** - Coming in Phase 2
-
-## 🎯 **User Experience Features**
-
-### 📱 **Responsive Design**
-
-- **Mobile-First** - Optimized for smartphone usage
-- **Adaptive Layout** - Widgets reorganize based on screen size
-- **Touch-Friendly** - Large touch targets and gestures
-
-### ⚡ **Performance Optimizations**
-
-- **Server-Side Rendering** - Fast initial page loads
-- **Progressive Enhancement** - Core functionality without JavaScript
-- **Optimistic Updates** - Immediate UI feedback
-- **Error Recovery** - Graceful handling of network issues
-
-### 🎨 **Design System**
-
-- **Consistent Colors** - Cohesive color palette
-- **Typography Scale** - Readable text hierarchy
-- **Component Library** - Reusable UI elements
-- **Loading States** - Skeleton loading for better UX
-
-## 🔮 Roadmap
-
-### ✅ **Phase 1.5 Complete** (Interactive Calendar Creation)
-
-- [x] Conversational AI chat interface
-- [x] Calendar event creation through natural language
-- [x] Real-time dashboard widgets
-- [x] Mobile-responsive design
-- [x] Production deployment on Vercel
-- [x] Smart conflict detection in UI
-
-### 🔄 **Phase 2 In Progress** (Enhanced Interactions)
-
-- [ ] Calendar management UI (update/delete events)
-- [ ] Drag & drop calendar interface
-- [ ] Advanced theming (dark/light mode)
-- [ ] Voice input for hands-free interaction
-- [ ] Browser notifications for reminders
-
-### 🔮 **Future Phases** (Advanced Features)
-
-- [ ] Multi-user support with authentication
-- [ ] Customizable dashboard layouts
-- [ ] Real-time collaboration features
-- [ ] Progressive Web App capabilities
-- [ ] Team calendar coordination
-- [ ] Integration with Slack/Teams
-
-## 🚀 Deployment
-
-### **Production (Vercel)**
-
-This project is deployed on Vercel with automatic deployments:
-
-- **URL**: https://daily-agent-ui.vercel.app
-- **Auto-Deploy**: Pushes to `main` branch trigger deployment
-- **Environment**: Production environment variables configured in Vercel
-
-### **Local Development**
+## Scripts
 
 ```bash
-npm run dev     # Development server at http://localhost:3000
-npm run build   # Production build
-npm run preview # Preview production build locally
+npm run dev          # Vite dev server
+npm run build        # Production build
+npm start            # Serve the production build
+npm run typecheck    # TypeScript check
 ```
 
-### **Environment Variables**
-
-Create `.env` file (optional - has good defaults):
+## Tests
 
 ```bash
-# API Endpoints (defaults work for local development)
-AI_AGENT_URL=http://localhost:8001
-MCP_SERVER_URL=http://localhost:8000
-
-# Feature Flags
-ENABLE_CHAT=true
-ENABLE_DASHBOARD=true
+npm test             # Vitest suite (includes auth.server.test.ts)
 ```
 
-## 🧪 Testing
+## Deployment (Vercel)
 
-### Manual Testing Checklist
+Auto-deploys on push to `main`. Production URL: https://daily-agent-ui.vercel.app.
 
-#### 📱 **Mobile Testing**
+Environment variables must be set in the Vercel dashboard. `AGENT_API_URL` should point at the production Agent (`https://aura-agent.fly.dev`).
 
-- [ ] Dashboard loads quickly on mobile
-- [ ] Widgets collapse appropriately
-- [ ] Chat interface is touch-friendly
-- [ ] Text is readable without zooming
+## Related Docs
 
-#### 🗣️ **Chat Features**
-
-- [ ] Slash commands work (`/weather`, `/calendar`, etc.)
-- [ ] Calendar creation responds correctly
-- [ ] Error messages are helpful
-- [ ] Conversation history persists
-
-#### 📊 **Dashboard Widgets**
-
-- [ ] Weather data loads and displays correctly
-- [ ] Financial data shows current prices
-- [ ] Calendar events appear with proper formatting
-- [ ] Todo items load with priorities
-
-## 🤝 Related Projects
-
-- **[Daily MCP Server](../daily-mcp-server/)** - Backend API and tool server
-- **[Daily AI Agent](../daily-ai-agent/)** - AI orchestration and chat backend
-
-## 📄 License
-
-MIT License - feel free to use this code for your own projects!
-
----
-
-## 🎉 **What Makes This Special**
-
-This isn't just another React app - it's a **complete productivity interface** that:
-
-- 🤖 **Integrates AI seamlessly** - Natural language becomes actionable calendar events
-- 📊 **Shows live data** - Real APIs with real information you can use daily
-- 📱 **Works everywhere** - Phone, tablet, desktop with responsive design
-- ⚡ **Performs fast** - Server-side rendering and optimized loading
-- 🎯 **Solves real problems** - Actual productivity features you'll use
-
-**Happy productivity!** 🚀 This UI demonstrates modern React patterns with real-world AI integration.
+- [`CLAUDE.md`](./CLAUDE.md) — components, patterns, common tasks
+- Root [`CLAUDE.md`](../../CLAUDE.md) — auth flow, cross-service architecture
