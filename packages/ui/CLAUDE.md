@@ -136,7 +136,7 @@ npm start
 # .env file (copy from .env.example)
 
 # Backend
-AGENT_API_URL=http://localhost:8001          # Agent reachable from the UI server
+VITE_AI_AGENT_API_URL=http://localhost:8001  # Agent reachable from the UI server
 
 # Auth (Google OAuth — see root CLAUDE.md → Authentication)
 GOOGLE_CLIENT_ID=...
@@ -349,7 +349,7 @@ npm start  # Runs on http://localhost:3000
 
 ### Dashboard shows "Failed to load" errors
 - Check the Agent is running on port 8001
-- Check `AGENT_API_URL` env var
+- Check `VITE_AI_AGENT_API_URL` env var
 - Look at the server logs — `ServerAIAgentAPI` throws with detailed messages
 
 ### Chat not responding

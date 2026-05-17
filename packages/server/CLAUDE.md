@@ -17,7 +17,7 @@ The Aura MCP Server is a Model Context Protocol (MCP) server providing productiv
 ## Codebase Structure
 
 ```
-daily-mcp-server/
+packages/server/
 ├── mcp_server/                 # Main application package
 │   ├── app.py                  # FastAPI application with auto-generated Swagger docs
 │   ├── server.py               # MCP protocol implementation and tool registry
@@ -303,7 +303,7 @@ For production:
 {
   "mcpServers": {
     "aura": {
-      "url": "https://your-server.railway.app/mcp/sse"
+      "url": "https://aura-mcp-server.fly.dev/mcp/sse"
     }
   }
 }

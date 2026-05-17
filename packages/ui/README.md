@@ -20,7 +20,7 @@ Or from the monorepo root: `make dev` runs everything in Docker.
 
 ```bash
 # Backend
-AGENT_API_URL=http://localhost:8001       # where the Agent is reachable from the UI server
+VITE_AI_AGENT_API_URL=http://localhost:8001  # where the Agent is reachable from the UI server
 
 # Auth (Google OAuth — see root CLAUDE.md → Authentication)
 GOOGLE_CLIENT_ID=...
@@ -103,7 +103,7 @@ npm test             # Vitest suite (includes auth.server.test.ts)
 
 Auto-deploys on push to `main`. Production URL: https://daily-agent-ui.vercel.app.
 
-Environment variables must be set in the Vercel dashboard. `AGENT_API_URL` should point at the production Agent (`https://aura-agent.fly.dev`).
+Environment variables must be set in the Vercel dashboard. `VITE_AI_AGENT_API_URL` should point at the production Agent (`https://aura-agent.fly.dev`).
 
 ## Related Docs
 
