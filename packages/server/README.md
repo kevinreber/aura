@@ -1,10 +1,8 @@
-# Daily MCP Server 🌅
+# Aura MCP Server
 
-A high-performance Model Context Protocol (MCP) server providing comprehensive daily productivity tools for AI agents. Features **complete Calendar CRUD** operations, **intelligent commute intelligence**, **live traffic data**, and real-world API integrations. Built with Flask and Python for optimal performance and AI agent productivity.
+A Model Context Protocol (MCP) server providing the productivity tools used by the Aura agent and any other MCP-compatible client (Claude Desktop, Cursor, …). Built on FastAPI with SSE transport.
 
-## 🚀 **Latest Enhancement: Complete Commute Intelligence System!**
-
-✨ **NEW**: **Comprehensive traffic & transit integration** with real-time data and personalized routing!
+This package lives inside the [Aura monorepo](../../README.md); see the root `CLAUDE.md` for cross-service architecture.
 
 ### 🚗🚂 **Commute Intelligence Features**
 
@@ -24,16 +22,16 @@ A high-performance Model Context Protocol (MCP) server providing comprehensive d
 - ⏰ **Smart Timing**: Departure recommendations and transfer coordination
 - 🤖 **AI Comparisons**: "Drive 45min vs Transit 63min" intelligent suggestions
 
-### 🎯 **Key Features**
+### Key Features
 
-- ✅ **Complete Commute Intelligence** - Real traffic + transit integration 🆕
-- ✅ **Live GTFS Data** - Official Caltrain schedules with caching 🆕
-- ✅ **Personal Address Config** - Door-to-door routing accuracy 🆕
-- ✅ **Advanced Caching System** - Redis + in-memory fallback
-- ✅ **Complete Calendar CRUD** - Create, read, update, delete events
-- ✅ **Smart Time Finding** - AI-powered scheduling with conflict detection
-- ✅ **Real API Integrations** - Google Maps, Calendar, Weather, Financial APIs
-- ✅ **Production Ready** - Deployed on Railway with health monitoring
+- **Calendar CRUD** — create / list / update / delete events + `find_free_time` smart scheduling
+- **Commute Intelligence** — real-time traffic (Google Maps), live Caltrain GTFS, MV Connector shuttle schedules
+- **Todoist CRUD** — list / create / update / complete / delete todos
+- **Financial data** — Alpha Vantage + CoinGecko (stocks + crypto)
+- **Weather** — OpenWeatherMap with geocoding cache
+- **Weekend Orchestrator** — trails, concerts, and multi-day itineraries (Google Places + Ticketmaster Discovery; fixture fallback for offline dev)
+- **Caching** — Redis primary, in-memory fallback. TTLs tuned per data type
+- **Production deploy** — Fly.io (`aura-mcp-server`)
 
 ## 🛠️ Available Tools
 
@@ -250,34 +248,17 @@ Real-time stock and cryptocurrency market data.
 
 ### 1. Setup Environment
 
-**Option A: Using UV (Recommended - Much Faster!)**
-
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd daily-mcp-server
+cd packages/server
 
 # Install uv if you don't have it
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies (creates venv automatically)
 uv sync --dev
-
-# Activate the environment (optional - uv commands work without this)
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-**Option B: Traditional pip/venv**
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-```
+Or use the monorepo root: `make dev` runs everything in Docker.
 
 ### 2. Configure Environment
 
@@ -297,22 +278,12 @@ WORK_ADDRESS=456 Work Ave, Work City, State ZIP
 
 ### 3. Run the Server
 
-**With UV:**
-
 ```bash
-# Start development server
 uv run python run.py
-# Or use the script shortcut:
-uv run mcp-server
-
-# Server will start on http://localhost:8000
+# or: uv run mcp-server
 ```
 
-**Traditional:**
-
-```bash
-python run.py
-```
+Server starts at http://localhost:8000. Swagger UI at `/docs`. MCP SSE endpoint at `/mcp/sse`.
 
 ## 🧪 Testing the Tools
 
@@ -575,65 +546,50 @@ curl -X POST http://localhost:8000/tools/todo.delete \
 
 **Note**: The server works without API keys/addresses using mock data for development/testing.
 
-## 🏗️ Architecture
+## Architecture
 
-This repository contains **only the MCP server**. The complete morning routine system uses a multi-repository architecture:
+This package is one of three in the [Aura monorepo](../../README.md):
 
 ```
-┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
-│   Remix Frontend    │    │    AI Agent        │    │    MCP Server       │
-│  (morning-routine-  │    │ (morning-routine-   │    │ (daily-mcp-server)  │
-│       ui)           │    │      agent)         │    │    [THIS REPO]      │
-├─────────────────────┤    ├─────────────────────┤    ├─────────────────────┤
-│ • User Interface    │    │ • LangChain/LlamaIdx│    │ • Flask Server      │
-│ • Data Loading      │◄──►│ • OpenAI/Claude     │◄──►│ • 6 Tools (5R+1W)   │
-│ • Error Boundaries  │    │ • Tool Orchestration│    │ • External APIs     │
-│ • Remix Routes      │    │ • Optional BFF API  │    │ • Schema Validation │
-└─────────────────────┘    └─────────────────────┘    └─────────────────────┘
+UI (React Router v7)  ──HTTP──▶  Agent (LangChain)  ──MCP/SSE──▶  Server (this package)
+                                                                       │
+                                                                       ▼
+                                                              External APIs + Redis
 ```
 
-## 🚀 Deployment
+Direct MCP clients (Claude Desktop, Cursor) can connect to this server at `/mcp/sse` without going through the Agent.
 
-### Option 1: Railway.app (Recommended for Learning)
+## Deployment (Fly.io)
 
-1. Push code to GitHub
-2. Connect repository to [Railway](https://railway.app)
-3. Add environment variables in Railway dashboard
-4. Deploy automatically on push!
-
-### Option 2: Render.com (Free)
-
-1. Connect GitHub repository to [Render](https://render.com)
-2. Set up environment variables
-3. Deploy with zero configuration
-
-### Option 3: Local with Ngrok
+`fly.toml` is checked in. Deploy from the **monorepo root** (the build context needs paths from `packages/server/`):
 
 ```bash
-# Run server locally
-python run.py
-
-# In another terminal, expose to internet
-ngrok http 8000
+fly deploy --config packages/server/fly.toml \
+  --dockerfile docker/server.Dockerfile \
+  --app aura-mcp-server
 ```
+
+Set secrets with `fly secrets set KEY=value --app aura-mcp-server`. The app expects `REDIS_URL` to point at a shared Redis (Upstash, Fly Redis, etc.).
 
 ## 🧩 Development
 
 ### Project Structure
 
 ```
-daily-mcp-server/
-├── mcp_server/           # Main application package
-│   ├── tools/           # Individual MCP tools
-│   ├── schemas/         # Pydantic validation schemas
-│   ├── clients/         # API clients (Google Calendar, Caltrain GTFS) 🆕
-│   ├── utils/           # Shared utilities (caching, HTTP, shuttle data) 🆕
-│   ├── app.py          # Flask application factory
-│   └── config.py       # Configuration management
-├── tests/              # Test suite
-├── pyproject.toml      # Modern Python dependencies & config
-├── requirements.txt    # Legacy dependencies (still supported)
-└── run.py             # Development server entry point
+packages/server/
+├── mcp_server/          # Main application package
+│   ├── tools/           # Individual MCP tools (weather, calendar, mobility, todo, financial, weekend)
+│   ├── schemas/         # Pydantic input/output schemas
+│   ├── clients/         # External API clients (Google Calendar, Caltrain GTFS)
+│   ├── utils/           # Shared utilities (caching, HTTP, shuttle data)
+│   ├── app.py           # FastAPI application factory
+│   ├── server.py        # MCP tool registry + JSON-RPC handlers
+│   ├── mcp_sse.py       # SSE transport
+│   └── config.py        # Pydantic settings
+├── tests/               # Pytest suite (+ tests/fixtures/weekend/ for offline data)
+├── fly.toml             # Fly.io deploy config
+├── pyproject.toml       # Dependencies (uv)
+└── run.py               # Dev server entry point
 ```
 
 ### Running Tests
@@ -694,18 +650,15 @@ mypy mcp_server/
 | 💰 Financial            | ✅ **Live** | Alpha Vantage + CoinGecko       | Stocks + crypto prices                          |
 | ✅ Todo CRUD            | ✅ **Live** | **Todoist API Integration**     | **Complete task management with projects**      |
 
-## 🎯 **Current Capabilities**
+## Current Capabilities
 
-- ✅ **12 Tools Total** - All with real API integration 🆕
-- ✅ **Complete Commute Intelligence** - Real traffic + transit data 🆕
-- ✅ **Live GTFS Integration** - Official Caltrain schedules 🆕
-- ✅ **Personal Address Routing** - Door-to-door accuracy 🆕
-- ✅ **Multi-Modal Planning** - Drive vs transit comparisons 🆕
-- ✅ **Complete Calendar CRUD** - Create, read, update, delete events
-- ✅ **Complete Todo CRUD** - Full Todoist integration with project management 🆕
-- ✅ **Smart Time Finding** - AI-powered scheduling with conflict detection
-- ✅ **Multi-Calendar Support** - Primary, Runna, Family calendars
-- ✅ **Production Deployment** - Railway.app with auto-deployment
+- **~19 tools** spanning weather, calendar CRUD, mobility, todos, financial, and weekend orchestration
+- **Complete Commute Intelligence** — real traffic + Caltrain GTFS + MV Connector shuttles
+- **Calendar CRUD** — create, read, update, delete + `find_free_time`
+- **Todoist CRUD** — full task management with bucket → project mapping
+- **Weekend Orchestrator** — trails, concerts, multi-day itineraries with fixture fallback
+- **MCP protocol** — SSE transport for Claude Desktop / Cursor + the Aura agent
+- **Production deploy** — Fly.io (`aura-mcp-server`)
 
 ## 🔮 **Future Enhancements**
 
@@ -740,24 +693,9 @@ Visit `http://localhost:8000/docs` for comprehensive Swagger UI documentation wi
 - 📊 **Response Examples** - See real API responses
 - 🔍 **Schema Explorer** - Understand data structures
 
-## 🎉 **What Makes This Special**
+## Related Docs
 
-This isn't just another API - it's a **complete productivity assistant backend** with **real commute intelligence**:
-
-- 🤖 **AI Agent Ready** - Purpose-built for LLM integration
-- 🚗🚂 **Complete Commute Intelligence** - Real traffic + transit with AI recommendations 🆕
-- 🏠 **Personalized Routing** - Door-to-door accuracy with your addresses 🆕
-- 🔄 **Read + Write** - Both information retrieval AND action taking
-- 🧠 **Smart Features** - Conflict detection, multi-calendar support, commute planning
-- ⚡ **Real Integrations** - Google Maps, Caltrain GTFS, MV Connector, Calendar, Weather, Financial APIs
-- 📱 **Production Deployed** - Working system you can use daily
-- 🎯 **Personal Use** - Designed for individual productivity
-
-### 🚀 **Perfect for Morning Routine AI Agents**
-
-- _"How should I get to work?"_ → **43min driving (light traffic) vs 63min transit (next train 8:15 AM)**
-- _"When's my next meeting?"_ → **Team sync at 2 PM in Conference Room A**
-- _"What's the weather?"_ → **Partly cloudy, 72°F high, 20% rain chance**
-- _"When should I leave for my 9 AM meeting?"_ → **Leave at 8:05 AM (driving) or catch 7:44 AM train**
-
-**Happy coding!** 🚀 This MCP server demonstrates modern AI agent architecture with real-world integrations, commute intelligence, and write capabilities.
+- [`CLAUDE.md`](./CLAUDE.md) — architecture, conventions, common tasks for contributors
+- [`WEEKEND_ORCHESTRATOR_SPEC.md`](./WEEKEND_ORCHESTRATOR_SPEC.md) — design spec for the weekend feature
+- [`CACHING_GUIDE.md`](./CACHING_GUIDE.md) — Redis + in-memory cache details
+- [`GOOGLE_CALENDAR_SETUP.md`](./GOOGLE_CALENDAR_SETUP.md) — OAuth setup for Calendar API

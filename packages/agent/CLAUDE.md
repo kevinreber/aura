@@ -1,42 +1,44 @@
-# CLAUDE.md - AI Assistant Guide for daily-ai-agent
+# CLAUDE.md — AI Assistant Guide for the Aura Agent
 
-This document provides essential context for AI assistants working on this codebase.
+This document provides essential context for AI assistants working on the `packages/agent/` package inside the Aura monorepo.
 
 ## Project Overview
 
-**daily-ai-agent** is a production-ready Python AI agent that serves as a personal productivity assistant. It connects to an MCP (Model Context Protocol) server using the official MCP SDK with SSE transport to provide:
+The **Aura Agent** is a Python AI agent that powers the conversational chat in the UI. It connects to the MCP Server (sibling package `packages/server/`) via the official MCP SDK over SSE, and exposes a Flask REST API the UI proxies to. Capabilities:
 
-- Natural language conversations powered by LangChain + GPT-4o-mini
-- Weather forecasts, calendar management, todo tracking, commute intelligence
-- Financial market data (stocks and crypto)
-- AI-generated morning briefings
+- Natural-language chat powered by LangChain + GPT-4o-mini (with optional Anthropic fallback)
+- Weather, calendar CRUD (incl. travel-block insertion), todos (incl. create), commute intelligence, financial data
+- **Weekend Orchestrator** tools — trails, concerts, multi-day itineraries
+- AI-generated daily briefings
+- **Defense-in-depth auth** — verifies `X-Internal-Auth` + `X-User-Email` headers from the UI proxy
 
 The project has **two interfaces**:
-1. **CLI** (`daily-ai-agent`) - Typer-based terminal commands
-2. **REST API** (`daily-ai-agent-api`) - Flask server on port 8001
+1. **CLI** (`daily-ai-agent`) — Typer-based terminal commands (dev/testing)
+2. **REST API** (`daily-ai-agent-api`) — Flask server on port 8001 (what the UI talks to)
 
 ## Directory Structure
 
 ```
-daily-ai-agent/
+packages/agent/
 ├── src/daily_ai_agent/
-│   ├── __init__.py              # Package info (v0.1.0)
+│   ├── __init__.py              # Package info
 │   ├── main.py                  # CLI entry point (Typer)
-│   ├── api.py                   # Flask REST API (main implementation)
+│   ├── api.py                   # Flask REST API
 │   ├── api_server.py            # API server bootstrap
 │   ├── agent/
 │   │   ├── orchestrator.py      # LangChain agent + tool orchestration
-│   │   └── tools.py             # 10 LangChain tool implementations
+│   │   └── tools.py             # 17 LangChain tool implementations
 │   ├── services/
-│   │   ├── mcp_client.py        # Async HTTP client for MCP server
-│   │   └── llm.py               # OpenAI integration & briefing generation
+│   │   ├── mcp_client.py        # MCP SDK client (SSE transport)
+│   │   ├── llm.py               # OpenAI + Anthropic integrations, briefing generation
+│   │   └── preferences.py       # Weekend-orchestrator preferences (JSON file)
 │   └── models/
-│       └── config.py            # Pydantic settings (env-based config)
-├── pyproject.toml               # Project metadata, dependencies, entry points
+│       └── config.py            # Pydantic settings (env-based)
+├── tests/                       # Pytest suite (test_api, test_tools, test_preferences)
+├── pyproject.toml               # Project metadata + entry points
 ├── uv.lock                      # UV dependency lockfile
-├── .env.example                 # Environment variable template
-├── Procfile                     # Heroku/Railway process definition
-└── railway.json                 # Railway deployment config
+├── fly.toml                     # Fly.io deploy config
+└── .env.example                 # Environment variable template
 ```
 
 ## Key Files to Understand
@@ -92,11 +94,17 @@ uv run isort src/                  # Import sorting
 ## Required Environment Variables
 
 ```bash
-# Required for AI features
+# AI
 OPENAI_API_KEY=your_openai_api_key_here
+LLM_PROVIDER=openai                       # "openai" (default) or "anthropic"
+ANTHROPIC_API_KEY=your_anthropic_key      # only needed if LLM_PROVIDER=anthropic
 
-# MCP Server (default: http://localhost:8000)
-MCP_SERVER_URL=http://localhost:8000
+# MCP Server
+MCP_SERVER_URL=http://localhost:8000      # set to https://aura-mcp-server.fly.dev in prod
+
+# Auth (must match UI's INTERNAL_AUTH_SECRET + ALLOWED_EMAILS; see root CLAUDE.md)
+INTERNAL_AUTH_SECRET=<openssl rand -hex 32>
+ALLOWED_EMAILS=you@example.com
 
 # User preferences
 USER_NAME=Kevin
@@ -108,8 +116,15 @@ DEFAULT_COMMUTE_DESTINATION=Office
 HOST=0.0.0.0
 PORT=8001
 DEBUG=false
-ENVIRONMENT=development  # or production
+ENVIRONMENT=development                   # or production
+
+# Optional: LangSmith tracing
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls_...
+LANGCHAIN_PROJECT=aura
 ```
+
+**Local dev shortcut:** leave `INTERNAL_AUTH_SECRET` unset and the auth check is skipped entirely. The UI still enforces login. **Never deploy with it unset.**
 
 ## Code Patterns
 
@@ -211,16 +226,27 @@ settings = get_settings()  # Singleton pattern
 
 ## Available LangChain Tools
 
-1. **WeatherTool** - Get weather forecasts
-2. **CalendarTool** - Get single-date calendar events
-3. **CalendarRangeTool** - Get date-range calendar events
-4. **CalendarCreateTool** - Create calendar events with conflict detection
-5. **TodoTool** - Get todos from buckets
-6. **CommuteTool** - Basic commute between locations
-7. **CommuteOptionsTool** - Driving vs transit analysis
-8. **ShuttleTool** - MV Connector shuttle schedules
-9. **FinancialTool** - Stock/crypto prices
-10. **MorningBriefingTool** - Complete morning briefing
+Defined in `agent/tools.py`. The orchestrator registers all of them by default.
+
+| # | Tool class | Wraps MCP tool | Purpose |
+|---|---|---|---|
+| 1 | `WeatherTool` | `weather.get_daily` | Forecast for a location |
+| 2 | `CalendarTool` | `calendar.list_events` | Events for a single date |
+| 3 | `CalendarRangeTool` | `calendar.list_events_range` | Events for a date range |
+| 4 | `CalendarCreateTool` | `calendar.create_event` | Create event w/ conflict check |
+| 5 | `CalendarUpdateTool` | `calendar.update_event` | Update existing event |
+| 6 | `CalendarDeleteTool` | `calendar.delete_event` | Delete event |
+| 7 | `TodoTool` | `todo.list` | List todos (bucketed) |
+| 8 | `TodoCreateTool` | `todo.create` | Create todo |
+| 9 | `CommuteTool` | `mobility.get_commute` | Basic commute |
+| 10 | `CommuteOptionsTool` | `mobility.get_commute_options` | Drive vs transit comparison |
+| 11 | `ShuttleTool` | `mobility.get_shuttle_schedule` | MV Connector shuttle schedules |
+| 12 | `FinancialTool` | `financial.get_data` | Stock + crypto prices |
+| 13 | `MorningBriefingTool` | (orchestrated) | Composite daily briefing |
+| 14 | `CreateTravelBlockTool` | `calendar.create_event` | Deterministic travel-time blocks |
+| 15 | `TrailScoutTool` | `weekend.get_trails` | Weekend trail scouting |
+| 16 | `ConcertAlertTool` | `weekend.get_concerts` | Concert listings |
+| 17 | `ItineraryTool` | `weekend.generate_itinerary` | Multi-day weekend itinerary |
 
 ## Important Conventions
 
@@ -278,14 +304,14 @@ def new_command(param: str = typer.Option(...)):
 ## Deployment
 
 ### Production URLs
-- MCP Server: `https://web-production-66f9.up.railway.app`
-- AI Agent API: `https://web-production-f80730.up.railway.app`
+- MCP Server: `https://aura-mcp-server.fly.dev`
+- Agent API: `https://aura-agent.fly.dev`
 
-### Railway Deployment
-- Configured via `railway.json`
-- Uses NIXPACKS builder
-- Start command: `uv run daily-ai-agent-api`
-- Environment: Set in Railway dashboard
+### Fly.io Deployment
+- `fly.toml` lives in this package
+- Deploy from monorepo root: `fly deploy --config packages/agent/fly.toml --dockerfile docker/agent.Dockerfile --app aura-agent`
+- Secrets via `fly secrets set KEY=value --app aura-agent`
+- Health check at `/health` (Fly polls every 30s)
 
 ## Common Issues & Solutions
 

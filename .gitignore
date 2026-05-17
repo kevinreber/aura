@@ -14,3 +14,4 @@ credentials.json
 token.json
 data/weekend_preferences.json
 .claude/settings.local.json
+.claude/scheduled_tasks.lock

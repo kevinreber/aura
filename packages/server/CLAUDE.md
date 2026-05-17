@@ -4,19 +4,20 @@ This document provides essential context for AI assistants working on this codeb
 
 ## Project Overview
 
-Daily MCP Server is a Model Context Protocol (MCP) server providing productivity tools for AI agents. Built with FastAPI and Python 3.11+, it offers real-time integrations with external APIs for weather, calendar, todos, commute intelligence, and financial data.
+The Aura MCP Server is a Model Context Protocol (MCP) server providing productivity tools for AI agents. Built with FastAPI and Python 3.11+, it offers real-time integrations with external APIs for weather, calendar, todos, commute intelligence, financial data, and the **Weekend Orchestrator** (trails, concerts, full-day itineraries).
 
 **Key Characteristics:**
 - FastAPI server with native async support and auto-generated Swagger/OpenAPI docs
 - Official MCP protocol support via SSE transport (sse-starlette)
-- Real API integrations (Google Calendar, OpenWeatherMap, Google Maps, Todoist, Alpha Vantage)
+- Real API integrations (Google Calendar, OpenWeatherMap, Google Maps, Todoist, Alpha Vantage, Ticketmaster Discovery)
 - Intelligent caching with Redis primary and in-memory fallback
-- Production deployed on Railway.app
+- Mock/fixture fallback for weekend tools when API keys are missing (deterministic dev + tests)
+- Production deployed on Fly.io (`aura-mcp-server`)
 
 ## Codebase Structure
 
 ```
-daily-mcp-server/
+packages/server/
 ├── mcp_server/                 # Main application package
 │   ├── app.py                  # FastAPI application with auto-generated Swagger docs
 │   ├── server.py               # MCP protocol implementation and tool registry
@@ -28,13 +29,15 @@ daily-mcp-server/
 │   │   ├── calendar.py         # Google Calendar CRUD operations
 │   │   ├── mobility.py         # Google Maps + Caltrain + Shuttle integration
 │   │   ├── todo.py             # Todoist integration
-│   │   └── financial.py        # Alpha Vantage + CoinGecko integration
+│   │   ├── financial.py        # Alpha Vantage + CoinGecko integration
+│   │   └── weekend.py          # Weekend Orchestrator (trails, concerts, itineraries)
 │   ├── schemas/                # Pydantic input/output models
 │   │   ├── weather.py
 │   │   ├── calendar.py
 │   │   ├── mobility.py
 │   │   ├── todo.py
-│   │   └── financial.py
+│   │   ├── financial.py
+│   │   └── weekend.py
 │   ├── clients/                # External API clients
 │   │   ├── google_calendar.py  # Google Calendar API wrapper
 │   │   └── caltrain.py         # Caltrain GTFS data client
@@ -54,7 +57,7 @@ daily-mcp-server/
 
 ## Available Tools
 
-The server provides 15 tools organized by domain:
+The server provides ~19 tools organized by domain:
 
 | Tool | Type | Description |
 |------|------|-------------|
@@ -74,6 +77,9 @@ The server provides 15 tools organized by domain:
 | `todo.complete` | Write | Mark todo complete/incomplete |
 | `todo.delete` | Write | Delete todo |
 | `financial.get_data` | Read | Stock/crypto prices |
+| `weekend.get_trails` | Read | Scout hiking/biking trails near a location (Google Places + fixtures fallback) |
+| `weekend.get_concerts` | Read | Concert listings near a location (Ticketmaster Discovery + fixtures fallback) |
+| `weekend.generate_itinerary` | Read | Combine trails/POIs/concerts + weather into a multi-day itinerary |
 
 ## Development Commands
 
@@ -207,7 +213,11 @@ WORK_ADDRESS=full_work_address
 GOOGLE_CALENDAR_CREDENTIALS_PATH=./credentials.json
 TODOIST_API_KEY=your_todoist_key
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
+TICKETMASTER_API_KEY=your_ticketmaster_key   # weekend.get_concerts (falls back to fixtures)
 REDIS_URL=redis://localhost:6379
+
+# Weekend Orchestrator preferences (where the JSON config lives)
+WEEKEND_PREFS_PATH=/data/weekend_preferences.json
 ```
 
 Configuration is managed via Pydantic Settings in `mcp_server/config.py`.
@@ -257,9 +267,10 @@ curl -X POST http://localhost:8000/tools/calendar.list_events \
 - Use structured logging for debugging
 
 ### Deployment
-- Production on Railway.app with auto-deploy
-- Environment variables in Railway dashboard
-- Health check at `/health` for monitoring
+- Production on Fly.io as `aura-mcp-server` (`fly.toml` checked into this package)
+- Deploy from monorepo root: `fly deploy --config packages/server/fly.toml --dockerfile docker/server.Dockerfile --app aura-mcp-server`
+- Secrets via `fly secrets set` (per app)
+- Health check at `/health` for monitoring (Fly's HTTP service checks every 30s)
 
 ## MCP Protocol Support
 
@@ -292,7 +303,7 @@ For production:
 {
   "mcpServers": {
     "aura": {
-      "url": "https://your-server.railway.app/mcp/sse"
+      "url": "https://aura-mcp-server.fly.dev/mcp/sse"
     }
   }
 }
