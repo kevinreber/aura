@@ -81,7 +81,7 @@ export function HabitsWidget({ collapsed = false, onToggle }: HabitsWidgetProps)
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsed ? 'p-3' : 'p-4 sm:p-6'}`}
+      className={`group rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-200/40 backdrop-blur-sm transition-all hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none dark:hover:border-white/20 ${collapsed ? 'p-3' : 'p-4 sm:p-6'}`}
     >
       <div className={`flex items-center justify-between ${collapsed ? 'mb-0' : 'mb-4'}`}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">

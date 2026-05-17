@@ -96,7 +96,7 @@ export function CommuteDashboard({ className }: CommuteDashboardProps) {
   if (loading) {
     return (
       <div
-        className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 ${className || ''}`}
+        className={`rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-200/40 backdrop-blur-sm transition-all dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none p-4 sm:p-6 ${className || ''}`}
       >
         <div className="animate-pulse">
           <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
@@ -113,7 +113,7 @@ export function CommuteDashboard({ className }: CommuteDashboardProps) {
   if (error) {
     return (
       <div
-        className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 ${className || ''}`}
+        className={`rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-200/40 backdrop-blur-sm transition-all dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none p-4 sm:p-6 ${className || ''}`}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">🚗 Commute</h3>
@@ -131,7 +131,7 @@ export function CommuteDashboard({ className }: CommuteDashboardProps) {
 
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 ${className || ''}`}
+      className={`rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-200/40 backdrop-blur-sm transition-all dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none p-4 sm:p-6 ${className || ''}`}
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
