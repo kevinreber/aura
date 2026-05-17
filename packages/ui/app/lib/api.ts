@@ -311,9 +311,9 @@ export class AIAgentAPI {
       tool: 'calendar',
       data: {
         events: [
-          { title: 'Team Standup', time: '9:00 AM', color: 'blue' },
-          { title: 'Code Review', time: '2:00 PM', color: 'green' },
-          { title: 'Gym Session', time: '6:00 PM', color: 'orange' },
+          { title: 'Team Standup', start_time: '2026-01-01 09:00:00', color: 'blue' },
+          { title: 'Code Review', start_time: '2026-01-01 14:00:00', color: 'green' },
+          { title: 'Gym Session', start_time: '2026-01-01 18:00:00', color: 'orange' },
         ],
         total_events: 3,
       },
@@ -323,42 +323,12 @@ export class AIAgentAPI {
 
   private getMockTodos(bucket?: string): TodoData {
     const allTodos = [
-      {
-        id: '1',
-        text: 'Review quarterly reports',
-        completed: false,
-        priority: 'high',
-        bucket: 'work',
-      },
-      {
-        id: '2',
-        text: 'Update project timeline',
-        completed: false,
-        priority: 'medium',
-        bucket: 'work',
-      },
-      {
-        id: '3',
-        text: 'Call insurance company',
-        completed: false,
-        priority: 'low',
-        bucket: 'personal',
-      },
-      {
-        id: '4',
-        text: 'Book dentist appointment',
-        completed: false,
-        priority: 'low',
-        bucket: 'personal',
-      },
-      { id: '5', text: 'Grocery shopping', completed: false, priority: 'medium', bucket: 'home' },
-      {
-        id: '6',
-        text: 'Pick up dry cleaning',
-        completed: false,
-        priority: 'low',
-        bucket: 'errands',
-      },
+      { id: '1', title: 'Review quarterly reports', completed: false, priority: 'high', bucket: 'work' },
+      { id: '2', title: 'Update project timeline', completed: false, priority: 'medium', bucket: 'work' },
+      { id: '3', title: 'Call insurance company', completed: false, priority: 'low', bucket: 'personal' },
+      { id: '4', title: 'Book dentist appointment', completed: false, priority: 'low', bucket: 'personal' },
+      { id: '5', title: 'Grocery shopping', completed: false, priority: 'medium', bucket: 'home' },
+      { id: '6', title: 'Pick up dry cleaning', completed: false, priority: 'low', bucket: 'errands' },
     ];
 
     const items = bucket ? allTodos.filter((todo) => todo.bucket === bucket) : allTodos;
@@ -366,8 +336,10 @@ export class AIAgentAPI {
     return {
       tool: 'todos',
       data: {
-        items: items.map(({ bucket, ...item }) => item), // Remove bucket from items for compatibility
-        total_pending: items.filter((item) => !item.completed).length,
+        items,
+        pending_count: items.filter((item) => !item.completed).length,
+        total_items: items.length,
+        completed_count: items.filter((item) => item.completed).length,
         bucket: bucket || null,
       },
       timestamp: new Date().toISOString(),
@@ -521,8 +493,13 @@ export interface CalendarData {
   data: {
     events: Array<{
       title: string;
-      time: string;
-      color: string;
+      start_time: string;
+      end_time?: string;
+      all_day?: boolean;
+      location?: string;
+      description?: string;
+      calendar_source?: string;
+      color?: string;
     }>;
     total_events: number;
   };
@@ -534,12 +511,17 @@ export interface TodoData {
   data: {
     items: Array<{
       id: string;
-      text: string;
+      title: string;
       completed: boolean;
       priority: string;
+      bucket?: string;
+      tags?: string[];
+      due_date?: string;
     }>;
-    total_pending: number;
-    bucket?: string | null; // Added bucket field
+    pending_count: number;
+    total_items?: number;
+    completed_count?: number;
+    bucket?: string | null;
   };
   timestamp: string;
 }

@@ -123,6 +123,20 @@ interface DashboardProps {
   };
 }
 
+// Agent returns ISO-ish "YYYY-MM-DD HH:MM:SS" or all_day events. Format to "h:mm AM/PM"
+// for the dashboard widget without pulling in a date lib.
+function formatEventTime(event: { start_time?: string; all_day?: boolean }): string {
+  if (event.all_day) return 'All day';
+  if (!event.start_time) return '';
+  // Accept either "YYYY-MM-DD HH:MM:SS" or ISO 8601.
+  const isoish = event.start_time.includes('T')
+    ? event.start_time
+    : event.start_time.replace(' ', 'T');
+  const d = new Date(isoish);
+  if (Number.isNaN(d.getTime())) return event.start_time;
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 export default function Dashboard({
   userName = 'Kevin',
   userEmail,
@@ -998,7 +1012,7 @@ export default function Dashboard({
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {calendar?.data?.total_events
+                  {calendar?.data?.total_events !== undefined
                     ? `${calendar.data.total_events} events`
                     : 'Loading...'}
                 </span>
@@ -1047,13 +1061,13 @@ export default function Dashboard({
                       return (
                         <div
                           key={index}
-                          className={`border-l-2 ${colorMap[event.color] || 'border-gray-500'} pl-3`}
+                          className={`border-l-2 ${event.color ? colorMap[event.color] || 'border-gray-500' : 'border-gray-500'} pl-3`}
                         >
                           <div className="text-sm font-medium text-gray-900 dark:text-white">
                             {event.title}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {event.time}
+                            {formatEventTime(event)}
                           </div>
                         </div>
                       );
@@ -1075,17 +1089,17 @@ export default function Dashboard({
             >
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                 ✅ Tasks
-                {collapsedWidgets.todos && todos?.data?.total_pending !== undefined && (
+                {collapsedWidgets.todos && todos?.data?.pending_count !== undefined && (
                   <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
-                    {todos.data.total_pending} pending (
+                    {todos.data.pending_count} pending (
                     {selectedBucket === 'all' ? 'all' : selectedBucket})
                   </span>
                 )}
               </h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {todos?.data?.total_pending !== undefined
-                    ? `${todos.data.total_pending} pending (${selectedBucket === 'all' ? 'all' : selectedBucket})`
+                  {todos?.data?.pending_count !== undefined
+                    ? `${todos.data.pending_count} pending (${selectedBucket === 'all' ? 'all' : selectedBucket})`
                     : 'Loading...'}
                 </span>
                 <button
@@ -1167,7 +1181,7 @@ export default function Dashboard({
                           <span
                             className={`text-sm ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}
                           >
-                            {item.text}
+                            {item.title}
                           </span>
                           {item.priority === 'high' && (
                             <span className="text-xs text-red-500 font-medium">!</span>
