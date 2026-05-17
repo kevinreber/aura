@@ -71,6 +71,13 @@ class Settings(BaseSettings):
     user_location: str = "San Francisco"
     default_commute_origin: str = "Home"
     default_commute_destination: str = "Office"
+    # Full street address for per-event commute calculations. Sourced from
+    # the same HOME_ADDRESS env var the server reads — the briefing builder
+    # uses it as the origin for the first located event of the day.
+    home_address: str = ""
+    # Used to compute "tomorrow" in user-local time. Single-user app, so we
+    # default to PT; the agent server itself runs UTC in Docker.
+    user_timezone: str = "America/Los_Angeles"
 
     class Config:
         env_file = ".env"

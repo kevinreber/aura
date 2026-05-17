@@ -83,6 +83,7 @@ import {
   type FinancialData,
   type TodoBucket,
   type TodoData,
+  type TomorrowBriefing,
   type WeatherData,
 } from '../lib/api';
 import {
@@ -101,6 +102,7 @@ import { CommuteDashboard } from './CommuteDashboard';
 import { HabitsWidget } from './HabitsWidget';
 import { NotesWidget } from './NotesWidget';
 import { PomodoroWidget } from './PomodoroWidget';
+import { TomorrowBriefingWidget } from './TomorrowBriefingWidget';
 import { WeekendPlannerWidget } from './WeekendPlannerWidget';
 import { WeekendSettings } from './WeekendSettings';
 
@@ -149,12 +151,14 @@ interface DashboardProps {
   initialCalendar?: CalendarData | null;
   initialTodos?: TodoData | null;
   initialCommute?: CommuteOptionsData | null;
+  initialTomorrow?: TomorrowBriefing | null;
   serverErrors?: {
     weather?: string | null;
     financial?: string | null;
     calendar?: string | null;
     todos?: string | null;
     commute?: string | null;
+    tomorrow?: string | null;
   };
 }
 
@@ -181,6 +185,7 @@ export default function Dashboard({
   initialCalendar,
   initialTodos,
   initialCommute,
+  initialTomorrow,
   serverErrors,
 }: DashboardProps) {
   const [weather, setWeather] = useState<WeatherData | null>(initialWeather || null);
@@ -312,6 +317,7 @@ export default function Dashboard({
       weather: false,
       financial: isMobile,
       calendar: isMobile,
+      tomorrow: isMobile,
       todos: isMobile,
       notes: isMobile,
       habits: isMobile,
@@ -1378,6 +1384,23 @@ export default function Dashboard({
               </>
             )}
           </div>
+        </div>
+
+        {/* SECTION: Tomorrow Briefing — forward-looking prep with per-event commute */}
+        <SectionHeader
+          title="Tomorrow"
+          subtitle="Prep, commute, and weather at a glance"
+          tag="Forward"
+        />
+        <div className="mb-8">
+          <TomorrowBriefingWidget
+            briefing={initialTomorrow ?? null}
+            error={serverErrors?.tomorrow ?? null}
+            collapsed={collapsedWidgets.tomorrow}
+            onToggle={() =>
+              setCollapsedWidgets((prev) => ({ ...prev, tomorrow: !prev.tomorrow }))
+            }
+          />
         </div>
 
         {/* SECTION: Productivity Tools — Notes, Habits, Pomodoro */}

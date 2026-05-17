@@ -168,6 +168,14 @@ export class AIAgentAPI {
     }
   }
 
+  // Tomorrow briefing — structured, no LLM. UI passes its own local-tz date.
+  async getTomorrowBriefing(date?: string): Promise<TomorrowBriefingResponse> {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    const qs = params.toString() ? `?${params}` : '';
+    return await this.fetchAPI(`/briefing/tomorrow${qs}`);
+  }
+
   // Traffic/Commute methods
   async getBasicCommute(
     origin: string,
@@ -539,6 +547,56 @@ export interface BriefingData {
   timestamp: string;
 }
 
+// Tomorrow briefing — structured, deterministic. Returned by /briefing/tomorrow.
+export interface TomorrowEventCommute {
+  origin: string;
+  destination: string;
+  duration_minutes: number | null;
+  distance_miles: number | null;
+  traffic_status: string | null;
+  leave_by: string | null; // ISO timestamp
+}
+
+export interface TomorrowEvent {
+  id?: string;
+  title: string;
+  start_time: string;
+  end_time?: string;
+  all_day?: boolean;
+  location?: string;
+  description?: string;
+  commute: TomorrowEventCommute | null;
+}
+
+export interface TomorrowPrepTodo {
+  id: string;
+  title: string;
+  priority: string;
+  due_date?: string;
+}
+
+export interface TomorrowBriefing {
+  date: string; // YYYY-MM-DD
+  weather: {
+    location?: string;
+    summary?: string;
+    temp_hi?: number;
+    temp_lo?: number;
+    precip_chance?: number;
+  };
+  events: TomorrowEvent[];
+  prep_todos: TomorrowPrepTodo[];
+  flags: string[];
+  calendar_error: string | null;
+}
+
+export interface TomorrowBriefingResponse {
+  type: 'tomorrow';
+  briefing: TomorrowBriefing;
+  timestamp: string;
+  request_id?: string;
+}
+
 // Traffic/Commute data interfaces
 export interface BasicCommuteData {
   tool: string;
@@ -731,6 +789,14 @@ export class ServerAIAgentAPI {
       console.warn('Failed to send chat message:', error);
       throw error;
     }
+  }
+
+  // Tomorrow briefing — structured, no LLM. Server-side variant throws on error.
+  async getTomorrowBriefing(date?: string): Promise<TomorrowBriefingResponse> {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    const qs = params.toString() ? `?${params}` : '';
+    return await this.fetchAPI(`/briefing/tomorrow${qs}`);
   }
 
   // Traffic/Commute methods (server-side)

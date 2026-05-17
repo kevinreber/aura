@@ -15,6 +15,7 @@ from loguru import logger
 from typing import Dict, Any, Optional, AsyncIterator
 
 from .agent.orchestrator import AgentOrchestrator
+from .agent.briefing import build_tomorrow_briefing, resolve_tomorrow_date
 from .services.mcp_client import MCPClient
 from .models.config import get_settings
 from .utils.constants import (
@@ -507,6 +508,51 @@ def create_app(testing: bool = False) -> Flask:
 
         except Exception as e:
             logger.error(f"[{g.request_id}] Briefing error: {e}")
+            return jsonify({
+                "error": str(e),
+                "request_id": g.get('request_id', 'unknown'),
+            }), 500
+
+    @app.route('/briefing/tomorrow', methods=['GET'])
+    @limiter.limit("20 per minute")
+    async def briefing_tomorrow():
+        """Structured briefing for tomorrow.
+
+        Returns calendar events with per-event commute, weather, prep todos,
+        and flags. Deterministic — no LLM. Date defaults to user-local
+        tomorrow (via USER_TIMEZONE setting); UI can override with ?date=.
+        ---
+        tags:
+          - AI Features
+        parameters:
+          - name: date
+            in: query
+            type: string
+            required: false
+            description: "YYYY-MM-DD override. Defaults to user-local tomorrow."
+        responses:
+          200:
+            description: Tomorrow briefing
+        """
+        try:
+            date_override = request.args.get('date')
+            if date_override:
+                tomorrow_date = date_override
+            else:
+                tomorrow_date = resolve_tomorrow_date(settings.user_timezone)
+
+            logger.info(f"[{g.request_id}] Building tomorrow briefing for {tomorrow_date}")
+            briefing = await build_tomorrow_briefing(tomorrow_date, mcp_client)
+
+            return jsonify({
+                "type": "tomorrow",
+                "briefing": briefing,
+                "timestamp": datetime.now().isoformat(),
+                "request_id": g.get('request_id', 'unknown'),
+            })
+
+        except Exception as e:
+            logger.error(f"[{g.request_id}] Tomorrow briefing error: {e}")
             return jsonify({
                 "error": str(e),
                 "request_id": g.get('request_id', 'unknown'),
