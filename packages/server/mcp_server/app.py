@@ -7,7 +7,9 @@ This module provides a FastAPI-based REST API with:
 - Rate limiting and CORS support
 """
 
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -20,6 +22,36 @@ from slowapi.errors import RateLimitExceeded
 from .config import get_settings
 from .utils.logging import setup_logging, get_logger
 from .utils.cache import get_cache_service
+
+
+def _weekend_prefs_path() -> Path:
+    """Resolve the weekend preferences JSON path.
+
+    Resolution order:
+      1. WEEKEND_PREFS_PATH env var (recommended for prod — point at a
+         persistent volume mount).
+      2. Walk up from this file looking for data/weekend_preferences.json
+         (works in the local monorepo dev layout).
+      3. Fall back to data/weekend_preferences.json relative to cwd. The
+         file may not exist; callers handle FileNotFoundError to apply
+         defaults.
+
+    Bug history: previously hardcoded `parents[3]` for the dev layout,
+    which raised IndexError in Docker where the depth is shorter
+    (/app/mcp_server/app.py only has 3 parents). Mirror of the e528d83
+    fix already applied to the agent.
+    """
+    override = os.environ.get("WEEKEND_PREFS_PATH")
+    if override:
+        return Path(override)
+
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "data" / "weekend_preferences.json"
+        if candidate.exists():
+            return candidate
+
+    return Path.cwd() / "data" / "weekend_preferences.json"
 from .server import get_mcp_server
 from .mcp_sse import router as mcp_router
 from .schemas import (
@@ -421,13 +453,8 @@ def create_app() -> FastAPI:
         artists) when the file is missing or unparseable.
         """
         import json
-        from pathlib import Path
 
-        # Resolve data/ at the monorepo root (this file lives at
-        # packages/server/mcp_server/app.py so we walk up 3 levels).
-        prefs_path = (
-            Path(__file__).resolve().parents[3] / "data" / "weekend_preferences.json"
-        )
+        prefs_path = _weekend_prefs_path()
         defaults = {
             "enabled_categories": ["trails", "concerts", "itinerary"],
             "pinned_artists": [],
@@ -453,8 +480,6 @@ def create_app() -> FastAPI:
         write can never corrupt the prefs file.
         """
         import json
-        import os
-        from pathlib import Path
 
         # Allowed keys mirror the WeekendPreferences pydantic model in the
         # agent. We coerce to known fields to drop any unexpected keys
@@ -484,10 +509,8 @@ def create_app() -> FastAPI:
                     detail=f"Invalid category IDs: {invalid}. Valid: {sorted(VALID_CATEGORIES)}",
                 )
 
-        prefs_path = (
-            Path(__file__).resolve().parents[3] / "data" / "weekend_preferences.json"
-        )
-        prefs_path.parent.mkdir(exist_ok=True)
+        prefs_path = _weekend_prefs_path()
+        prefs_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Atomic write: stage to temp file, then rename. This is POSIX-atomic
         # so a process crash mid-write can't leave the file half-written.

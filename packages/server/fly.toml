@@ -1,0 +1,44 @@
+# fly.toml app configuration file for aura-mcp-server.
+#
+# Deploy from the monorepo root (build context needs packages/server/ paths):
+#
+#   fly deploy \
+#     --config packages/server/fly.toml \
+#     --dockerfile docker/server.Dockerfile \
+#     --app aura-mcp-server
+#
+# See https://fly.io/docs/reference/configuration/ for full options.
+
+app = 'aura-mcp-server'
+primary_region = 'sjc'
+
+[env]
+  DEBUG = 'false'
+  ENVIRONMENT = 'production'
+  HOST = '0.0.0.0'
+  LOG_LEVEL = 'WARNING'
+  PORT = '8000'
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = 'connections'
+    hard_limit = 25
+    soft_limit = 20
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
