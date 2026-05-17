@@ -17,5 +17,6 @@ export default [
   route('api/v1/commute-options', 'routes/api.v1.commute-options.ts'),
   route('api/v1/shuttle', 'routes/api.v1.shuttle.ts'),
   route('api/v1/todos', 'routes/api.v1.todos.ts'),
+  route('api/v1/financial', 'routes/api.v1.financial.ts'),
   route('api', 'routes/api._index.ts'),
 ] satisfies RouteConfig;

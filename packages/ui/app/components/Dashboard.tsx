@@ -182,14 +182,24 @@ export default function Dashboard({
   // Dark mode
   const { isDark, toggle: toggleDarkMode } = useDarkMode();
 
-  // Fetch financial data with caching
+  // Fetch financial data with caching. Goes through the UI proxy so the
+  // session cookie carries auth — direct browser→Agent calls can't attach
+  // the internal auth secret.
   const fetchFinancialData = useCallback(async () => {
-    // Check cache first (5 minute TTL for financial data)
     const cached = getCachedData<FinancialData>('financial');
     if (cached) return cached;
 
-    const data = await apiClient.getFinancialData();
-    setCachedData('financial', data, 5 * 60 * 1000); // 5 minutes
+    const resp = await fetch('/api/v1/financial', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbols: ['MSFT', 'BTC', 'ETH', 'NVDA'],
+        data_type: 'mixed',
+      }),
+    });
+    if (!resp.ok) throw new Error(`financial ${resp.status}`);
+    const data = (await resp.json()) as FinancialData;
+    setCachedData('financial', data, 5 * 60 * 1000);
     return data;
   }, []);
 
