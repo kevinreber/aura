@@ -14,5 +14,8 @@ export default [
   route('api/v1/chat/stream', 'routes/api.v1.chat.stream.ts'),
   route('api/v1/health', 'routes/api.v1.health.ts'),
   route('api/v1/preferences', 'routes/api.v1.preferences.ts'),
+  route('api/v1/commute-options', 'routes/api.v1.commute-options.ts'),
+  route('api/v1/shuttle', 'routes/api.v1.shuttle.ts'),
+  route('api/v1/todos', 'routes/api.v1.todos.ts'),
   route('api', 'routes/api._index.ts'),
 ] satisfies RouteConfig;

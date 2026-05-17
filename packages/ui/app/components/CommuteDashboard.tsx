@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import {
-  apiClient,
-  type BasicCommuteData,
-  type CommuteOptionsData,
-  type ShuttleScheduleData,
+import type {
+  BasicCommuteData,
+  CommuteOptionsData,
+  ShuttleScheduleData,
 } from '../lib/api';
 
 interface CommuteDashboardProps {
@@ -27,9 +26,19 @@ export function CommuteDashboard({ className }: CommuteDashboardProps) {
     setError(null);
 
     try {
-      // Fetch commute options
-      const commuteResult = await apiClient.getCommuteOptions(selectedDirection);
-      setCommuteData(commuteResult);
+      // Go through the UI proxy so the session cookie carries auth — the
+      // browser can't attach INTERNAL_AUTH_SECRET directly.
+      const commuteResp = await fetch('/api/v1/commute-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          direction: selectedDirection,
+          include_driving: true,
+          include_transit: true,
+        }),
+      });
+      if (!commuteResp.ok) throw new Error(`commute-options ${commuteResp.status}`);
+      setCommuteData((await commuteResp.json()) as CommuteOptionsData);
 
       // Fetch shuttle schedule (MV Caltrain to LinkedIn for morning, reverse for evening)
       const shuttleOrigin =
@@ -37,8 +46,13 @@ export function CommuteDashboard({ className }: CommuteDashboardProps) {
       const shuttleDestination =
         selectedDirection === 'to_work' ? 'linkedin_transit_center' : 'mountain_view_caltrain';
 
-      const shuttleResult = await apiClient.getShuttleSchedule(shuttleOrigin, shuttleDestination);
-      setShuttleData(shuttleResult);
+      const shuttleResp = await fetch('/api/v1/shuttle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ origin: shuttleOrigin, destination: shuttleDestination }),
+      });
+      if (!shuttleResp.ok) throw new Error(`shuttle ${shuttleResp.status}`);
+      setShuttleData((await shuttleResp.json()) as ShuttleScheduleData);
     } catch (err) {
       setError('Failed to load commute data');
       console.error('Error fetching commute data:', err);

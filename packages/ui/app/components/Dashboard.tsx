@@ -618,11 +618,18 @@ export default function Dashboard({
     selectedBucket,
   ]);
 
-  // Refresh todos when bucket selection changes
+  // Refresh todos when bucket selection changes. Goes through the UI proxy
+  // (cookie carries auth) — direct browser→Agent calls can't attach the
+  // internal auth secret.
   const refreshTodos = async (bucket: TodoBucket | 'all') => {
     try {
       setLoading(true);
-      const todoData = await apiClient.getTodos(bucket === 'all' ? undefined : bucket);
+      const url = bucket === 'all'
+        ? '/api/v1/todos'
+        : `/api/v1/todos?bucket=${encodeURIComponent(bucket)}`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`todos ${resp.status}`);
+      const todoData = (await resp.json()) as TodoData;
       setTodos(todoData);
     } catch (error) {
       console.error('Error refreshing todos:', error);
