@@ -66,6 +66,23 @@ wheels = [
 ]
 
 [[package]]
+name = "asyncresil"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/17/ea995fbb955505e2b9d1d0fc607cd59468a1d596ef3e7cb7aa6d2b43a6a1/asyncresil-0.1.0.tar.gz", hash = "sha256:c8d6fce9a8b937020aac2dccf2a8d554fbe8acc4aa97c5806420f5ff7da30fe6", size = 7682, upload-time = "2026-05-17T23:04:35.177Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/8a/0bf5515b49d5b738ddbc0ff6c649ad69730e11434d380eff8550c1a1b475/asyncresil-0.1.0-py3-none-any.whl", hash = "sha256:e9d8d2a9edd234bc584d533789d8b5871dabcd8e400044e48206a0a46213d091", size = 10201, upload-time = "2026-05-17T23:04:33.37Z" },
+]
+
+[package.optional-dependencies]
+redis = [
+    { name = "redis" },
+]
+
+[[package]]
 name = "attrs"
 version = "25.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -400,6 +417,7 @@ name = "daily-mcp-server"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "asyncresil", extra = ["redis"] },
     { name = "fastapi" },
     { name = "google-api-python-client" },
     { name = "google-auth-httplib2" },
@@ -435,6 +453,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "asyncresil", extras = ["redis"], specifier = ">=0.1.0" },
     { name = "black", marker = "extra == 'dev'", specifier = "==23.11.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = "==6.1.0" },

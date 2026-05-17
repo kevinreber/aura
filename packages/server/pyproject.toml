@@ -45,6 +45,9 @@ dependencies = [
     # Redis caching
     "redis[hiredis]==5.0.1",
 
+    # Async resilience primitives (extracted from this repo's mcp_server/utils/)
+    "asyncresil[redis]>=0.1.0",
+
     # HTTP requests
     "requests>=2.32.4",
 
