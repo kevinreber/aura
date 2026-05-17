@@ -104,6 +104,41 @@ import { PomodoroWidget } from './PomodoroWidget';
 import { WeekendPlannerWidget } from './WeekendPlannerWidget';
 import { WeekendSettings } from './WeekendSettings';
 
+// Shared card styling — refined glass-morphism look that adapts to light/dark.
+const CARD_BASE =
+  'group rounded-2xl border border-slate-200/70 bg-white/80 shadow-sm shadow-slate-200/40 backdrop-blur-sm transition-all hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none dark:hover:border-white/20';
+
+const CHEVRON_BTN =
+  'rounded-md p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-white';
+
+function SectionHeader({
+  title,
+  subtitle,
+  tag,
+}: {
+  title: string;
+  subtitle?: string;
+  tag?: string;
+}) {
+  return (
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="text-sm font-semibold tracking-wide text-slate-900 dark:text-white">
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+        )}
+      </div>
+      {tag && (
+        <span className="flex-shrink-0 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          {tag}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface DashboardProps {
   userName?: string;
   userEmail?: string;
@@ -740,142 +775,224 @@ export default function Dashboard({
     return 'Good evening';
   };
 
+  const allCollapsed = Object.values(collapsedWidgets).every((collapsed) => collapsed);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="relative min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      {/* Ambient gradient background */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-20 h-96 w-96 rounded-full bg-indigo-400/10 blur-3xl dark:bg-indigo-600/10" />
+        <div className="absolute top-1/2 -right-40 h-[28rem] w-[28rem] rounded-full bg-fuchsia-400/10 blur-3xl dark:bg-fuchsia-600/10" />
+        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-cyan-400/10 blur-3xl dark:bg-cyan-600/10" />
+      </div>
+
       {/* Header - Sticky and Mobile Optimized */}
-      <header className="sticky top-0 z-50 bg-white/90 dark:bg-gray-800/90 backdrop-blur-md border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4">
-          <div className="flex justify-between items-center">
-            <div className="min-w-0 flex-1 flex items-center space-x-2 sm:space-x-3">
-              <img
-                src="/logo_100x100_fullheight.png"
-                alt="Daily Agent Logo"
-                className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white truncate">
-                  <span className="hidden sm:inline">Daily Agent</span>
-                  <span className="sm:hidden">Daily Agent</span>
-                </h1>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 hidden sm:block">
-                  {getGreeting()}, {userName}! Here's your daily overview.
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-300 sm:hidden">
-                  {getGreeting()}, {userName}!
-                </p>
-              </div>
+      <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/70 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
+          {/* Brand */}
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 via-fuchsia-500 to-cyan-400 shadow-md shadow-indigo-500/30 sm:h-10 sm:w-10">
+              <span className="text-lg" aria-hidden="true">
+                ✨
+              </span>
+              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent" />
             </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <button
-                onClick={() => {
-                  const allCollapsed = Object.values(collapsedWidgets).every(
-                    (collapsed) => collapsed
-                  );
-                  setCollapsedWidgets({
-                    weather: !allCollapsed,
-                    financial: !allCollapsed,
-                    calendar: !allCollapsed,
-                    todos: !allCollapsed,
-                    notes: !allCollapsed,
-                    habits: !allCollapsed,
-                    pomodoro: !allCollapsed,
-                    chat: !allCollapsed,
-                  });
-                }}
-                className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-full transition-colors"
+            <div className="min-w-0">
+              <h1 className="text-base font-semibold tracking-tight text-slate-900 dark:text-white sm:text-lg">
+                Aura
+              </h1>
+              <p className="hidden text-xs text-slate-500 dark:text-slate-400 sm:block">
+                Your daily agent
+              </p>
+            </div>
+          </div>
+
+          {/* Clock (center on lg+) */}
+          <div className="hidden flex-1 justify-center lg:flex">
+            <Clock
+              userName={userName}
+              className="font-mono text-sm text-slate-600 dark:text-slate-300"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => {
+                setCollapsedWidgets({
+                  weather: !allCollapsed,
+                  financial: !allCollapsed,
+                  calendar: !allCollapsed,
+                  todos: !allCollapsed,
+                  notes: !allCollapsed,
+                  habits: !allCollapsed,
+                  pomodoro: !allCollapsed,
+                  weekendPlanner: !allCollapsed,
+                  chat: !allCollapsed,
+                });
+              }}
+              className="hidden items-center gap-1.5 rounded-full border border-slate-200 bg-white/60 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white sm:inline-flex"
+              title={allCollapsed ? 'Expand all widgets' : 'Collapse all widgets'}
+            >
+              <svg
+                className={`h-3.5 w-3.5 transition-transform ${allCollapsed ? '' : 'rotate-180'}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <span className="hidden sm:inline">
-                  {Object.values(collapsedWidgets).every((collapsed) => collapsed)
-                    ? 'Expand All'
-                    : 'Collapse All'}
-                </span>
-                <span className="sm:hidden">
-                  {Object.values(collapsedWidgets).every((collapsed) => collapsed) ? '↕️' : '⬇️'}
-                </span>
-              </button>
-              {/* Dark Mode Toggle */}
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+              {allCollapsed ? 'Expand all' : 'Collapse all'}
+            </button>
+
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="rounded-full border border-slate-200 bg-white/60 p-2 text-slate-600 transition-colors hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {isDark ? (
+                <svg className="h-4 w-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+              )}
+            </button>
+
+            {/* User menu / logout — POST form so a cross-origin <img src> can't drive-by log the user out. */}
+            <form method="post" action="/auth/logout" className="inline">
               <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
-                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+                type="submit"
+                title={userEmail ? `Sign out (${userEmail})` : 'Sign out'}
+                className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/60 p-1 text-xs font-medium text-slate-700 transition-colors hover:bg-white hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10 dark:hover:text-white sm:pr-3"
+                aria-label="Sign out"
               >
-                {isDark ? (
-                  <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                {userPicture ? (
+                  <img
+                    src={userPicture}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="h-7 w-7 rounded-full ring-2 ring-white dark:ring-slate-800"
+                  />
                 ) : (
-                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                  </svg>
+                  <span
+                    aria-hidden="true"
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-xs font-semibold text-white"
+                  >
+                    {(userName || '?').slice(0, 1).toUpperCase()}
+                  </span>
                 )}
+                <span className="hidden sm:inline">Sign out</span>
               </button>
-              <Clock userName={userName} className="font-mono" />
-              {/* User menu / logout — POST form so a cross-origin <img src> can't drive-by log the user out. */}
-              <form method="post" action="/auth/logout" className="inline">
-                <button
-                  type="submit"
-                  title={userEmail ? `Sign out (${userEmail})` : 'Sign out'}
-                  className="flex items-center gap-1.5 p-1 sm:px-2 sm:py-1 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs text-gray-700 dark:text-gray-300 transition-colors"
-                  aria-label="Sign out"
-                >
-                  {userPicture ? (
-                    <img
-                      src={userPicture}
-                      alt=""
-                      referrerPolicy="no-referrer"
-                      className="w-6 h-6 rounded-full"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-semibold"
-                    >
-                      {(userName || '?').slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  <span className="hidden sm:inline">Sign out</span>
-                </button>
-              </form>
-            </div>
+            </form>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4 pb-20">
-        {/* Dashboard Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mb-4">
+      <main className="relative mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+        {/* Hero welcome */}
+        <section className="mb-8 sm:mb-10">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                {new Date().toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+              <h2 className="mt-2 bg-gradient-to-br from-slate-900 via-slate-700 to-slate-900 bg-clip-text text-3xl font-bold tracking-tight text-transparent dark:from-white dark:via-slate-200 dark:to-white sm:text-4xl">
+                {getGreeting()}, {userName}.
+              </h2>
+              <p className="mt-2 max-w-xl text-sm text-slate-600 dark:text-slate-400 sm:text-base">
+                Here's everything that matters today — your calendar, tasks, markets, and weather,
+                all in one view. Ask the AI assistant anything below.
+              </p>
+            </div>
+
+            {/* Stat strip — quick at-a-glance metrics */}
+            <div className="grid w-full grid-cols-3 gap-2 sm:gap-3 lg:w-auto lg:flex-shrink-0">
+              <div className="rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2.5 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] sm:px-4 sm:py-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span aria-hidden="true">🌤️</span>
+                  <span>Weather</span>
+                </div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                  {weather ? `${weather.data.current_temp}°` : '—'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2.5 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] sm:px-4 sm:py-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span aria-hidden="true">📅</span>
+                  <span>Events</span>
+                </div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                  {calendar?.data?.total_events ?? '—'}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200/70 bg-white/60 px-3 py-2.5 backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] sm:px-4 sm:py-3">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span aria-hidden="true">✅</span>
+                  <span>Pending</span>
+                </div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 dark:text-white sm:text-xl">
+                  {todos?.data?.pending_count ?? '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION: At a Glance — Weather + Markets */}
+        <SectionHeader
+          title="At a Glance"
+          subtitle="Live data and ambient info"
+          tag="Info"
+        />
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {/* Weather Widget */}
           <div
-            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.weather ? 'p-3' : 'p-4 sm:p-6'}`}
+            className={`${CARD_BASE} ${collapsedWidgets.weather ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
               className={`flex items-center justify-between ${collapsedWidgets.weather ? 'mb-0' : 'mb-4'}`}
             >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                🌤️ Weather
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-100 text-base dark:bg-sky-500/20">
+                  🌤️
+                </span>
+                Weather
                 {collapsedWidgets.weather && weather && (
-                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                     {weather.data.current_temp}°F, {weather.data.condition}
                   </span>
                 )}
               </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
                   {weather?.data?.location || 'Loading...'}
                 </span>
                 <button
                   onClick={() => toggleWidget('weather')}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className={CHEVRON_BTN}
                   aria-label={collapsedWidgets.weather ? 'Expand weather' : 'Collapse weather'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.weather ? '' : 'rotate-180'}`}
+                    className={`h-4 w-4 text-slate-500 transition-transform ${collapsedWidgets.weather ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -895,24 +1012,25 @@ export default function Dashboard({
                 {loading ? (
                   <div className="space-y-3 animate-pulse">
                     <div className="flex items-center justify-between">
-                      <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                      <div className="h-10 bg-slate-200 dark:bg-white/10 rounded w-20"></div>
+                      <div className="h-4 bg-slate-200 dark:bg-white/10 rounded w-24"></div>
                     </div>
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                    <div className="h-3 bg-slate-200 dark:bg-white/10 rounded w-full"></div>
                   </div>
                 ) : weather ? (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="flex items-end justify-between">
+                      <span className="bg-gradient-to-br from-sky-500 to-indigo-500 bg-clip-text text-4xl font-bold text-transparent dark:from-sky-300 dark:to-indigo-300">
                         {weather.data.current_temp}°F
                       </span>
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                      <span className="text-sm text-slate-600 dark:text-slate-300">
                         {weather.data.condition}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      High: {weather.data.temp_hi}°F • Low: {weather.data.temp_lo}°F •
-                      Precipitation: {weather.data.precip_chance}%
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <span>↑ {weather.data.temp_hi}°F</span>
+                      <span>↓ {weather.data.temp_lo}°F</span>
+                      <span>💧 {weather.data.precip_chance}%</span>
                     </div>
                   </div>
                 ) : (
@@ -924,30 +1042,33 @@ export default function Dashboard({
 
           {/* Financial Widget */}
           <div
-            className={`col-span-1 md:col-span-2 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.financial ? 'p-3' : 'p-4 sm:p-6'}`}
+            className={`${CARD_BASE} ${collapsedWidgets.financial ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
               className={`flex items-center justify-between ${collapsedWidgets.financial ? 'mb-0' : 'mb-4'}`}
             >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                💰 Markets
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-base dark:bg-emerald-500/20">
+                  💰
+                </span>
+                Markets
                 {collapsedWidgets.financial && financial?.data?.data && (
-                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                     {financial.data.data.length} stocks
                   </span>
                 )}
               </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-white/5 dark:text-slate-400">
                   {financial?.data?.market_status || 'Loading...'}
                 </span>
                 <button
                   onClick={() => toggleWidget('financial')}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className={CHEVRON_BTN}
                   aria-label={collapsedWidgets.financial ? 'Expand markets' : 'Collapse markets'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.financial ? '' : 'rotate-180'}`}
+                    className={`h-4 w-4 transition-transform ${collapsedWidgets.financial ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -965,26 +1086,29 @@ export default function Dashboard({
             {!collapsedWidgets.financial && (
               <>
                 {loading ? (
-                  <div className="space-y-2 animate-pulse">
+                  <div className="space-y-2.5 animate-pulse">
                     {[1, 2, 3].map((i) => (
                       <div key={i} className="flex justify-between items-center">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+                        <div className="h-4 bg-slate-200 dark:bg-white/10 rounded w-12"></div>
                         <div className="text-right space-y-1">
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
-                          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-10"></div>
+                          <div className="h-4 bg-slate-200 dark:bg-white/10 rounded w-16"></div>
+                          <div className="h-3 bg-slate-200 dark:bg-white/10 rounded w-10"></div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : financial?.data?.data ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {financial.data.data.slice(0, 3).map((item) => (
-                      <div key={item.symbol} className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <div
+                        key={item.symbol}
+                        className="flex items-center justify-between rounded-lg px-1.5 py-1 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                      >
+                        <span className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-200">
                           {item.symbol}
                         </span>
-                        <div className="text-right">
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">
                             $
                             {item.price.toLocaleString(undefined, {
                               minimumFractionDigits:
@@ -994,12 +1118,14 @@ export default function Dashboard({
                             })}
                           </span>
                           <span
-                            className={`text-xs ml-2 ${
-                              item.change_percent >= 0 ? 'text-green-600' : 'text-red-600'
+                            className={`text-xs font-medium ${
+                              item.change_percent >= 0
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-rose-600 dark:text-rose-400'
                             }`}
                           >
-                            {item.change_percent >= 0 ? '+' : ''}
-                            {item.change_percent.toFixed(1)}%
+                            {item.change_percent >= 0 ? '▲' : '▼'}
+                            {Math.abs(item.change_percent).toFixed(1)}%
                           </span>
                         </div>
                       </div>
@@ -1011,35 +1137,46 @@ export default function Dashboard({
               </>
             )}
           </div>
+        </div>
 
+        {/* SECTION: Today's Focus — Calendar + Tasks */}
+        <SectionHeader
+          title="Today's Focus"
+          subtitle="What's on your plate right now"
+          tag="Actionable"
+        />
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {/* Calendar Widget */}
           <div
-            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.calendar ? 'p-3' : 'p-4 sm:p-6'}`}
+            className={`${CARD_BASE} ${collapsedWidgets.calendar ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
               className={`flex items-center justify-between ${collapsedWidgets.calendar ? 'mb-0' : 'mb-4'}`}
             >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                📅 Today
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-base dark:bg-violet-500/20">
+                  📅
+                </span>
+                Today
                 {collapsedWidgets.calendar && calendar?.data?.total_events !== undefined && (
-                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
                     {calendar.data.total_events} events
                   </span>
                 )}
               </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-white/5 dark:text-slate-400">
                   {calendar?.data?.total_events !== undefined
-                    ? `${calendar.data.total_events} events`
+                    ? `${calendar.data.total_events} event${calendar.data.total_events === 1 ? '' : 's'}`
                     : 'Loading...'}
                 </span>
                 <button
                   onClick={() => toggleWidget('calendar')}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className={CHEVRON_BTN}
                   aria-label={collapsedWidgets.calendar ? 'Expand calendar' : 'Collapse calendar'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.calendar ? '' : 'rotate-180'}`}
+                    className={`h-4 w-4 transition-transform ${collapsedWidgets.calendar ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1059,36 +1196,52 @@ export default function Dashboard({
                 {loading ? (
                   <div className="space-y-3 animate-pulse">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className="border-l-2 border-gray-300 pl-3">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-1"></div>
-                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                      <div key={i} className="border-l-2 border-slate-200 dark:border-white/10 pl-3">
+                        <div className="h-4 bg-slate-200 dark:bg-white/10 rounded w-24 mb-1"></div>
+                        <div className="h-3 bg-slate-200 dark:bg-white/10 rounded w-16"></div>
                       </div>
                     ))}
                   </div>
-                ) : calendar?.data?.events ? (
-                  <div className="space-y-3">
+                ) : calendar?.data?.events && calendar.data.events.length > 0 ? (
+                  <div className="space-y-2.5">
                     {calendar.data.events.map((event, index) => {
                       const colorMap: Record<string, string> = {
-                        blue: 'border-blue-500',
-                        green: 'border-green-500',
-                        orange: 'border-orange-500',
-                        red: 'border-red-500',
-                        purple: 'border-purple-500',
+                        blue: 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/5',
+                        green: 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-500/5',
+                        orange: 'border-orange-500 bg-orange-50/50 dark:bg-orange-500/5',
+                        red: 'border-rose-500 bg-rose-50/50 dark:bg-rose-500/5',
+                        purple: 'border-violet-500 bg-violet-50/50 dark:bg-violet-500/5',
                       };
+                      const colorClass = event.color
+                        ? colorMap[event.color] ||
+                          'border-slate-400 bg-slate-50/50 dark:bg-white/[0.02]'
+                        : 'border-slate-400 bg-slate-50/50 dark:bg-white/[0.02]';
                       return (
                         <div
                           key={index}
-                          className={`border-l-2 ${event.color ? colorMap[event.color] || 'border-gray-500' : 'border-gray-500'} pl-3`}
+                          className={`rounded-r-lg border-l-2 px-3 py-1.5 ${colorClass}`}
                         >
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          <div className="text-sm font-medium text-slate-900 dark:text-white">
                             {event.title}
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-slate-500 dark:text-slate-400">
                             {formatEventTime(event)}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                ) : calendar?.data ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <span className="text-3xl" aria-hidden="true">
+                      🎉
+                    </span>
+                    <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                      Nothing scheduled
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Your calendar is clear today.
+                    </p>
                   </div>
                 ) : (
                   <div className="text-sm text-red-500">Failed to load calendar data</div>
@@ -1099,33 +1252,35 @@ export default function Dashboard({
 
           {/* Todo Widget */}
           <div
-            className={`col-span-1 md:col-span-1 lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-all ${collapsedWidgets.todos ? 'p-3' : 'p-4 sm:p-6'}`}
+            className={`${CARD_BASE} ${collapsedWidgets.todos ? 'p-3' : 'p-4 sm:p-6'}`}
           >
             <div
               className={`flex items-center justify-between ${collapsedWidgets.todos ? 'mb-0' : 'mb-4'}`}
             >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                ✅ Tasks
+              <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-base dark:bg-emerald-500/20">
+                  ✅
+                </span>
+                Tasks
                 {collapsedWidgets.todos && todos?.data?.pending_count !== undefined && (
-                  <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
-                    {todos.data.pending_count} pending (
-                    {selectedBucket === 'all' ? 'all' : selectedBucket})
+                  <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
+                    {todos.data.pending_count} pending
                   </span>
                 )}
               </h2>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-white/5 dark:text-slate-400">
                   {todos?.data?.pending_count !== undefined
-                    ? `${todos.data.pending_count} pending (${selectedBucket === 'all' ? 'all' : selectedBucket})`
+                    ? `${todos.data.pending_count} pending`
                     : 'Loading...'}
                 </span>
                 <button
                   onClick={() => toggleWidget('todos')}
-                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  className={CHEVRON_BTN}
                   aria-label={collapsedWidgets.todos ? 'Expand tasks' : 'Collapse tasks'}
                 >
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${collapsedWidgets.todos ? '' : 'rotate-180'}`}
+                    className={`h-4 w-4 transition-transform ${collapsedWidgets.todos ? '' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1143,69 +1298,79 @@ export default function Dashboard({
             {!collapsedWidgets.todos && (
               <>
                 {/* Bucket Selector */}
-                <div className="mb-3 border-b border-gray-100 dark:border-gray-700 pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Bucket:
-                    </span>
+                <div className="mb-3 flex flex-wrap items-center gap-1.5 border-b border-slate-100 dark:border-white/10 pb-3">
+                  {(['all', 'work', 'home', 'errands', 'personal'] as const).map((bucket) => (
                     <button
-                      onClick={() => handleBucketChange('all')}
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                      key={bucket}
+                      onClick={() => handleBucketChange(bucket)}
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                        selectedBucket === bucket
+                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10'
+                      }`}
                     >
-                      Refresh
+                      {bucket === 'all'
+                        ? 'All'
+                        : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
                     </button>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1">
-                    {(['all', 'work', 'home', 'errands', 'personal'] as const).map((bucket) => (
-                      <button
-                        key={bucket}
-                        onClick={() => handleBucketChange(bucket)}
-                        className={`text-xs px-2 py-1 rounded-full transition-colors ${
-                          selectedBucket === bucket
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {bucket === 'all'
-                          ? 'All'
-                          : bucket.charAt(0).toUpperCase() + bucket.slice(1)}
-                      </button>
-                    ))}
-                  </div>
+                  ))}
+                  <button
+                    onClick={() => handleBucketChange('all')}
+                    className="ml-auto text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+                  >
+                    Refresh
+                  </button>
                 </div>
 
                 {loading ? (
                   <div className="space-y-2 animate-pulse">
                     {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="flex items-center space-x-2">
-                        <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded flex-1"></div>
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="h-4 w-4 bg-slate-200 dark:bg-white/10 rounded"></div>
+                        <div className="h-4 bg-slate-200 dark:bg-white/10 rounded flex-1"></div>
                       </div>
                     ))}
                   </div>
-                ) : todos?.data?.items ? (
-                  <div className="space-y-2">
+                ) : todos?.data?.items && todos.data.items.length > 0 ? (
+                  <div className="space-y-1">
                     {todos.data.items.slice(0, 4).map((item) => {
                       const isCompleted = todoCompletions[item.id] ?? item.completed;
                       return (
-                        <div key={item.id} className="flex items-center space-x-2">
+                        <label
+                          key={item.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                        >
                           <input
                             type="checkbox"
-                            className="rounded border-gray-300 cursor-pointer"
+                            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-white/20 dark:bg-white/5"
                             checked={isCompleted}
                             onChange={() => handleTodoToggle(item.id, isCompleted)}
                           />
                           <span
-                            className={`text-sm ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}
+                            className={`flex-1 text-sm ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}
                           >
                             {item.title}
                           </span>
                           {item.priority === 'high' && (
-                            <span className="text-xs text-red-500 font-medium">!</span>
+                            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-xs font-bold text-rose-700 dark:bg-rose-500/20 dark:text-rose-300">
+                              !
+                            </span>
                           )}
-                        </div>
+                        </label>
                       );
                     })}
+                  </div>
+                ) : todos?.data ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <span className="text-3xl" aria-hidden="true">
+                      ✨
+                    </span>
+                    <p className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                      All clear!
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      No pending tasks in this bucket.
+                    </p>
                   </div>
                 ) : (
                   <div className="text-sm text-red-500">Failed to load todo data</div>
@@ -1213,7 +1378,15 @@ export default function Dashboard({
               </>
             )}
           </div>
+        </div>
 
+        {/* SECTION: Productivity Tools — Notes, Habits, Pomodoro */}
+        <SectionHeader
+          title="Productivity Tools"
+          subtitle="Capture thoughts, build habits, focus deeply"
+          tag="Personal"
+        />
+        <div className="mb-8 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {/* Notes Widget */}
           <NotesWidget
             collapsed={collapsedWidgets.notes}
@@ -1231,7 +1404,15 @@ export default function Dashboard({
             collapsed={collapsedWidgets.pomodoro}
             onToggle={() => setCollapsedWidgets((prev) => ({ ...prev, pomodoro: !prev.pomodoro }))}
           />
+        </div>
 
+        {/* SECTION: Plan Your Weekend */}
+        <SectionHeader
+          title="Plan Your Weekend"
+          subtitle="Ideas powered by your interests"
+          tag="Inspire"
+        />
+        <div className="mb-8">
           {/* Weekend Planner — quick-prompt buttons that drop a message into chat.
               Settings opens as a modal via the gear icon in the header. */}
           <WeekendPlannerWidget
@@ -1251,7 +1432,12 @@ export default function Dashboard({
           />
         </div>
 
-        {/* Commute Dashboard - Full Width */}
+        {/* SECTION: Commute */}
+        <SectionHeader
+          title="Commute"
+          subtitle="Real-time traffic and transit options"
+          tag="Live"
+        />
         <div className="mb-6">
           <CommuteDashboard />
         </div>
@@ -1273,31 +1459,34 @@ export default function Dashboard({
         )}
 
         {/* AI Chat Interface - Bottom Anchored */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-2xl backdrop-blur-sm rounded-t-xl lg:rounded-t-none transition-all duration-300 ease-in-out">
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/70 bg-white/90 shadow-[0_-8px_32px_rgba(15,23,42,0.08)] backdrop-blur-xl transition-all duration-300 ease-in-out dark:border-white/10 dark:bg-slate-950/90 dark:shadow-[0_-8px_32px_rgba(0,0,0,0.5)] lg:rounded-t-none rounded-t-2xl">
           <div className="max-w-7xl mx-auto">
             <div
               className={`flex flex-col transition-all duration-300 ease-in-out ${collapsedWidgets.chat ? 'h-auto' : 'max-h-[calc(100vh-120px)] lg:max-h-[calc(100vh-200px)] min-h-[200px]'}`}
             >
               {/* Collapsible Header */}
               <div
-                className="p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
+                className="flex-shrink-0 cursor-pointer border-b border-slate-200/70 p-3 transition-colors duration-200 hover:bg-slate-50 dark:border-white/10 dark:hover:bg-white/[0.03]"
                 onClick={() => setCollapsedWidgets((prev) => ({ ...prev, chat: !prev.chat }))}
               >
                 {/* Mobile drag handle */}
                 <div className="flex justify-center mb-2 lg:hidden">
-                  <div className="w-8 h-1 bg-gray-300 dark:bg-gray-600 rounded-full transition-colors duration-200"></div>
+                  <div className="h-1 w-10 rounded-full bg-slate-300 dark:bg-white/20"></div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                    🤖 AI Assistant
+                  <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-xs shadow-sm shadow-indigo-500/30">
+                      🤖
+                    </span>
+                    AI Assistant
                     {/* Connection status indicator */}
                     <span
-                      className={`w-2 h-2 rounded-full ${
+                      className={`h-2 w-2 rounded-full ${
                         agentStatus === 'online'
-                          ? 'bg-green-500'
+                          ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
                           : agentStatus === 'offline'
-                            ? 'bg-red-500'
-                            : 'bg-yellow-500 animate-pulse'
+                            ? 'bg-rose-500'
+                            : 'animate-pulse bg-amber-500'
                       }`}
                       title={`Agent ${agentStatus}`}
                     />
@@ -1342,9 +1531,9 @@ export default function Dashboard({
                       key={index}
                       className={`${
                         message.type === 'user'
-                          ? 'ml-6 bg-blue-500 text-white'
-                          : 'mr-6 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                      } rounded-lg p-3 text-sm`}
+                          ? 'ml-6 bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/20'
+                          : 'mr-6 bg-slate-100 text-slate-900 dark:bg-white/[0.06] dark:text-slate-100'
+                      } rounded-2xl px-3.5 py-2.5 text-sm`}
                     >
                       {message.type === 'user' && message.message.startsWith('/') ? (
                         // Special rendering for slash commands
@@ -1356,7 +1545,7 @@ export default function Dashboard({
                             if (spaceIndex === -1) {
                               // Just the command, no additional text
                               return (
-                                <span className="font-bold text-yellow-200 bg-blue-700/50 px-1 rounded">
+                                <span className="rounded bg-white/20 px-1.5 py-0.5 font-mono font-semibold text-white">
                                   {messageText}
                                 </span>
                               );
@@ -1366,10 +1555,10 @@ export default function Dashboard({
                               const rest = messageText.substring(spaceIndex);
                               return (
                                 <>
-                                  <span className="font-bold text-yellow-200 bg-blue-700/50 px-1 rounded">
+                                  <span className="rounded bg-white/20 px-1.5 py-0.5 font-mono font-semibold text-white">
                                     {command}
                                   </span>
-                                  <span className="text-white/90">{rest}</span>
+                                  <span className="ml-1 text-white/90">{rest}</span>
                                 </>
                               );
                             }
@@ -1389,16 +1578,16 @@ export default function Dashboard({
 
                   {/* Streaming message or loading indicator */}
                   {isLoadingChat && (
-                    <div className="mr-6 bg-gray-100 dark:bg-gray-700 rounded-lg p-3 text-sm">
+                    <div className="mr-6 rounded-2xl bg-slate-100 px-3.5 py-2.5 text-sm dark:bg-white/[0.06]">
                       {/* Show active tools */}
                       {activeTools.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
                           {activeTools.map((tool) => (
                             <span
                               key={tool}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300"
                             >
-                              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
                               {tool.replace(/_/g, ' ')}
                             </span>
                           ))}
@@ -1511,7 +1700,7 @@ export default function Dashboard({
               </div>
 
               {/* Input Area - Always visible */}
-              <div className="relative border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+              <div className="relative border-t border-slate-200/70 bg-white/80 p-3 dark:border-white/10 dark:bg-slate-950/60">
                 {/* Command Suggestions - Floating above input */}
                 {showCommandSuggestions &&
                   chatMessage.startsWith('/') &&
@@ -1590,9 +1779,9 @@ export default function Dashboard({
                     }}
                     onKeyDown={handleKeyDown}
                     disabled={isLoadingChat}
-                    className={`flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:opacity-50 transition-all text-sm ${
+                    className={`flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-slate-500 ${
                       chatMessage.startsWith('/')
-                        ? 'text-blue-600 dark:text-blue-300 font-medium border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/20'
+                        ? 'border-indigo-300 bg-indigo-50/50 font-medium text-indigo-600 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200'
                         : ''
                     }`}
                     autoComplete="off"
@@ -1600,7 +1789,7 @@ export default function Dashboard({
                   <button
                     onClick={handleSendMessage}
                     disabled={isLoadingChat || !chatMessage.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-1 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-500/30 transition-all hover:shadow-lg hover:shadow-indigo-500/40 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
                   >
                     {isLoadingChat ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
