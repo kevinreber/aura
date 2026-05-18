@@ -20,6 +20,9 @@ loguru==0.7.2
 # Caching (optional)
 redis[hiredis]==5.0.1
 
+# Async resilience primitives (extracted from this repo's mcp_server/utils/)
+asyncresil[redis]>=0.1.0
+
 # External API integrations
 requests==2.31.0
 todoist-api-python==2.1.4
