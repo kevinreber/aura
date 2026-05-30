@@ -27,7 +27,9 @@ services:
       - ./packages/server/run.py:/app/run.py
       # Brain-vault bind-mount for dev. Override VAULT_HOST_PATH in .env if
       # your vault lives elsewhere. Read-only — vault tools never write.
-      - ${VAULT_HOST_PATH:-~/Projects/brain-vault}:/vault:ro
+      # NB: use ${HOME} not ~; docker-compose does not expand tildes inside
+      # the ${VAR:-default} fallback, but ${HOME} is shell-style and works.
+      - ${VAULT_HOST_PATH:-${HOME}/Projects/brain-vault}:/vault:ro
     depends_on:
       redis:
         condition: service_healthy

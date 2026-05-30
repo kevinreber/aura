@@ -152,7 +152,10 @@ class VaultTool:
                 # to the vault root (rg's cwd).
                 cmd.extend(["--ignore-file", ignore.name])
 
-            cmd.extend([input_data.query, relative_search])
+            # `--` separates flags from positional args so a query/folder
+            # starting with "-" (e.g. user searches for "-rf") doesn't
+            # get parsed as a flag.
+            cmd.extend(["--", input_data.query, relative_search])
 
             hits, truncated = await self._run_ripgrep(cmd, root, input_data.limit)
 
@@ -206,9 +209,10 @@ class VaultTool:
             err = stderr.decode("utf-8", errors="replace").strip()
             raise RuntimeError(f"ripgrep failed (exit {proc.returncode}): {err}")
 
-        # Parse all `match` events first; rg's stdout is small for our
-        # bounded queries, and decoupling parsing from the cap check keeps
-        # the truncation logic obvious.
+        # Parse `match` events, capped at a small multiple of `limit` so a
+        # pathological query (e.g. regex 'a' across the whole vault) can't
+        # balloon memory. We still parse `limit + 1` to detect truncation.
+        max_parsed = limit * 10 + 1
         match_events: List[dict] = []
         for raw_line in stdout.splitlines():
             try:
@@ -217,6 +221,8 @@ class VaultTool:
                 continue
             if event.get("type") == "match":
                 match_events.append(event)
+                if len(match_events) >= max_parsed:
+                    break
 
         hits: List[VaultSearchHit] = []
         for event in match_events[:limit]:

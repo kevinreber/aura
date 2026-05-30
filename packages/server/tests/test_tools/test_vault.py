@@ -98,6 +98,18 @@ class TestVaultSearch:
         assert result.total == 2
         assert result.truncated is True
 
+    @pytest.mark.asyncio
+    async def test_dash_prefixed_query_not_parsed_as_flag(self, vault_tool, fake_vault):
+        # If we forgot the `--` separator, rg would treat "-h" as `--help`
+        # and produce no JSON match events at all. With the separator, this
+        # is a literal search that should yield zero hits (no "-h" in vault)
+        # without raising.
+        (fake_vault / "dash.md").write_text("contains -h literally\n")
+        result = await vault_tool.search(VaultSearchInput(query="-h"))
+        # The literal token "-h" exists in dash.md, so we should find it.
+        paths = [hit.path for hit in result.hits]
+        assert "dash.md" in paths
+
 
 class TestVaultRead:
     @pytest.mark.asyncio
