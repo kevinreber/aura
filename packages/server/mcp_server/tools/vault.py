@@ -37,6 +37,9 @@ _CONTEXT_LINES = 2
 # Hard cap on file size for vault.read to avoid loading huge files into memory.
 _MAX_READ_BYTES = 1_000_000  # 1 MB
 
+# Wall-clock timeout for a single ripgrep invocation.
+_RIPGREP_TIMEOUT_SECS = 15.0
+
 # Heading detection regex (markdown ATX headings).
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
 
@@ -134,12 +137,12 @@ class VaultTool:
                 "--json",
                 "--context",
                 str(_CONTEXT_LINES),
-                "--max-count",
-                # rg --max-count is per-file. We over-fetch and trim globally.
-                str(max(input_data.limit, 5)),
                 "--type",
                 "md",
             ]
+            # We intentionally don't pass --max-count: it's per-file, which
+            # makes the truncation flag wrong when a single file has more
+            # matches than `limit`. Global trimming below is correct.
             if not input_data.regex:
                 cmd.append("--fixed-strings")
 
@@ -173,13 +176,30 @@ class VaultTool:
         self, cmd: List[str], root: Path, limit: int
     ) -> tuple[List[VaultSearchHit], bool]:
         """Execute ripgrep (in cwd=root) and parse its --json output."""
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(root),
-        )
-        stdout, stderr = await proc.communicate()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(root),
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "ripgrep (`rg`) is not installed in this environment. "
+                "Install it (e.g. `apt-get install ripgrep` or `brew install ripgrep`) "
+                "to use vault.search."
+            ) from exc
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=_RIPGREP_TIMEOUT_SECS
+            )
+        except asyncio.TimeoutError as exc:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(
+                f"vault.search timed out after {_RIPGREP_TIMEOUT_SECS}s"
+            ) from exc
 
         # rg exit codes: 0 = matches found, 1 = no matches, 2 = error.
         if proc.returncode not in (0, 1):

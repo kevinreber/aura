@@ -8,6 +8,7 @@ class VaultSearchInput(BaseModel):
     """Input schema for vault.search tool."""
 
     query: str = Field(
+        min_length=1,
         description="Search query (literal text by default, regex if regex=true)",
         examples=["aura roadmap", "weekend orchestrator"],
     )
@@ -75,6 +76,7 @@ class VaultReadInput(BaseModel):
     """Input schema for vault.read tool."""
 
     path: str = Field(
+        min_length=1,
         description="Vault-relative path to a markdown file",
         examples=["Projects/aura.md", "Career/interview-prep/index.md"],
     )

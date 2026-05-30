@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from mcp_server.config import Settings
 import mcp_server.tools.vault as vault_module
@@ -147,6 +148,22 @@ class TestVaultList:
     async def test_rejects_traversal(self, vault_tool):
         with pytest.raises(VaultPathError):
             await vault_tool.list(VaultListInput(folder="../etc"))
+
+
+class TestInputValidation:
+    def test_empty_query_rejected(self):
+        with pytest.raises(ValidationError):
+            VaultSearchInput(query="")
+
+    def test_empty_read_path_rejected(self):
+        with pytest.raises(ValidationError):
+            VaultReadInput(path="")
+
+    def test_search_limit_bounds_enforced(self):
+        with pytest.raises(ValidationError):
+            VaultSearchInput(query="x", limit=0)
+        with pytest.raises(ValidationError):
+            VaultSearchInput(query="x", limit=999)
 
 
 class TestVaultUnavailable:
