@@ -57,7 +57,7 @@ packages/server/
 
 ## Available Tools
 
-The server provides ~19 tools organized by domain:
+The server provides ~22 tools organized by domain:
 
 | Tool | Type | Description |
 |------|------|-------------|
@@ -80,6 +80,9 @@ The server provides ~19 tools organized by domain:
 | `weekend.get_trails` | Read | Scout hiking/biking trails near a location (Google Places + fixtures fallback) |
 | `weekend.get_concerts` | Read | Concert listings near a location (Ticketmaster Discovery + fixtures fallback) |
 | `weekend.generate_itinerary` | Read | Combine trails/POIs/concerts + weather into a multi-day itinerary |
+| `vault.search` | Read | Ripgrep-backed search across the brain-vault (`VAULT_ROOT`), with `.auraignore` support and folder scoping |
+| `vault.read` | Read | Read a single markdown file from the vault (1 MB cap, path-traversal guarded) |
+| `vault.list` | Read | List immediate children of a vault folder (one level deep, dotfiles hidden) |
 
 ## Development Commands
 
@@ -218,6 +221,9 @@ REDIS_URL=redis://localhost:6379
 
 # Weekend Orchestrator preferences (where the JSON config lives)
 WEEKEND_PREFS_PATH=/data/weekend_preferences.json
+
+# Brain-vault MCP tools (optional — tools degrade gracefully if unset)
+VAULT_ROOT=/vault                # In-container path where the vault is mounted
 ```
 
 Configuration is managed via Pydantic Settings in `mcp_server/config.py`.
