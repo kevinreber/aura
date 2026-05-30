@@ -6,6 +6,7 @@ from .calendar import CalendarTool
 from .todo import TodoTool
 from .financial import FinancialTool
 from .weekend import WeekendTools
+from .vault import VaultTool
 
 __all__ = [
     "WeatherTool",
@@ -14,4 +15,5 @@ __all__ = [
     "TodoTool",
     "FinancialTool",
     "WeekendTools",
+    "VaultTool",
 ]

@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 import json
 from datetime import datetime
 
-from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool, WeekendTools
+from .tools import WeatherTool, MobilityTool, CalendarTool, TodoTool, FinancialTool, WeekendTools, VaultTool
 from .schemas import (
     WeatherInput, WeatherOutput,
     MobilityInput, MobilityOutput, CommuteInput, CommuteOutput,
@@ -23,6 +23,9 @@ from .schemas import (
     TrailSearchInput, TrailSearchOutput,
     ConcertSearchInput, ConcertSearchOutput,
     ItineraryInput, ItineraryOutput,
+    VaultSearchInput, VaultSearchOutput,
+    VaultReadInput, VaultReadOutput,
+    VaultListInput, VaultListOutput,
 )
 from .utils.logging import get_logger
 
@@ -172,6 +175,27 @@ class MCPServer:
                 "output_schema": ItineraryOutput,
                 "description": "Generate a structured multi-day itinerary with points of interest and transit estimates",
                 "method": "generate_itinerary"
+            },
+            "vault.search": {
+                "tool": VaultTool(),
+                "input_schema": VaultSearchInput,
+                "output_schema": VaultSearchOutput,
+                "description": "Search Kevin's personal markdown vault (projects, career, meetings, decisions) by keyword or regex; returns ranked snippets with file paths and line numbers",
+                "method": "search"
+            },
+            "vault.read": {
+                "tool": VaultTool(),
+                "input_schema": VaultReadInput,
+                "output_schema": VaultReadOutput,
+                "description": "Read a single markdown file from Kevin's personal vault by vault-relative path (use vault.search first to discover paths)",
+                "method": "read"
+            },
+            "vault.list": {
+                "tool": VaultTool(),
+                "input_schema": VaultListInput,
+                "output_schema": VaultListOutput,
+                "description": "List immediate children of a folder in Kevin's vault (one level deep) — use to explore vault structure (e.g., list Projects/ to find a project note)",
+                "method": "list"
             }
         }
     
@@ -286,7 +310,7 @@ class MCPServer:
                 "sampling": False    # Not implemented yet
             },
             "tool_count": len(self.tools),
-            "supported_tool_types": ["weather", "mobility", "calendar", "todo", "financial"],
+            "supported_tool_types": ["weather", "mobility", "calendar", "todo", "financial", "weekend", "vault"],
             "created_at": datetime.now().isoformat()
         }
 

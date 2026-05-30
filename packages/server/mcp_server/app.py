@@ -62,6 +62,7 @@ from .schemas import (
     TodoInput, TodoCreateInput, TodoUpdateInput, TodoCompleteInput, TodoDeleteInput,
     FinancialInput,
     TrailSearchInput, ConcertSearchInput, ItineraryInput,
+    VaultSearchInput, VaultReadInput, VaultListInput,
 )
 
 # Initialize logger
@@ -607,6 +608,54 @@ def create_app() -> FastAPI:
             return result
         except Exception as e:
             logger.error(f"Error in weekend.generate_itinerary: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # ==================== Vault Endpoints ====================
+
+    @app.post("/tools/vault.search", response_model=None, tags=["Vault"])
+    async def vault_search(input_data: VaultSearchInput):
+        """Search Kevin's personal markdown vault.
+
+        Ripgrep-backed full-text search across the brain-vault. Returns ranked
+        snippets with vault-relative paths, line numbers, and the nearest
+        preceding markdown heading for orientation. Scope a search with `folder`
+        (e.g., 'Projects', 'Career') for faster, more focused results.
+        """
+        try:
+            result = await mcp_server.call_tool("vault.search", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in vault.search: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/tools/vault.read", response_model=None, tags=["Vault"])
+    async def vault_read(input_data: VaultReadInput):
+        """Read a single markdown file from Kevin's vault.
+
+        Returns the raw file contents. Use vault.search first to discover
+        the path, then vault.read to load the full note. Files larger than 1 MB
+        are rejected.
+        """
+        try:
+            result = await mcp_server.call_tool("vault.read", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in vault.read: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/tools/vault.list", response_model=None, tags=["Vault"])
+    async def vault_list(input_data: VaultListInput):
+        """List immediate children of a vault folder (one level deep).
+
+        Use to explore vault structure — e.g., list 'Projects' to find a project
+        note, or list with no folder to see top-level layout (Activity/, Career/,
+        Projects/, etc.). Dotfiles are hidden.
+        """
+        try:
+            result = await mcp_server.call_tool("vault.list", input_data.model_dump())
+            return result
+        except Exception as e:
+            logger.error(f"Error in vault.list: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Error Handlers ====================

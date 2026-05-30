@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     ticketmaster_api_key: Optional[str] = None  # Concert listings (Discovery API)
     outdooractive_api_key: Optional[str] = None  # Trail data (falls back to Google Places)
 
+    # Brain-vault integration (optional — when unset, vault tools return a
+    # "vault not configured" error rather than crashing the server).
+    vault_root: Optional[str] = None  # Filesystem path to the markdown vault root
+
     # Caching (optional)
     redis_url: Optional[str] = None
     cache_ttl: int = 300  # 5 minutes default

@@ -16,6 +16,11 @@ from .weekend import (
     Trail, ConcertEvent, POI, TransitEstimate,
     ActivityType, TrailDifficulty, TicketStatus, POICategory,
 )
+from .vault import (
+    VaultSearchInput, VaultSearchOutput, VaultSearchHit,
+    VaultReadInput, VaultReadOutput,
+    VaultListInput, VaultListOutput, VaultEntry,
+)
 
 __all__ = [
     "WeatherInput", "WeatherOutput",
@@ -30,4 +35,7 @@ __all__ = [
     "ItineraryInput", "ItineraryOutput",
     "Trail", "ConcertEvent", "POI", "TransitEstimate",
     "ActivityType", "TrailDifficulty", "TicketStatus", "POICategory",
+    "VaultSearchInput", "VaultSearchOutput", "VaultSearchHit",
+    "VaultReadInput", "VaultReadOutput",
+    "VaultListInput", "VaultListOutput", "VaultEntry",
 ]
