@@ -121,14 +121,12 @@ class VaultTool:
             # absolute search paths, ripgrep silently treats anchored
             # patterns as non-matching.
             if input_data.folder:
-                # Validate that the folder is inside the vault before we hand
-                # it to rg as a relative path.
-                self._resolve_within_vault(input_data.folder, root)
-                relative_search = input_data.folder
-                if not (root / input_data.folder).is_dir():
+                folder_abs = self._resolve_within_vault(input_data.folder, root)
+                if not folder_abs.is_dir():
                     raise VaultPathError(
                         f"Folder {input_data.folder!r} is not a directory."
                     )
+                relative_search = input_data.folder
             else:
                 relative_search = "."
 
@@ -252,8 +250,7 @@ class VaultTool:
             if line_no is None or not line_text:
                 continue
 
-            snippet = self._build_snippet(abs_path, line_no)
-            heading = self._preceding_heading(abs_path, line_no)
+            snippet, heading = self._extract_context(abs_path, line_no)
 
             hits.append(
                 VaultSearchHit(
@@ -267,30 +264,31 @@ class VaultTool:
         truncated = len(match_events) > limit
         return hits, truncated
 
-    def _build_snippet(self, file_path: Path, line_no: int) -> str:
-        """Read N lines of context around `line_no` from a file."""
+    def _extract_context(self, file_path: Path, line_no: int) -> tuple[str, Optional[str]]:
+        """Read the file once and return (snippet, preceding_heading) for `line_no`.
+
+        Consolidates the two pieces of per-hit metadata so we only hit the
+        disk once per match, even when many hits share a file.
+        """
         try:
             with file_path.open("r", encoding="utf-8", errors="replace") as fh:
                 lines = fh.readlines()
-        except OSError:
-            return ""
+        except OSError as exc:
+            logger.warning(f"vault: could not read {file_path} for context: {exc}")
+            return "", None
+
         start = max(0, line_no - 1 - _CONTEXT_LINES)
         end = min(len(lines), line_no + _CONTEXT_LINES)
-        return "".join(lines[start:end]).rstrip("\n")
+        snippet = "".join(lines[start:end]).rstrip("\n")
 
-    def _preceding_heading(self, file_path: Path, line_no: int) -> Optional[str]:
-        """Find the nearest markdown heading at or before `line_no`."""
-        try:
-            with file_path.open("r", encoding="utf-8", errors="replace") as fh:
-                lines = fh.readlines()
-        except OSError:
-            return None
-        # Walk upward from the match.
+        heading: Optional[str] = None
         for i in range(min(line_no, len(lines)) - 1, -1, -1):
             match = _HEADING_RE.match(lines[i].rstrip("\n"))
             if match:
-                return match.group(2).strip()
-        return None
+                heading = match.group(2).strip()
+                break
+
+        return snippet, heading
 
     # ---------------------------------------------------------------- read
 
