@@ -278,6 +278,30 @@ class MCPClient:
             params["departure_time"] = departure_time
         return await self.call_tool("mobility_get_shuttle_schedule", params)
 
+    async def vault_search(
+        self,
+        query: str,
+        folder: Optional[str] = None,
+        limit: int = 10,
+        regex: bool = False,
+    ) -> Dict[str, Any]:
+        """Ripgrep-backed search across Kevin's brain-vault."""
+        params: Dict[str, Any] = {"query": query, "limit": limit, "regex": regex}
+        if folder:
+            params["folder"] = folder
+        return await self.call_tool("vault_search", params)
+
+    async def vault_read(self, path: str) -> Dict[str, Any]:
+        """Read a single markdown file from the vault."""
+        return await self.call_tool("vault_read", {"path": path})
+
+    async def vault_list(self, folder: Optional[str] = None) -> Dict[str, Any]:
+        """List immediate children of a vault folder (or the root if folder is None)."""
+        params: Dict[str, Any] = {}
+        if folder:
+            params["folder"] = folder
+        return await self.call_tool("vault_list", params)
+
     async def get_all_morning_data(self, date: str) -> Dict[str, Any]:
         """Get all morning routine data in parallel for speed."""
         settings = get_settings()

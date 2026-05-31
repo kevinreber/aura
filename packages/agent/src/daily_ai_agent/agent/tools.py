@@ -142,6 +142,37 @@ class WeekendItineraryInput(BaseModel):
     base_location: Optional[str] = Field(default=None, description="Hotel/Airbnb address — used to compute drive-time estimates between POIs")
 
 
+class VaultSearchInput(BaseModel):
+    """Input schema for the brain-vault search tool."""
+    query: str = Field(description="Keyword or phrase to search for in Kevin's personal notes")
+    folder: Optional[str] = Field(
+        default=None,
+        description=(
+            "Vault folder to scope the search. Common values: 'Projects', 'Career', "
+            "'Activity', 'Meetings', 'Backlog', 'Concepts'. Omit to search everything."
+        ),
+    )
+    limit: int = Field(default=8, description="Max number of hits to return (1-25)")
+
+
+class VaultReadInput(BaseModel):
+    """Input schema for the brain-vault read tool."""
+    path: str = Field(
+        description=(
+            "Vault-relative path to a markdown file, e.g. 'Projects/aura.md' or "
+            "'Career/interview-prep/index.md'. Get this from search_vault hits."
+        )
+    )
+
+
+class VaultListInput(BaseModel):
+    """Input schema for the brain-vault list tool."""
+    folder: Optional[str] = Field(
+        default=None,
+        description="Vault folder to list. Omit to list the top-level structure.",
+    )
+
+
 class WeatherTool(BaseTool):
     """Tool to get weather forecasts."""
     
@@ -1175,6 +1206,117 @@ class ItineraryTool(BaseTool):
         return asyncio.run(self._arun(destination, duration_days, interests, base_location))
 
 
+class VaultSearchTool(BaseTool):
+    """Search Kevin's personal markdown vault (projects, career, meetings, decisions)."""
+
+    name: str = "vault_search"
+    description: str = (
+        "Search Kevin's personal knowledge base (his 'brain-vault' — markdown notes "
+        "covering his projects, career history, past meetings, decisions, and ideas). "
+        "Use this whenever the user asks about: 'my projects' / 'project X status', "
+        "career or interview prep, meetings, people they've worked with, past decisions, "
+        "or their backlog. Returns a ranked list of hits with file paths, line numbers, "
+        "and the nearest preceding markdown heading for orientation. After searching, "
+        "use vault_read on the most relevant path to load the full note."
+    )
+    args_schema: Type[BaseModel] = VaultSearchInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(
+        self, query: str, folder: Optional[str] = None, limit: int = 8
+    ) -> str:
+        try:
+            client = self._get_mcp_client()
+            data = await client.vault_search(query=query, folder=folder, limit=limit)
+            hits = data.get("hits", [])
+            if not hits:
+                scope = f" in folder '{folder}'" if folder else ""
+                return f"No vault hits for '{query}'{scope}."
+
+            lines = [f"Found {data.get('total', len(hits))} hit(s) for '{query}':"]
+            for i, hit in enumerate(hits, 1):
+                heading = hit.get("preceding_heading") or "(no heading)"
+                snippet = (hit.get("snippet") or "").strip().replace("\n", " | ")
+                if len(snippet) > 240:
+                    snippet = snippet[:237] + "…"
+                lines.append(
+                    f"{i}. {hit['path']}:{hit['line_no']} — under \"{heading}\"\n   {snippet}"
+                )
+            if data.get("truncated"):
+                lines.append("(more matches exist; raise `limit` or narrow the search)")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error searching vault: {str(e)}"
+
+    def _run(self, query: str, folder: Optional[str] = None, limit: int = 8) -> str:
+        return asyncio.run(self._arun(query, folder, limit))
+
+
+class VaultReadTool(BaseTool):
+    """Read a single markdown file from Kevin's vault."""
+
+    name: str = "vault_read"
+    description: str = (
+        "Read a specific markdown note from Kevin's brain-vault by vault-relative path. "
+        "Use after vault_search has surfaced a promising hit and you need the full file "
+        "to answer the user's question. Paths look like 'Projects/aura.md' or "
+        "'Career/interview-prep/index.md'."
+    )
+    args_schema: Type[BaseModel] = VaultReadInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(self, path: str) -> str:
+        try:
+            client = self._get_mcp_client()
+            data = await client.vault_read(path=path)
+            content = data.get("content", "")
+            return f"=== {data.get('path', path)} ({data.get('size_bytes', '?')} bytes) ===\n{content}"
+        except Exception as e:
+            return f"Error reading vault file: {str(e)}"
+
+    def _run(self, path: str) -> str:
+        return asyncio.run(self._arun(path))
+
+
+class VaultListTool(BaseTool):
+    """List entries in a brain-vault folder."""
+
+    name: str = "vault_list"
+    description: str = (
+        "List the immediate children (one level deep) of a folder in Kevin's brain-vault. "
+        "Use this to explore the vault structure when you're not sure what folders or "
+        "files exist — e.g., to see all his Projects/ before searching, or to find "
+        "the right subfolder under Career/. Omit `folder` to list the vault root."
+    )
+    args_schema: Type[BaseModel] = VaultListInput
+
+    def _get_mcp_client(self) -> MCPClient:
+        return MCPClient()
+
+    async def _arun(self, folder: Optional[str] = None) -> str:
+        try:
+            client = self._get_mcp_client()
+            data = await client.vault_list(folder=folder)
+            entries = data.get("entries", [])
+            if not entries:
+                return f"Folder '{folder or '.'}' is empty (or not visible)."
+            lines = [f"Contents of vault folder '{folder or '.'}' ({len(entries)} entries):"]
+            for e in entries:
+                marker = "📁" if e.get("type") == "folder" else "📄"
+                size = f" ({e['size_bytes']}b)" if e.get("size_bytes") else ""
+                lines.append(f"  {marker} {e['path']}{size}")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error listing vault: {str(e)}"
+
+    def _run(self, folder: Optional[str] = None) -> str:
+        return asyncio.run(self._arun(folder))
+
+
 def get_all_tools():
     """Get all available tools for the agent."""
     return [
@@ -1195,4 +1337,7 @@ def get_all_tools():
         ConcertAlertTool(),
         ItineraryTool(),
         CreateTravelBlockTool(),
+        VaultSearchTool(),
+        VaultReadTool(),
+        VaultListTool(),
     ]
