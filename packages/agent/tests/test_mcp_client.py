@@ -208,3 +208,54 @@ class TestMCPClient:
 
             result = await client.health_check()
             assert result is False
+
+    @pytest.mark.asyncio
+    async def test_vault_search_with_folder(self, client):
+        """vault_search forwards the folder scope and limit."""
+        sample = {"query": "aura", "folder": "Projects", "hits": [], "total": 0, "truncated": False}
+        with patch.object(client, "call_tool", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = sample
+            result = await client.vault_search("aura", folder="Projects", limit=5)
+            mock_call.assert_called_once_with(
+                "vault_search",
+                {"query": "aura", "limit": 5, "regex": False, "folder": "Projects"},
+            )
+            assert result == sample
+
+    @pytest.mark.asyncio
+    async def test_vault_search_without_folder(self, client):
+        """vault_search omits `folder` from the payload when None."""
+        with patch.object(client, "call_tool", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {"hits": [], "total": 0, "truncated": False}
+            await client.vault_search("anything")
+            args, _ = mock_call.call_args
+            assert args[0] == "vault_search"
+            assert "folder" not in args[1]
+            assert args[1]["query"] == "anything"
+            assert args[1]["limit"] == 10  # default
+
+    @pytest.mark.asyncio
+    async def test_vault_read(self, client):
+        """vault_read passes path through unchanged."""
+        sample = {"path": "Projects/aura.md", "content": "# Aura", "size_bytes": 6}
+        with patch.object(client, "call_tool", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = sample
+            result = await client.vault_read("Projects/aura.md")
+            mock_call.assert_called_once_with("vault_read", {"path": "Projects/aura.md"})
+            assert result == sample
+
+    @pytest.mark.asyncio
+    async def test_vault_list_root(self, client):
+        """vault_list with no folder calls with empty params (root listing)."""
+        with patch.object(client, "call_tool", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {"folder": ".", "entries": [], "total": 0}
+            await client.vault_list()
+            mock_call.assert_called_once_with("vault_list", {})
+
+    @pytest.mark.asyncio
+    async def test_vault_list_with_folder(self, client):
+        """vault_list forwards the folder."""
+        with patch.object(client, "call_tool", new_callable=AsyncMock) as mock_call:
+            mock_call.return_value = {"folder": "Projects", "entries": [], "total": 0}
+            await client.vault_list(folder="Projects")
+            mock_call.assert_called_once_with("vault_list", {"folder": "Projects"})

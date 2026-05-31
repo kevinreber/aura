@@ -247,6 +247,9 @@ Defined in `agent/tools.py`. The orchestrator registers all of them by default.
 | 15 | `TrailScoutTool` | `weekend_get_trails` | Weekend trail scouting |
 | 16 | `ConcertAlertTool` | `weekend_get_concerts` | Concert listings |
 | 17 | `ItineraryTool` | `weekend_generate_itinerary` | Multi-day weekend itinerary |
+| 18 | `VaultSearchTool` | `vault_search` | Search Kevin's personal markdown notes (ripgrep-backed) |
+| 19 | `VaultReadTool` | `vault_read` | Read a specific note from Kevin's vault |
+| 20 | `VaultListTool` | `vault_list` | List entries in a vault folder |
 
 ## Important Conventions
 
