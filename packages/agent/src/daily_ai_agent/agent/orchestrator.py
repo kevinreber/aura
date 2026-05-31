@@ -268,8 +268,14 @@ Workflow:
        - "Meetings"     — meeting notes, transcripts
        - "Backlog"      — ideas and follow-ups
        - "Concepts"     — how-tos and reference material
-  2. Read the top 1-2 most relevant hits with vault_read.
-  3. Answer from the retrieved content. Cite the file path so the user can verify.
+  2. Search returns hits ALREADY RANKED by relevance (BM25 over file content).
+     Before reading anything, scan the top 3-5 hits and pick the 1-2 you actually
+     need based on the `path` and `preceding_heading` — don't just blindly read
+     the #1 hit if a later one looks more on-topic for the user's question.
+     This is your "rerank" pass: cheap LLM judgment beats blind retrieval.
+  3. Read the chosen hits with vault_read. Prefer reading at most 2 files;
+     each read is ~5-15KB of content in your context.
+  4. Answer from the retrieved content. Cite the file path so the user can verify.
 
 Do NOT fabricate vault content — if the search returns nothing, say so plainly
 ("I don't see anything in your vault about X") rather than guessing.

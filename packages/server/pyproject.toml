@@ -18,41 +18,32 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "sse-starlette>=2.1.0",
     "slowapi>=0.1.9",
-
     # MCP SDK for official protocol support
     "mcp>=1.0.0",
-
     # Google integrations
     "google-api-python-client>=2.140.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.2.0",
-
     # HTTP client
     "httpx>=0.28.1",
-
     # Logging
     "loguru>=0.7.3",
-
     # Data validation and settings
     "pydantic>=2.11.7",
     "pydantic-settings>=2.10.1",
-
     # Date/time utilities
     "python-dateutil>=2.9.0.post0",
     "python-dotenv>=1.1.1",
     "pytz==2025.2",
-
     # Redis caching
     "redis[hiredis]==5.0.1",
-
     # Async resilience primitives (extracted from this repo's mcp_server/utils/)
     "asyncresil[redis]>=0.1.0",
-
     # HTTP requests
     "requests>=2.32.4",
-
     # Todoist integration
     "todoist-api-python==2.1.4",
+    "bm25s>=0.3.9",
 ]
 
 # Tell hatchling where our package is located
