@@ -53,7 +53,7 @@ class TransitOption(BaseModel):
 
 
 class MobilityInput(BaseModel):
-    """Input schema for mobility.get_commute tool."""
+    """Input schema for mobility_get_commute tool."""
     
     origin: str = Field(
         description="Starting location (address, place name, or coordinates)",
@@ -70,7 +70,7 @@ class MobilityInput(BaseModel):
 
 
 class MobilityOutput(BaseModel):
-    """Output schema for mobility.get_commute tool."""
+    """Output schema for mobility_get_commute tool."""
     
     duration_minutes: int = Field(description="Estimated travel time in minutes")
     distance_miles: float = Field(description="Total distance in miles")

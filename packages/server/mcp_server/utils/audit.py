@@ -20,7 +20,7 @@ def audit_log(
     Log an audit trail entry for write operations.
 
     Args:
-        operation: The operation performed (e.g., "calendar.create_event")
+        operation: The operation performed (e.g., "calendar_create_event")
         input_data: The input data for the operation
         result: The result of the operation
         client_ip: The client's IP address

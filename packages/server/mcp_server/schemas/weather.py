@@ -12,7 +12,7 @@ class WhenEnum(str, Enum):
 
 
 class WeatherInput(BaseModel):
-    """Input schema for weather.get_daily tool."""
+    """Input schema for weather_get_daily tool."""
     
     location: str = Field(
         description="Location name (city, state/country) or coordinates",
@@ -25,7 +25,7 @@ class WeatherInput(BaseModel):
 
 
 class WeatherOutput(BaseModel):
-    """Output schema for weather.get_daily tool."""
+    """Output schema for weather_get_daily tool."""
     
     temp_hi: float = Field(description="High temperature in Fahrenheit")
     temp_lo: float = Field(description="Low temperature in Fahrenheit")

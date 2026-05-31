@@ -31,10 +31,10 @@ class TestToolsListEndpoint:
         
         tools = data['tools']
         expected_tools = [
-            'weather.get_daily',
-            'mobility.get_commute',
-            'calendar.list_events',
-            'todo.list'
+            'weather_get_daily',
+            'mobility_get_commute',
+            'calendar_list_events',
+            'todo_list'
         ]
         
         for tool_name in expected_tools:
@@ -50,7 +50,7 @@ class TestWeatherEndpoint:
     def test_weather_valid_input(self, client, sample_weather_input):
         """Test weather endpoint with valid input."""
         response = client.post(
-            '/tools/weather.get_daily',
+            '/tools/weather_get_daily',
             data=json.dumps(sample_weather_input),
             content_type='application/json'
         )
@@ -65,7 +65,7 @@ class TestWeatherEndpoint:
     
     def test_weather_missing_body(self, client):
         """Test weather endpoint with missing JSON body."""
-        response = client.post('/tools/weather.get_daily')
+        response = client.post('/tools/weather_get_daily')
         assert response.status_code == 400
         
         data = json.loads(response.data)
@@ -75,7 +75,7 @@ class TestWeatherEndpoint:
         """Test weather endpoint with invalid input."""
         invalid_input = {"invalid_field": "value"}
         response = client.post(
-            '/tools/weather.get_daily',
+            '/tools/weather_get_daily',
             data=json.dumps(invalid_input),
             content_type='application/json'
         )
@@ -88,7 +88,7 @@ class TestMobilityEndpoint:
     def test_mobility_valid_input(self, client, sample_mobility_input):
         """Test mobility endpoint with valid input."""
         response = client.post(
-            '/tools/mobility.get_commute',
+            '/tools/mobility_get_commute',
             data=json.dumps(sample_mobility_input),
             content_type='application/json'
         )
@@ -110,7 +110,7 @@ class TestCalendarEndpoint:
     def test_calendar_valid_input(self, client, sample_calendar_input):
         """Test calendar endpoint with valid input."""
         response = client.post(
-            '/tools/calendar.list_events',
+            '/tools/calendar_list_events',
             data=json.dumps(sample_calendar_input),
             content_type='application/json'
         )
@@ -129,7 +129,7 @@ class TestTodoEndpoint:
     def test_todo_valid_input(self, client, sample_todo_input):
         """Test todo endpoint with valid input."""
         response = client.post(
-            '/tools/todo.list',
+            '/tools/todo_list',
             data=json.dumps(sample_todo_input),
             content_type='application/json'
         )
@@ -157,7 +157,7 @@ class TestErrorHandlers:
     
     def test_405_method_not_allowed(self, client):
         """Test 405 error handler."""
-        response = client.get('/tools/weather.get_daily')  # Should be POST
+        response = client.get('/tools/weather_get_daily')  # Should be POST
         assert response.status_code == 405
         
         data = json.loads(response.data)

@@ -38,7 +38,7 @@ class FinancialTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("financial.get_data", input_data.dict(), duration_ms)
+            log_tool_call("financial_get_data", input_data.dict(), duration_ms)
             
             return result
         
@@ -79,7 +79,7 @@ class FinancialTool:
                 
                 # Log the successful tool call
                 duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-                log_tool_call("financial.get_data", input_data.dict(), duration_ms)
+                log_tool_call("financial_get_data", input_data.dict(), duration_ms)
                 
                 return result
             
@@ -99,7 +99,7 @@ class FinancialTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("financial.get_data", input_data.dict(), duration_ms)
+            log_tool_call("financial_get_data", input_data.dict(), duration_ms)
             
             return result
             
@@ -109,7 +109,7 @@ class FinancialTool:
             
             # Log the tool call (with error)
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("financial.get_data", input_data.dict(), duration_ms)
+            log_tool_call("financial_get_data", input_data.dict(), duration_ms)
             
             return result
 

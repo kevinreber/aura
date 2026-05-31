@@ -54,13 +54,13 @@ class WeatherTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weather.get_daily", input_data.dict(), duration_ms)
+            log_tool_call("weather_get_daily", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weather.get_daily", input_data.dict(), duration_ms)
+            log_tool_call("weather_get_daily", input_data.dict(), duration_ms)
             logger.error(f"Error getting weather data: {e}")
             raise
     

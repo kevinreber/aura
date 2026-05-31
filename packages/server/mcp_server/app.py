@@ -192,7 +192,7 @@ def create_app() -> FastAPI:
 
     # ==================== Weather Endpoints ====================
 
-    @app.post("/tools/weather.get_daily", response_model=None, tags=["Weather"])
+    @app.post("/tools/weather_get_daily", response_model=None, tags=["Weather"])
     async def weather_get_daily(input_data: WeatherInput):
         """Get current weather and daily forecast.
 
@@ -200,15 +200,15 @@ def create_app() -> FastAPI:
         temperature, conditions, humidity, and wind speed.
         """
         try:
-            result = await mcp_server.call_tool("weather.get_daily", input_data.model_dump())
+            result = await mcp_server.call_tool("weather_get_daily", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in weather.get_daily: {e}")
+            logger.error(f"Error in weather_get_daily: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Mobility Endpoints ====================
 
-    @app.post("/tools/mobility.get_commute", response_model=None, tags=["Mobility"])
+    @app.post("/tools/mobility_get_commute", response_model=None, tags=["Mobility"])
     async def mobility_get_commute(input_data: MobilityInput):
         """Get commute information with travel times and route options.
 
@@ -216,13 +216,13 @@ def create_app() -> FastAPI:
         with real-time traffic data from Google Maps.
         """
         try:
-            result = await mcp_server.call_tool("mobility.get_commute", input_data.model_dump())
+            result = await mcp_server.call_tool("mobility_get_commute", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in mobility.get_commute: {e}")
+            logger.error(f"Error in mobility_get_commute: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/mobility.get_commute_options", response_model=None, tags=["Mobility"])
+    @app.post("/tools/mobility_get_commute_options", response_model=None, tags=["Mobility"])
     async def mobility_get_commute_options(input_data: CommuteInput):
         """Get comprehensive commute analysis with driving AND transit options.
 
@@ -230,13 +230,13 @@ def create_app() -> FastAPI:
         shuttle connections, fuel estimates, and AI recommendations.
         """
         try:
-            result = await mcp_server.call_tool("mobility.get_commute_options", input_data.model_dump())
+            result = await mcp_server.call_tool("mobility_get_commute_options", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in mobility.get_commute_options: {e}")
+            logger.error(f"Error in mobility_get_commute_options: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/mobility.get_shuttle_schedule", response_model=None, tags=["Mobility"])
+    @app.post("/tools/mobility_get_shuttle_schedule", response_model=None, tags=["Mobility"])
     async def mobility_get_shuttle_schedule(input_data: ShuttleScheduleInput):
         """Get MV Connector shuttle schedules.
 
@@ -244,15 +244,15 @@ def create_app() -> FastAPI:
         LinkedIn Transit Center, and LinkedIn 950|1000.
         """
         try:
-            result = await mcp_server.call_tool("mobility.get_shuttle_schedule", input_data.model_dump())
+            result = await mcp_server.call_tool("mobility_get_shuttle_schedule", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in mobility.get_shuttle_schedule: {e}")
+            logger.error(f"Error in mobility_get_shuttle_schedule: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Calendar Endpoints ====================
 
-    @app.post("/tools/calendar.list_events", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_list_events", response_model=None, tags=["Calendar"])
     async def calendar_list_events(input_data: CalendarInput):
         """List calendar events for a specific date.
 
@@ -260,13 +260,13 @@ def create_app() -> FastAPI:
         including title, time, location, and attendees.
         """
         try:
-            result = await mcp_server.call_tool("calendar.list_events", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_list_events", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in calendar.list_events: {e}")
+            logger.error(f"Error in calendar_list_events: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/calendar.list_events_range", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_list_events_range", response_model=None, tags=["Calendar"])
     async def calendar_list_events_range(input_data: CalendarRangeInput):
         """List calendar events for a date range.
 
@@ -274,13 +274,13 @@ def create_app() -> FastAPI:
         between start_date and end_date inclusive.
         """
         try:
-            result = await mcp_server.call_tool("calendar.list_events_range", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_list_events_range", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in calendar.list_events_range: {e}")
+            logger.error(f"Error in calendar_list_events_range: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/calendar.create_event", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_create_event", response_model=None, tags=["Calendar"])
     async def calendar_create_event(input_data: CalendarCreateInput):
         """Create a new calendar event.
 
@@ -288,13 +288,13 @@ def create_app() -> FastAPI:
         location, and conflict detection.
         """
         try:
-            result = await mcp_server.call_tool("calendar.create_event", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_create_event", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in calendar.create_event: {e}")
+            logger.error(f"Error in calendar_create_event: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/calendar.update_event", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_update_event", response_model=None, tags=["Calendar"])
     async def calendar_update_event(input_data: CalendarUpdateInput):
         """Update an existing calendar event.
 
@@ -302,17 +302,17 @@ def create_app() -> FastAPI:
         Returns the updated event and list of changes made.
         """
         try:
-            result = await mcp_server.call_tool("calendar.update_event", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_update_event", input_data.model_dump())
             if not result.get('success') and 'not found' in result.get('message', '').lower():
                 raise HTTPException(status_code=404, detail=result.get('message'))
             return result
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error in calendar.update_event: {e}")
+            logger.error(f"Error in calendar_update_event: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/calendar.delete_event", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_delete_event", response_model=None, tags=["Calendar"])
     async def calendar_delete_event(input_data: CalendarDeleteInput):
         """Delete a calendar event.
 
@@ -320,17 +320,17 @@ def create_app() -> FastAPI:
         Returns the deleted event details for confirmation.
         """
         try:
-            result = await mcp_server.call_tool("calendar.delete_event", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_delete_event", input_data.model_dump())
             if not result.get('success') and 'not found' in result.get('message', '').lower():
                 raise HTTPException(status_code=404, detail=result.get('message'))
             return result
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error in calendar.delete_event: {e}")
+            logger.error(f"Error in calendar_delete_event: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/calendar.find_free_time", response_model=None, tags=["Calendar"])
+    @app.post("/tools/calendar_find_free_time", response_model=None, tags=["Calendar"])
     async def calendar_find_free_time(input_data: CalendarFindFreeTimeInput):
         """Find available time slots for scheduling.
 
@@ -338,15 +338,15 @@ def create_app() -> FastAPI:
         with optional time preferences and duration requirements.
         """
         try:
-            result = await mcp_server.call_tool("calendar.find_free_time", input_data.model_dump())
+            result = await mcp_server.call_tool("calendar_find_free_time", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in calendar.find_free_time: {e}")
+            logger.error(f"Error in calendar_find_free_time: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Todo Endpoints ====================
 
-    @app.post("/tools/todo.list", response_model=None, tags=["Todo"])
+    @app.post("/tools/todo_list", response_model=None, tags=["Todo"])
     async def todo_list(input_data: TodoInput):
         """List todo items from Todoist.
 
@@ -354,10 +354,10 @@ def create_app() -> FastAPI:
         or all buckets if none specified. Supports filtering completed items.
         """
         try:
-            result = await mcp_server.call_tool("todo.list", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_list", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in todo.list: {e}")
+            logger.error(f"Error in todo_list: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/tools/todos", response_model=None, tags=["Todo"])
@@ -368,13 +368,13 @@ def create_app() -> FastAPI:
         """GET endpoint for todos - frontend compatibility."""
         try:
             input_data = TodoInput(bucket=bucket, include_completed=include_completed)
-            result = await mcp_server.call_tool("todo.list", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_list", input_data.model_dump())
             return result
         except Exception as e:
             logger.error(f"Error in todos GET: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/todo.create", response_model=None, tags=["Todo"])
+    @app.post("/tools/todo_create", response_model=None, tags=["Todo"])
     async def todo_create(input_data: TodoCreateInput):
         """Create a new todo item in Todoist.
 
@@ -382,13 +382,13 @@ def create_app() -> FastAPI:
         priority levels, and bucket categorization.
         """
         try:
-            result = await mcp_server.call_tool("todo.create", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_create", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in todo.create: {e}")
+            logger.error(f"Error in todo_create: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/todo.update", response_model=None, tags=["Todo"])
+    @app.post("/tools/todo_update", response_model=None, tags=["Todo"])
     async def todo_update(input_data: TodoUpdateInput):
         """Update an existing todo item.
 
@@ -396,41 +396,41 @@ def create_app() -> FastAPI:
         Returns the updated todo and list of changes made.
         """
         try:
-            result = await mcp_server.call_tool("todo.update", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_update", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in todo.update: {e}")
+            logger.error(f"Error in todo_update: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/todo.complete", response_model=None, tags=["Todo"])
+    @app.post("/tools/todo_complete", response_model=None, tags=["Todo"])
     async def todo_complete(input_data: TodoCompleteInput):
         """Mark a todo item as completed or uncompleted.
 
         Toggle the completion status of a todo item.
         """
         try:
-            result = await mcp_server.call_tool("todo.complete", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_complete", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in todo.complete: {e}")
+            logger.error(f"Error in todo_complete: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/todo.delete", response_model=None, tags=["Todo"])
+    @app.post("/tools/todo_delete", response_model=None, tags=["Todo"])
     async def todo_delete(input_data: TodoDeleteInput):
         """Delete a todo item permanently.
 
         Removes the todo from Todoist. Returns deleted item for audit trail.
         """
         try:
-            result = await mcp_server.call_tool("todo.delete", input_data.model_dump())
+            result = await mcp_server.call_tool("todo_delete", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in todo.delete: {e}")
+            logger.error(f"Error in todo_delete: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Financial Endpoints ====================
 
-    @app.post("/tools/financial.get_data", response_model=None, tags=["Financial"])
+    @app.post("/tools/financial_get_data", response_model=None, tags=["Financial"])
     async def financial_get_data(input_data: FinancialInput):
         """Get real-time financial data for stocks and cryptocurrencies.
 
@@ -438,10 +438,10 @@ def create_app() -> FastAPI:
         specified symbols from Alpha Vantage and CoinGecko.
         """
         try:
-            result = await mcp_server.call_tool("financial.get_data", input_data.model_dump())
+            result = await mcp_server.call_tool("financial_get_data", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in financial.get_data: {e}")
+            logger.error(f"Error in financial_get_data: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Weekend Endpoints ====================
@@ -548,26 +548,26 @@ def create_app() -> FastAPI:
                     "label": "Trails & Outdoors",
                     "description": "Hiking, running, and cycling trails near a location",
                     "default_enabled": True,
-                    "tools": ["weekend.get_trails"],
+                    "tools": ["weekend_get_trails"],
                 },
                 {
                     "id": "concerts",
                     "label": "Live Music",
                     "description": "Upcoming concerts and live music events",
                     "default_enabled": True,
-                    "tools": ["weekend.get_concerts"],
+                    "tools": ["weekend_get_concerts"],
                 },
                 {
                     "id": "itinerary",
                     "label": "Multi-day Trips",
                     "description": "Full weekend trip planning with points of interest",
                     "default_enabled": True,
-                    "tools": ["weekend.generate_itinerary"],
+                    "tools": ["weekend_generate_itinerary"],
                 },
             ]
         }
 
-    @app.post("/tools/weekend.get_trails", response_model=None, tags=["Weekend"])
+    @app.post("/tools/weekend_get_trails", response_model=None, tags=["Weekend"])
     async def weekend_get_trails(input_data: TrailSearchInput):
         """Scout outdoor trails near a location.
 
@@ -575,13 +575,13 @@ def create_app() -> FastAPI:
         Phase 1: returns mock data when no API key is configured.
         """
         try:
-            result = await mcp_server.call_tool("weekend.get_trails", input_data.model_dump())
+            result = await mcp_server.call_tool("weekend_get_trails", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in weekend.get_trails: {e}")
+            logger.error(f"Error in weekend_get_trails: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/weekend.get_concerts", response_model=None, tags=["Weekend"])
+    @app.post("/tools/weekend_get_concerts", response_model=None, tags=["Weekend"])
     async def weekend_get_concerts(input_data: ConcertSearchInput):
         """Find upcoming concerts and live music events.
 
@@ -589,13 +589,13 @@ def create_app() -> FastAPI:
         date range. Phase 1: returns mock data when Bandsintown is not configured.
         """
         try:
-            result = await mcp_server.call_tool("weekend.get_concerts", input_data.model_dump())
+            result = await mcp_server.call_tool("weekend_get_concerts", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in weekend.get_concerts: {e}")
+            logger.error(f"Error in weekend_get_concerts: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/weekend.generate_itinerary", response_model=None, tags=["Weekend"])
+    @app.post("/tools/weekend_generate_itinerary", response_model=None, tags=["Weekend"])
     async def weekend_generate_itinerary(input_data: ItineraryInput):
         """Generate a multi-day itinerary with points of interest.
 
@@ -604,15 +604,15 @@ def create_app() -> FastAPI:
         day-by-day narrative. Phase 1: returns mock data.
         """
         try:
-            result = await mcp_server.call_tool("weekend.generate_itinerary", input_data.model_dump())
+            result = await mcp_server.call_tool("weekend_generate_itinerary", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in weekend.generate_itinerary: {e}")
+            logger.error(f"Error in weekend_generate_itinerary: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Vault Endpoints ====================
 
-    @app.post("/tools/vault.search", response_model=None, tags=["Vault"])
+    @app.post("/tools/vault_search", response_model=None, tags=["Vault"])
     async def vault_search(input_data: VaultSearchInput):
         """Search Kevin's personal markdown vault.
 
@@ -622,28 +622,28 @@ def create_app() -> FastAPI:
         (e.g., 'Projects', 'Career') for faster, more focused results.
         """
         try:
-            result = await mcp_server.call_tool("vault.search", input_data.model_dump())
+            result = await mcp_server.call_tool("vault_search", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in vault.search: {e}")
+            logger.error(f"Error in vault_search: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/vault.read", response_model=None, tags=["Vault"])
+    @app.post("/tools/vault_read", response_model=None, tags=["Vault"])
     async def vault_read(input_data: VaultReadInput):
         """Read a single markdown file from Kevin's vault.
 
-        Returns the raw file contents. Use vault.search first to discover
-        the path, then vault.read to load the full note. Files larger than 1 MB
+        Returns the raw file contents. Use vault_search first to discover
+        the path, then vault_read to load the full note. Files larger than 1 MB
         are rejected.
         """
         try:
-            result = await mcp_server.call_tool("vault.read", input_data.model_dump())
+            result = await mcp_server.call_tool("vault_read", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in vault.read: {e}")
+            logger.error(f"Error in vault_read: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.post("/tools/vault.list", response_model=None, tags=["Vault"])
+    @app.post("/tools/vault_list", response_model=None, tags=["Vault"])
     async def vault_list(input_data: VaultListInput):
         """List immediate children of a vault folder (one level deep).
 
@@ -652,10 +652,10 @@ def create_app() -> FastAPI:
         Projects/, etc.). Dotfiles are hidden.
         """
         try:
-            result = await mcp_server.call_tool("vault.list", input_data.model_dump())
+            result = await mcp_server.call_tool("vault_list", input_data.model_dump())
             return result
         except Exception as e:
-            logger.error(f"Error in vault.list: {e}")
+            logger.error(f"Error in vault_list: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
     # ==================== Error Handlers ====================
