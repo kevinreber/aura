@@ -213,20 +213,20 @@ class MCPClient:
 
     async def get_weather(self, location: str, when: str = "today") -> Dict[str, Any]:
         """Get weather forecast for a location."""
-        return await self.call_tool("weather.get_daily", {
+        return await self.call_tool("weather_get_daily", {
             "location": location,
             "when": when
         })
 
     async def get_calendar_events(self, date: str) -> Dict[str, Any]:
         """Get calendar events for a specific date."""
-        return await self.call_tool("calendar.list_events", {
+        return await self.call_tool("calendar_list_events", {
             "date": date
         })
 
     async def get_calendar_events_range(self, start_date: str, end_date: str) -> Dict[str, Any]:
         """Get calendar events for a date range."""
-        return await self.call_tool("calendar.list_events_range", {
+        return await self.call_tool("calendar_list_events_range", {
             "start_date": start_date,
             "end_date": end_date
         })
@@ -236,11 +236,11 @@ class MCPClient:
         params: Dict[str, Any] = {"include_completed": include_completed}
         if bucket is not None:
             params["bucket"] = bucket
-        return await self.call_tool("todo.list", params)
+        return await self.call_tool("todo_list", params)
 
     async def get_commute(self, origin: str, destination: str, mode: str = "driving") -> Dict[str, Any]:
         """Get basic commute information between locations."""
-        return await self.call_tool("mobility.get_commute", {
+        return await self.call_tool("mobility_get_commute", {
             "origin": origin,
             "destination": destination,
             "mode": mode
@@ -261,7 +261,7 @@ class MCPClient:
         }
         if departure_time:
             params["departure_time"] = departure_time
-        return await self.call_tool("mobility.get_commute_options", params)
+        return await self.call_tool("mobility_get_commute_options", params)
 
     async def get_shuttle_schedule(
         self,
@@ -276,7 +276,7 @@ class MCPClient:
         }
         if departure_time:
             params["departure_time"] = departure_time
-        return await self.call_tool("mobility.get_shuttle_schedule", params)
+        return await self.call_tool("mobility_get_shuttle_schedule", params)
 
     async def get_all_morning_data(self, date: str) -> Dict[str, Any]:
         """Get all morning routine data in parallel for speed."""

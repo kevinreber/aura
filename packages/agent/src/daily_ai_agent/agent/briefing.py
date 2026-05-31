@@ -31,9 +31,9 @@ async def compute_per_event_commute(
     Origin = previous located event's location, or `home_address` for the
     first event with a location. Events without a location get `None`.
 
-    Note: `mobility.get_commute` uses current traffic. Tomorrow-morning
+    Note: `mobility_get_commute` uses current traffic. Tomorrow-morning
     predicted traffic would need an extension to that tool that mirrors
-    `mobility.get_commute_options`'s `departure_time` param. V1 ships
+    `mobility_get_commute_options`'s `departure_time` param. V1 ships
     with current-traffic durations + a clear label in the UI.
     """
     results: list[Optional[dict[str, Any]]] = []

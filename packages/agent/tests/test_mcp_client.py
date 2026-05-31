@@ -29,7 +29,7 @@ class TestMCPClient:
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
-            result = await client.call_tool("weather.get_daily", {"location": "SF"})
+            result = await client.call_tool("weather_get_daily", {"location": "SF"})
             assert result == sample_weather_data
             mock_client.post.assert_called_once()
 
@@ -51,7 +51,7 @@ class TestMCPClient:
             mock_client_class.return_value = mock_client
 
             with pytest.raises(Exception) as exc_info:
-                await client.call_tool("weather.get_daily", {"location": "SF"})
+                await client.call_tool("weather_get_daily", {"location": "SF"})
             # Error message comes from retry logic - check for server error indication
             assert "Server error" in str(exc_info.value) or "failed" in str(exc_info.value).lower()
 
@@ -66,7 +66,7 @@ class TestMCPClient:
             mock_client_class.return_value = mock_client
 
             with pytest.raises(Exception) as exc_info:
-                await client.call_tool("weather.get_daily", {"location": "SF"})
+                await client.call_tool("weather_get_daily", {"location": "SF"})
             assert "Timeout" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -78,7 +78,7 @@ class TestMCPClient:
             result = await client.get_weather("San Francisco", "today")
 
             mock_call.assert_called_once_with(
-                "weather.get_daily", {"location": "San Francisco", "when": "today"}
+                "weather_get_daily", {"location": "San Francisco", "when": "today"}
             )
             assert result == sample_weather_data
 
@@ -91,7 +91,7 @@ class TestMCPClient:
             result = await client.get_calendar_events("2025-01-15")
 
             mock_call.assert_called_once_with(
-                "calendar.list_events", {"date": "2025-01-15"}
+                "calendar_list_events", {"date": "2025-01-15"}
             )
             assert result == sample_calendar_data
 
@@ -104,7 +104,7 @@ class TestMCPClient:
             result = await client.get_todos("work", include_completed=False)
 
             mock_call.assert_called_once_with(
-                "todo.list", {"include_completed": False, "bucket": "work"}
+                "todo_list", {"include_completed": False, "bucket": "work"}
             )
             assert result == sample_todos_data
 
@@ -117,7 +117,7 @@ class TestMCPClient:
             result = await client.get_todos(None, include_completed=False)
 
             mock_call.assert_called_once_with(
-                "todo.list", {"include_completed": False}
+                "todo_list", {"include_completed": False}
             )
             assert result == sample_todos_data
 
@@ -130,7 +130,7 @@ class TestMCPClient:
             result = await client.get_commute("Home", "Office", "driving")
 
             mock_call.assert_called_once_with(
-                "mobility.get_commute",
+                "mobility_get_commute",
                 {"origin": "Home", "destination": "Office", "mode": "driving"},
             )
             assert result == sample_commute_data

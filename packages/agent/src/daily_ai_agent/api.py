@@ -759,7 +759,7 @@ def create_app(testing: bool = False) -> Flask:
                 }), 400
 
             logger.info(f"[{g.request_id}] Financial request: {symbols} ({data_type})")
-            financial_data = await mcp_client.call_tool("financial.get_data", {
+            financial_data = await mcp_client.call_tool("financial_get_data", {
                 "symbols": symbols,
                 "data_type": data_type
             })
