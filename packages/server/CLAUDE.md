@@ -292,44 +292,54 @@ The server supports the official Model Context Protocol (MCP) via SSE transport,
 
 ### Connecting Claude Desktop
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Current Claude Desktop builds **do not accept URL-based MCP server entries in
+`claude_desktop_config.json`** — the validator silently strips them and shows
+a "could not be loaded" popup. Use stdio (subprocess) instead.
+
+**With the Docker stack running** (preferred — no host Python setup needed):
 
 ```json
 {
   "mcpServers": {
     "aura": {
-      "url": "http://localhost:8000/mcp/sse"
+      "command": "docker",
+      "args": ["exec", "-i", "aura-vault-server", "python", "-m", "mcp_server.mcp_protocol"]
     }
   }
 }
 ```
 
-For production:
-```json
-{
-  "mcpServers": {
-    "aura": {
-      "url": "https://aura-mcp-server.fly.dev/mcp/sse"
-    }
-  }
-}
-```
+The container name above (`aura-vault-server`) assumes the smoke-test
+container from PR #22. If you're running via `make up`, the server container
+name is `aura-server-1` (or similar — check `docker compose ps`).
 
-### Connecting via stdio (Local Development)
-
-For local integrations where the MCP client can spawn the server as a subprocess:
+**Without Docker** — run via host Python:
 
 ```json
 {
   "mcpServers": {
     "aura": {
-      "command": "python",
-      "args": ["-m", "mcp_server.mcp_protocol"],
-      "cwd": "/path/to/packages/server"
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp_server.mcp_protocol"],
+      "cwd": "/Users/you/Projects/aura/packages/server"
     }
   }
 }
 ```
+
+> **Known limitation — Claude Desktop chat compatibility:** All tools on this
+> server use a `namespace.action` naming convention (`weather.get_daily`,
+> `vault.search`, etc.). Claude Desktop's chat API enforces the regex
+> `^[a-zA-Z0-9_-]{1,64}$` on tool names, which **rejects the dots**. The
+> connector and tool list will load fine, but trying to actually use the tools
+> in a chat will error. Other MCP clients (Cursor, raw SDK, the Aura UI's own
+> agent) are unaffected. Tracked for cleanup in a follow-up PR.
+
+### Connecting via SSE (remote MCP clients)
+
+The server also exposes an SSE transport at `/mcp/sse` for clients that
+support it (Cursor, raw `mcp.client.sse`, etc. — but not Claude Desktop
+today). Production URL: `https://aura-mcp-server.fly.dev/mcp/sse`.
 
 ### Testing MCP Connection
 
