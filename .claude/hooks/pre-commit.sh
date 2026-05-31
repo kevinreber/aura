@@ -67,3 +67,27 @@ if [ -n "$UI_FILES" ]; then
 fi
 
 echo "✅ Pre-commit checks passed!"
+
+# ─── Doc-drift check ───────────────────────────────────────────────────
+# Detects when staged code touches user-facing surfaces (MCP tools,
+# agent endpoints, UI routes, env vars) without updating the matching
+# README/CLAUDE.md. Defaults to AI-driven refresh outside a Claude
+# session; warn-only inside one. Tunable via env vars — see the
+# script's header.
+HOOK_DIR="$(dirname "$0")"
+DRIFT_SCRIPT="$HOOK_DIR/check-docs-drift.sh"
+
+# Resolve symlinks so this works whether the hook is invoked via
+# .git/hooks/pre-commit (symlink) or directly.
+if [ -L "$0" ]; then
+    REAL_HOOK="$(readlink "$0")"
+    case "$REAL_HOOK" in
+        /*) DRIFT_SCRIPT="$(dirname "$REAL_HOOK")/check-docs-drift.sh" ;;
+        *)  DRIFT_SCRIPT="$(dirname "$0")/$REAL_HOOK"
+            DRIFT_SCRIPT="$(dirname "$DRIFT_SCRIPT")/check-docs-drift.sh" ;;
+    esac
+fi
+
+if [ -x "$DRIFT_SCRIPT" ]; then
+    "$DRIFT_SCRIPT"
+fi

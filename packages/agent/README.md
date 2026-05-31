@@ -7,7 +7,7 @@ This package lives inside the [Aura monorepo](../../README.md). For cross-servic
 ## What it does
 
 - **Conversational chat** — natural-language queries answered via LangChain tool calls
-- **17 LangChain tools** wrapping the MCP server: weather, calendar CRUD (incl. travel-block insertion), todos (incl. create), commute, financial, weekend (trails / concerts / itineraries), and the daily briefing
+- **20 LangChain tools** wrapping the MCP server: weather, calendar CRUD (incl. travel-block insertion), todos (incl. create), commute, financial, weekend (trails / concerts / itineraries), the daily briefing, and the **brain-vault** (`vault_search` / `vault_read` / `vault_list`) — letting chat answer questions from Kevin's personal markdown notes
 - **REST API** on port 8001 — chat, chat-stream (SSE), preferences, and direct tool endpoints
 - **Single-user auth** — re-validates `X-Internal-Auth` + `X-User-Email` headers from the UI proxy as defense in depth
 
@@ -70,13 +70,19 @@ Started via `uv run daily-ai-agent-api`. Highlights:
 | Method | Endpoint | Notes |
 | --- | --- | --- |
 | GET  | `/health` | Liveness check |
-| GET  | `/docs` | Swagger UI |
-| POST | `/chat` | Send a chat message |
-| POST | `/chat/stream` | Streaming chat (SSE) |
+| GET  | `/version` | Build info |
+| GET  | `/docs` | Swagger UI (Flasgger) |
 | GET  | `/tools` | List available tools |
+| POST | `/chat` | Send a chat message (rate-limited 10/min) |
+| POST | `/chat/stream` | Streaming chat (SSE) |
+| GET  | `/briefing` | Morning briefing (basic) |
+| GET  | `/briefing/tomorrow` | Tomorrow's preview briefing |
 | GET  | `/tools/weather` | Direct weather call |
 | GET  | `/tools/calendar` | Today's events |
 | GET  | `/tools/todos` | Todoist items (optional `?bucket=`) |
+| GET  | `/tools/commute` | Basic commute info |
+| POST | `/tools/commute-options` | Driving + transit comparison |
+| POST | `/tools/shuttle` | MV Connector schedules |
 | POST | `/tools/financial` | Stock / crypto prices |
 | GET/PUT | `/preferences` | Weekend orchestrator preferences |
 

@@ -5,6 +5,66 @@ All notable changes to the Daily MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-31 — Brain-Vault Integration
+
+Adds tools that let the agent answer questions from a personal markdown
+knowledge base (Kevin's `~/Projects/brain-vault/`) and renames every MCP
+tool to `namespace_action` form so Claude Desktop's chat API can route
+to them.
+
+### Added — Brain-Vault MCP tools
+
+Three new ripgrep-backed tools that operate on the markdown tree at
+`VAULT_ROOT`:
+
+- **`vault_search`** — full-text search via `rg --json`, ranked hits with surrounding context, optional folder scoping, `.auraignore` exclusion support.
+- **`vault_read`** — read a single markdown file. Caps at 1 MB (`_MAX_READ_BYTES = 1_000_000`), rejects absolute paths and `..` traversal.
+- **`vault_list`** — one-level directory listing. Hides dotfiles by default.
+
+All three tools share path-traversal guards in `_resolve_vault_path` and
+raise `VaultUnavailableError` if `VAULT_ROOT` isn't configured. Shipped
+in [#22](https://github.com/kevinreber/aura/pull/22) with three
+follow-up review passes (correctness / security / style polish).
+
+### Added — Brain-vault git sync
+
+The server can now keep the vault fresh in production where there's no
+bind-mount available:
+
+- Set `VAULT_GIT_URL` + `VAULT_GIT_TOKEN` (fine-grained PAT, `Contents: Read-only` on one repo).
+- On boot, if `VAULT_ROOT` is empty, the server clones the repo via an asyncio background task.
+- Subsequently `git pull`s every 15 minutes (`SYNC_INTERVAL_SECS = 15 * 60`).
+- Worst-case end-to-end freshness: ~30 minutes (vault → GitHub + GitHub → Fly).
+- Bind-mount detected (populated dir, no `.git`) → server warns and skips sync.
+- All sync failures are logged and swallowed; the server never refuses to boot.
+
+Shipped in [#26](https://github.com/kevinreber/aura/pull/26).
+
+### Changed — Tool name format
+
+Renamed every MCP tool from `namespace.action` to `namespace_action` for
+Claude Desktop chat-API compatibility. Claude Desktop validates tool
+names against `^[a-zA-Z0-9_-]{1,64}$`, which rejects dots — meaning the
+old names loaded fine but errored on actual use.
+
+Affected tools (all):
+
+- `weather.get_daily` → `weather_get_daily`
+- `mobility.get_commute` → `mobility_get_commute`
+- `mobility.get_commute_options` → `mobility_get_commute_options`
+- `mobility.get_shuttle_schedule` → `mobility_get_shuttle_schedule`
+- `calendar.list_events` / `list_events_range` / `create_event` / `update_event` / `delete_event` / `find_free_time` → underscore form
+- `todo.list` / `create` / `update` / `complete` / `delete` → underscore form
+- `financial.get_data` → `financial_get_data`
+- `weekend.get_trails` / `get_concerts` / `generate_itinerary` → underscore form
+
+Shipped in [#24](https://github.com/kevinreber/aura/pull/24) (closes #23).
+
+### Fixed
+
+- **Pre-create `/vault` directory owned by `appuser` in the prod image** so the asyncio sync task can clone into it without permission errors. ([#27](https://github.com/kevinreber/aura/pull/27))
+- **Bump git command timeout from 60s to 300s** for cold vault clones on Fly's first-boot. The default was too aggressive for large vaults. (commit d6aefc6)
+
 ## [0.5.0] - 2025-08-23 - 🚗🚂 **MAJOR: Complete Commute Intelligence System**
 
 ### 🎉 **COMMUTE REVOLUTION: Real Traffic & Transit Integration**

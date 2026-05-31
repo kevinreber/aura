@@ -58,9 +58,20 @@ done
 
 echo ""
 echo "${BLUE}📚 Installed Git Hooks:${NC}"
-echo "  • pre-commit  - Runs linters/formatters before commit"
+echo "  • pre-commit  - Runs linters/formatters, then checks for doc drift"
 echo "  • pre-push    - Runs tests before push"
 echo "  • post-merge  - Notifies if rebuild needed after merge"
+echo ""
+echo "${BLUE}🤖 Doc-drift hook:${NC}"
+echo "  When pre-commit detects code touching MCP tools, agent endpoints,"
+echo "  UI routes, or env vars without matching doc updates, it can invoke"
+echo "  Claude headlessly to refresh affected READMEs and re-stage them."
+echo ""
+echo "  Tunable env vars:"
+echo "    AURA_SKIP_DOC_CHECK=1            opt out entirely"
+echo "    AURA_DOC_CHECK_MODE=warn         print drift report only (no AI call)"
+echo "    AURA_DOC_CHECK_MODE=update       default — invoke Claude outside a session"
+echo "    AURA_DOC_CHECK_MODE=block        refuse commit on drift"
 echo ""
 
 # Check for required tools
