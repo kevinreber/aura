@@ -44,7 +44,7 @@ def weekend_tools():
 
 
 class TestGetTrails:
-    """Tests for weekend.get_trails (mock mode)."""
+    """Tests for weekend_get_trails (mock mode)."""
 
     @pytest.mark.asyncio
     async def test_returns_mock_trails_without_api_key(self, weekend_tools):
@@ -90,7 +90,7 @@ class TestGetTrails:
 
 
 class TestGetConcerts:
-    """Tests for weekend.get_concerts (mock mode)."""
+    """Tests for weekend_get_concerts (mock mode)."""
 
     @pytest.mark.asyncio
     async def test_returns_mock_concerts_without_api_key(self, weekend_tools):
@@ -135,7 +135,7 @@ class TestGetConcerts:
 
 
 class TestGenerateItinerary:
-    """Tests for weekend.generate_itinerary (mock mode)."""
+    """Tests for weekend_generate_itinerary (mock mode)."""
 
     @pytest.mark.asyncio
     async def test_returns_mock_itinerary_without_api_key(self, weekend_tools):

@@ -112,7 +112,7 @@ class TransitEstimate(BaseModel):
 
 
 class TrailSearchInput(BaseModel):
-    """Input for weekend.get_trails."""
+    """Input for weekend_get_trails."""
 
     location: str = Field(
         description="City or region to search near",
@@ -130,7 +130,7 @@ class TrailSearchInput(BaseModel):
 
 
 class TrailSearchOutput(BaseModel):
-    """Output for weekend.get_trails."""
+    """Output for weekend_get_trails."""
 
     trails: List[Trail] = Field(default_factory=list, description="Matching trails")
     source: str = Field(description="Provider used (e.g. 'google_places', 'mock')")
@@ -144,7 +144,7 @@ class TrailSearchOutput(BaseModel):
 
 
 class ConcertSearchInput(BaseModel):
-    """Input for weekend.get_concerts."""
+    """Input for weekend_get_concerts."""
 
     location: str = Field(
         description="City to search around",
@@ -160,7 +160,7 @@ class ConcertSearchInput(BaseModel):
 
 
 class ConcertSearchOutput(BaseModel):
-    """Output for weekend.get_concerts."""
+    """Output for weekend_get_concerts."""
 
     events: List[ConcertEvent] = Field(default_factory=list, description="Matching events")
     source: str = Field(description="Provider used (e.g. 'bandsintown', 'mock')")
@@ -174,7 +174,7 @@ class ConcertSearchOutput(BaseModel):
 
 
 class ItineraryInput(BaseModel):
-    """Input for weekend.generate_itinerary."""
+    """Input for weekend_generate_itinerary."""
 
     destination: str = Field(
         description="City or region for the trip",
@@ -193,7 +193,7 @@ class ItineraryInput(BaseModel):
 
 
 class ItineraryOutput(BaseModel):
-    """Output for weekend.generate_itinerary."""
+    """Output for weekend_generate_itinerary."""
 
     destination: str = Field(description="Resolved destination")
     duration_days: int = Field(description="Trip duration in days")

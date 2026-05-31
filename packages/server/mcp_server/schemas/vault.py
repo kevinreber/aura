@@ -5,7 +5,7 @@ from typing import List, Optional
 
 
 class VaultSearchInput(BaseModel):
-    """Input schema for vault.search tool."""
+    """Input schema for vault_search tool."""
 
     query: str = Field(
         min_length=1,
@@ -42,7 +42,7 @@ class VaultSearchHit(BaseModel):
 
 
 class VaultSearchOutput(BaseModel):
-    """Output schema for vault.search tool."""
+    """Output schema for vault_search tool."""
 
     query: str = Field(description="Echoed query string")
     folder: Optional[str] = Field(default=None, description="Echoed folder scope")
@@ -73,7 +73,7 @@ class VaultSearchOutput(BaseModel):
 
 
 class VaultReadInput(BaseModel):
-    """Input schema for vault.read tool."""
+    """Input schema for vault_read tool."""
 
     path: str = Field(
         min_length=1,
@@ -83,7 +83,7 @@ class VaultReadInput(BaseModel):
 
 
 class VaultReadOutput(BaseModel):
-    """Output schema for vault.read tool."""
+    """Output schema for vault_read tool."""
 
     path: str = Field(description="Echoed vault-relative path")
     content: str = Field(description="Raw file contents")
@@ -91,7 +91,7 @@ class VaultReadOutput(BaseModel):
 
 
 class VaultListInput(BaseModel):
-    """Input schema for vault.list tool."""
+    """Input schema for vault_list tool."""
 
     folder: Optional[str] = Field(
         default=None,
@@ -109,7 +109,7 @@ class VaultEntry(BaseModel):
 
 
 class VaultListOutput(BaseModel):
-    """Output schema for vault.list tool."""
+    """Output schema for vault_list tool."""
 
     folder: str = Field(description="Echoed folder (or '.' for root)")
     entries: List[VaultEntry] = Field(description="Entries at this level (one level deep)")

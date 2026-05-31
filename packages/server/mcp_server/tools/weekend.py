@@ -217,12 +217,12 @@ class WeekendTools:
             await cache.set(cache_key, result.model_dump(), CacheTTL.WEEKEND_TRAILS)
 
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weekend.get_trails", input_data.model_dump(), duration_ms)
+            log_tool_call("weekend_get_trails", input_data.model_dump(), duration_ms)
             return result
 
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weekend.get_trails", input_data.model_dump(), duration_ms)
+            log_tool_call("weekend_get_trails", input_data.model_dump(), duration_ms)
             logger.error(f"Error getting trails: {e}")
             return TrailSearchOutput(
                 trails=[],
@@ -345,12 +345,12 @@ class WeekendTools:
             await cache.set(cache_key, result.model_dump(), CacheTTL.WEEKEND_CONCERTS)
 
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weekend.get_concerts", input_data.model_dump(), duration_ms)
+            log_tool_call("weekend_get_concerts", input_data.model_dump(), duration_ms)
             return result
 
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("weekend.get_concerts", input_data.model_dump(), duration_ms)
+            log_tool_call("weekend_get_concerts", input_data.model_dump(), duration_ms)
             logger.error(f"Error getting concerts: {e}")
             return ConcertSearchOutput(
                 events=[],
@@ -532,14 +532,14 @@ class WeekendTools:
 
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call(
-                "weekend.generate_itinerary", input_data.model_dump(), duration_ms
+                "weekend_generate_itinerary", input_data.model_dump(), duration_ms
             )
             return result
 
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call(
-                "weekend.generate_itinerary", input_data.model_dump(), duration_ms
+                "weekend_generate_itinerary", input_data.model_dump(), duration_ms
             )
             logger.error(f"Error generating itinerary: {e}")
             return ItineraryOutput(

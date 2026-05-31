@@ -67,7 +67,7 @@ This guide walks you through setting up Google Calendar API integration for your
 
 3. Test the calendar endpoint:
    ```bash
-   curl -X POST http://localhost:8000/tools/calendar.list_events \
+   curl -X POST http://localhost:8000/tools/calendar_list_events \
         -H "Content-Type: application/json" \
         -d '{"date": "2024-12-18"}'
    ```

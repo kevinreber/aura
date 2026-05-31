@@ -12,7 +12,7 @@ _DEFAULT_TZ = pytz.timezone("America/Los_Angeles")
 
 
 class CalendarInput(BaseModel):
-    """Input schema for calendar.list_events tool."""
+    """Input schema for calendar_list_events tool."""
     
     date: dt.date = Field(
         description="Date to list events for (YYYY-MM-DD format)",
@@ -21,7 +21,7 @@ class CalendarInput(BaseModel):
 
 
 class CalendarRangeInput(BaseModel):
-    """Input schema for calendar.list_events_range tool."""
+    """Input schema for calendar_list_events_range tool."""
     
     start_date: dt.date = Field(
         description="Start date of the range (YYYY-MM-DD format, inclusive)",
@@ -63,7 +63,7 @@ class CalendarEvent(BaseModel):
 
 
 class CalendarOutput(BaseModel):
-    """Output schema for calendar.list_events tool."""
+    """Output schema for calendar_list_events tool."""
     
     date: dt.date = Field(description="Date queried for events")
     events: List[CalendarEvent] = Field(description="List of events for the date")
@@ -91,7 +91,7 @@ class CalendarOutput(BaseModel):
 
 
 class CalendarRangeOutput(BaseModel):
-    """Output schema for calendar.list_events_range tool."""
+    """Output schema for calendar_list_events_range tool."""
     
     start_date: dt.date = Field(description="Start date of the queried range")
     end_date: dt.date = Field(description="End date of the queried range")
@@ -121,7 +121,7 @@ class CalendarRangeOutput(BaseModel):
 
 
 class CalendarCreateInput(BaseModel):
-    """Input schema for calendar.create_event tool."""
+    """Input schema for calendar_create_event tool."""
     
     title: str = Field(
         description="Event title/summary",
@@ -188,7 +188,7 @@ class CalendarCreateInput(BaseModel):
 
 
 class CalendarCreateOutput(BaseModel):
-    """Output schema for calendar.create_event tool."""
+    """Output schema for calendar_create_event tool."""
     
     success: bool = Field(description="Whether the event was created successfully")
     event_id: Optional[str] = Field(description="Google Calendar event ID if created")
@@ -224,7 +224,7 @@ class CalendarCreateOutput(BaseModel):
 
 
 class CalendarUpdateInput(BaseModel):
-    """Input schema for calendar.update_event tool."""
+    """Input schema for calendar_update_event tool."""
     event_id: str = Field(description="Google Calendar event ID to update")
     title: Optional[str] = Field(default=None, description="New event title/summary")
     start_time: Optional[datetime] = Field(default=None, description="New event start time")
@@ -277,7 +277,7 @@ class CalendarUpdateInput(BaseModel):
 
 
 class CalendarUpdateOutput(BaseModel):
-    """Output schema for calendar.update_event tool."""
+    """Output schema for calendar_update_event tool."""
     success: bool = Field(description="Whether the event was updated successfully")
     event_id: str = Field(description="Google Calendar event ID that was updated")
     event_url: Optional[str] = Field(description="URL to view the updated event in Google Calendar")
@@ -312,7 +312,7 @@ class CalendarUpdateOutput(BaseModel):
 
 
 class CalendarDeleteInput(BaseModel):
-    """Input schema for calendar.delete_event tool."""
+    """Input schema for calendar_delete_event tool."""
     event_id: str = Field(description="Google Calendar event ID to delete")
     calendar_name: Optional[str] = Field(default="primary", description="Calendar to delete event from (primary, work, personal, etc.)")
 
@@ -326,7 +326,7 @@ class CalendarDeleteInput(BaseModel):
 
 
 class CalendarDeleteOutput(BaseModel):
-    """Output schema for calendar.delete_event tool."""
+    """Output schema for calendar_delete_event tool."""
     success: bool = Field(description="Whether the event was deleted successfully")
     event_id: str = Field(description="Google Calendar event ID that was deleted")
     deleted_event: Optional[CalendarEvent] = Field(description="The deleted event details")
@@ -354,7 +354,7 @@ class CalendarDeleteOutput(BaseModel):
 
 
 class CalendarFindFreeTimeInput(BaseModel):
-    """Input schema for calendar.find_free_time tool."""
+    """Input schema for calendar_find_free_time tool."""
     duration_minutes: int = Field(description="Duration needed in minutes (e.g., 30, 60, 120)")
     start_date: str = Field(description="Start date to search from (YYYY-MM-DD format)")
     end_date: Optional[str] = Field(default=None, description="End date to search until (YYYY-MM-DD format, defaults to start_date)")
@@ -424,7 +424,7 @@ class FreeTimeSlot(BaseModel):
 
 
 class CalendarFindFreeTimeOutput(BaseModel):
-    """Output schema for calendar.find_free_time tool."""
+    """Output schema for calendar_find_free_time tool."""
     success: bool = Field(description="Whether free time slots were found")
     free_slots: List[FreeTimeSlot] = Field(description="Available time slots matching criteria")
     total_slots_found: int = Field(description="Total number of slots found")

@@ -21,7 +21,7 @@ A complete transformation of the mobility system with real-time traffic data, li
 
 #### **🚗🚂 Comprehensive Commute Analysis**
 
-- **`mobility.get_commute_options`** - Complete morning/evening commute intelligence
+- **`mobility_get_commute_options`** - Complete morning/evening commute intelligence
   - Real-time driving conditions with traffic analysis
   - ⛽ **NEW**: EPA-based fuel consumption estimates (26 MPG average)
   - 🗺️ **NEW**: Clean route format ("South SF → LinkedIn" vs highway names)
@@ -32,7 +32,7 @@ A complete transformation of the mobility system with real-time traffic data, li
 
 #### **🚌 Shuttle Schedule Integration**
 
-- **`mobility.get_shuttle_schedule`** - MV Connector schedule queries
+- **`mobility_get_shuttle_schedule`** - MV Connector schedule queries
   - Complete timetables for all 3 stops (MV Caltrain ↔ LinkedIn Transit Center ↔ LinkedIn 950|1000)
   - Real-time next departure calculations
   - Service hours validation (morning 6:50 AM - 10:58 AM, evening 3:16 PM - 6:42 PM)
@@ -224,14 +224,14 @@ Your AI assistant can now answer:
 
 ### ✨ **New Tools**
 
-- `calendar.update_event` - Update existing calendar events with granular field updates
+- `calendar_update_event` - Update existing calendar events with granular field updates
 
   - Partial updates (only change specified fields)
   - Enhanced conflict detection (excludes event being updated)
   - Change tracking (reports exactly what was modified)
   - Support for all event properties (title, time, location, attendees, etc.)
 
-- `calendar.delete_event` - Delete calendar events safely
+- `calendar_delete_event` - Delete calendar events safely
   - Pre-deletion event retrieval for confirmation
   - Comprehensive error handling (404 for missing events, 403 for permissions)
   - Event details returned for audit trail
@@ -239,8 +239,8 @@ Your AI assistant can now answer:
 ### 🔧 **API Enhancements**
 
 - **New Endpoints**:
-  - `POST /tools/calendar.update_event` - Update calendar events
-  - `POST /tools/calendar.delete_event` - Delete calendar events
+  - `POST /tools/calendar_update_event` - Update calendar events
+  - `POST /tools/calendar_delete_event` - Delete calendar events
 - **Enhanced Schemas**: `CalendarUpdateInput/Output` and `CalendarDeleteInput/Output`
 - **Improved Error Responses**: Proper HTTP status codes (404 for missing events)
 - **Advanced Validation**: Field-level validation for updates with timezone awareness
@@ -262,17 +262,17 @@ Your AI assistant can now answer:
 
 - **Read Operations**:
 
-  - `weather.get_daily` - Weather forecasts via OpenWeatherMap
-  - `calendar.list_events` - Single date calendar events (✅ **FIXED**)
-  - `calendar.list_events_range` - Multi-day calendar events
-  - `todo.list` - Task management with filtering
-  - `mobility.get_commute` - Travel times via Google Maps
-  - `financial.get_data` - Stock/crypto prices
+  - `weather_get_daily` - Weather forecasts via OpenWeatherMap
+  - `calendar_list_events` - Single date calendar events (✅ **FIXED**)
+  - `calendar_list_events_range` - Multi-day calendar events
+  - `todo_list` - Task management with filtering
+  - `mobility_get_commute` - Travel times via Google Maps
+  - `financial_get_data` - Stock/crypto prices
 
 - **Write Operations**:
-  - `calendar.create_event` - Create calendar events with conflict detection
-  - `calendar.update_event` - **NEW**: Update existing events with change tracking
-  - `calendar.delete_event` - **NEW**: Delete calendar events safely
+  - `calendar_create_event` - Create calendar events with conflict detection
+  - `calendar_update_event` - **NEW**: Update existing events with change tracking
+  - `calendar_delete_event` - **NEW**: Delete calendar events safely
 
 ### 🎯 **User Experience Improvements**
 
@@ -297,14 +297,14 @@ Your AI assistant can now answer:
 
 ### 🚀 **Major Features Added**
 
-- **Calendar Event Creation**: Added `calendar.create_event` tool - first write operation!
+- **Calendar Event Creation**: Added `calendar_create_event` tool - first write operation!
 - **Smart Conflict Detection**: Automatically detects overlapping events when creating new ones
 - **Multi-Calendar Support**: Works with Primary, Runna, Family, and other Google calendars
 - **Enhanced Google Calendar Integration**: Added write permissions and full CRUD capabilities
 
 ### ✨ **New Tools**
 
-- `calendar.create_event` - Create new calendar events with rich metadata
+- `calendar_create_event` - Create new calendar events with rich metadata
   - Support for title, start/end times, location, description, attendees
   - Automatic conflict detection with existing events
   - Multi-calendar targeting (primary, work, personal, etc.)
@@ -312,7 +312,7 @@ Your AI assistant can now answer:
 
 ### 🔧 **API Enhancements**
 
-- **New Endpoint**: `POST /tools/calendar.create_event`
+- **New Endpoint**: `POST /tools/calendar_create_event`
 - **Enhanced Schemas**: `CalendarCreateInput` and `CalendarCreateOutput` with comprehensive validation
 - **Improved Error Handling**: Graceful fallbacks when Google Calendar API unavailable
 - **OAuth Scope Updates**: Added `calendar.events` scope for write permissions
@@ -328,15 +328,15 @@ Your AI assistant can now answer:
 
 - **Read Operations**:
 
-  - `weather.get_daily` - Weather forecasts via OpenWeatherMap
-  - `calendar.list_events` - Single date calendar events
-  - `calendar.list_events_range` - Multi-day calendar events (efficient batching)
-  - `todo.list` - Task management with filtering
-  - `mobility.get_commute` - Travel times via Google Maps
-  - `financial.get_data` - Stock/crypto prices via Alpha Vantage & CoinGecko
+  - `weather_get_daily` - Weather forecasts via OpenWeatherMap
+  - `calendar_list_events` - Single date calendar events
+  - `calendar_list_events_range` - Multi-day calendar events (efficient batching)
+  - `todo_list` - Task management with filtering
+  - `mobility_get_commute` - Travel times via Google Maps
+  - `financial_get_data` - Stock/crypto prices via Alpha Vantage & CoinGecko
 
 - **Write Operations**:
-  - `calendar.create_event` - Create calendar events with conflict detection
+  - `calendar_create_event` - Create calendar events with conflict detection
 
 ### 🐛 **Bug Fixes**
 

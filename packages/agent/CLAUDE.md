@@ -230,23 +230,23 @@ Defined in `agent/tools.py`. The orchestrator registers all of them by default.
 
 | # | Tool class | Wraps MCP tool | Purpose |
 |---|---|---|---|
-| 1 | `WeatherTool` | `weather.get_daily` | Forecast for a location |
-| 2 | `CalendarTool` | `calendar.list_events` | Events for a single date |
-| 3 | `CalendarRangeTool` | `calendar.list_events_range` | Events for a date range |
-| 4 | `CalendarCreateTool` | `calendar.create_event` | Create event w/ conflict check |
-| 5 | `CalendarUpdateTool` | `calendar.update_event` | Update existing event |
-| 6 | `CalendarDeleteTool` | `calendar.delete_event` | Delete event |
-| 7 | `TodoTool` | `todo.list` | List todos (bucketed) |
-| 8 | `TodoCreateTool` | `todo.create` | Create todo |
-| 9 | `CommuteTool` | `mobility.get_commute` | Basic commute |
-| 10 | `CommuteOptionsTool` | `mobility.get_commute_options` | Drive vs transit comparison |
-| 11 | `ShuttleTool` | `mobility.get_shuttle_schedule` | MV Connector shuttle schedules |
-| 12 | `FinancialTool` | `financial.get_data` | Stock + crypto prices |
+| 1 | `WeatherTool` | `weather_get_daily` | Forecast for a location |
+| 2 | `CalendarTool` | `calendar_list_events` | Events for a single date |
+| 3 | `CalendarRangeTool` | `calendar_list_events_range` | Events for a date range |
+| 4 | `CalendarCreateTool` | `calendar_create_event` | Create event w/ conflict check |
+| 5 | `CalendarUpdateTool` | `calendar_update_event` | Update existing event |
+| 6 | `CalendarDeleteTool` | `calendar_delete_event` | Delete event |
+| 7 | `TodoTool` | `todo_list` | List todos (bucketed) |
+| 8 | `TodoCreateTool` | `todo_create` | Create todo |
+| 9 | `CommuteTool` | `mobility_get_commute` | Basic commute |
+| 10 | `CommuteOptionsTool` | `mobility_get_commute_options` | Drive vs transit comparison |
+| 11 | `ShuttleTool` | `mobility_get_shuttle_schedule` | MV Connector shuttle schedules |
+| 12 | `FinancialTool` | `financial_get_data` | Stock + crypto prices |
 | 13 | `MorningBriefingTool` | (orchestrated) | Composite daily briefing |
-| 14 | `CreateTravelBlockTool` | `calendar.create_event` | Deterministic travel-time blocks |
-| 15 | `TrailScoutTool` | `weekend.get_trails` | Weekend trail scouting |
-| 16 | `ConcertAlertTool` | `weekend.get_concerts` | Concert listings |
-| 17 | `ItineraryTool` | `weekend.generate_itinerary` | Multi-day weekend itinerary |
+| 14 | `CreateTravelBlockTool` | `calendar_create_event` | Deterministic travel-time blocks |
+| 15 | `TrailScoutTool` | `weekend_get_trails` | Weekend trail scouting |
+| 16 | `ConcertAlertTool` | `weekend_get_concerts` | Concert listings |
+| 17 | `ItineraryTool` | `weekend_generate_itinerary` | Multi-day weekend itinerary |
 
 ## Important Conventions
 

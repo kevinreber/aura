@@ -90,13 +90,13 @@ class CalendarTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.list_events", input_data.dict(), duration_ms)
+            log_tool_call("calendar_list_events", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.list_events", input_data.dict(), duration_ms)
+            log_tool_call("calendar_list_events", input_data.dict(), duration_ms)
             logger.error(f"Error getting calendar events: {e}")
             raise
     
@@ -127,13 +127,13 @@ class CalendarTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.list_events_range", input_data.dict(), duration_ms)
+            log_tool_call("calendar_list_events_range", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.list_events_range", input_data.dict(), duration_ms)
+            log_tool_call("calendar_list_events_range", input_data.dict(), duration_ms)
             logger.error(f"Error getting calendar events for range: {e}")
             raise
     
@@ -474,13 +474,13 @@ class CalendarTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.create_event", input_data.dict(), duration_ms)
+            log_tool_call("calendar_create_event", input_data.dict(), duration_ms)
             
             return output
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("calendar.create_event", input_data.dict(), duration_ms)
+            log_tool_call("calendar_create_event", input_data.dict(), duration_ms)
             logger.error(f"Error creating calendar event: {e}")
             
             return CalendarCreateOutput(

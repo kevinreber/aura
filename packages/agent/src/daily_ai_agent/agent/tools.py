@@ -300,7 +300,7 @@ class CalendarCreateTool(BaseTool):
             # Remove None values
             event_data = {k: v for k, v in event_data.items() if v is not None}
             
-            result = await client.call_tool("calendar.create_event", event_data)
+            result = await client.call_tool("calendar_create_event", event_data)
             
             if result.get('success'):
                 message = result.get('message', 'Event created successfully')
@@ -348,7 +348,7 @@ class CalendarUpdateTool(BaseTool):
     description: str = (
         "Update an existing calendar event. Use this when the user wants to MOVE, "
         "RESCHEDULE, or EDIT an event they already have. Requires the event_id from "
-        "calendar.list_events or from a previous create response. DO NOT create a new "
+        "calendar_list_events or from a previous create response. DO NOT create a new "
         "event when the user wants to move an existing one — that would leave both."
     )
     args_schema: Type[BaseModel] = CalendarUpdateInput
@@ -384,7 +384,7 @@ class CalendarUpdateTool(BaseTool):
                 if v is not None:
                     payload[k] = v
 
-            result = await client.call_tool("calendar.update_event", payload)
+            result = await client.call_tool("calendar_update_event", payload)
 
             if result.get("success"):
                 changes = result.get("changes_made") or []
@@ -429,7 +429,7 @@ class CalendarDeleteTool(BaseTool):
     name: str = "delete_calendar_event"
     description: str = (
         "Delete an existing calendar event. Use this when the user wants to REMOVE, "
-        "CANCEL, or DELETE an event. Requires the event_id from calendar.list_events "
+        "CANCEL, or DELETE an event. Requires the event_id from calendar_list_events "
         "or from a previous tool response. DO NOT create a 'cancellation' marker event "
         "as a workaround — actually delete the original."
     )
@@ -442,7 +442,7 @@ class CalendarDeleteTool(BaseTool):
         try:
             client = self._get_mcp_client()
             result = await client.call_tool(
-                "calendar.delete_event",
+                "calendar_delete_event",
                 {"event_id": event_id, "calendar_name": calendar_name},
             )
             if result.get("success"):
@@ -549,7 +549,7 @@ class TodoCreateTool(BaseTool):
             if description:
                 payload["description"] = description
 
-            result = await client.call_tool("todo.create", payload)
+            result = await client.call_tool("todo_create", payload)
 
             if result.get("success"):
                 todo = result.get("todo") or {}
@@ -734,7 +734,7 @@ class FinancialTool(BaseTool):
         """Get financial data."""
         try:
             client = self._get_mcp_client()
-            data = await client.call_tool("financial.get_data", {"symbols": symbols, "data_type": data_type})
+            data = await client.call_tool("financial_get_data", {"symbols": symbols, "data_type": data_type})
             
             if 'data' in data:
                 financial_items = data['data']
@@ -788,7 +788,7 @@ class MorningBriefingTool(BaseTool):
             data = await client.get_all_morning_data(today)
             
             # Get financial data for tracked symbols from config
-            financial_data = await client.call_tool("financial.get_data", {
+            financial_data = await client.call_tool("financial_get_data", {
                 "symbols": FINANCIAL_SYMBOLS,
                 "data_type": "mixed"
             })
@@ -891,7 +891,7 @@ class CreateTravelBlockTool(BaseTool):
             destination = self._short_destination(next_event_title)
             travel_title = f"🚗 Drive to {destination}"
 
-            # The MCP server's calendar.create_event accepts naive ISO strings;
+            # The MCP server's calendar_create_event accepts naive ISO strings;
             # the schema's localize() validator will stamp Pacific timezone.
             payload: Dict[str, Any] = {
                 "title": travel_title,
@@ -904,7 +904,7 @@ class CreateTravelBlockTool(BaseTool):
             }
 
             client = self._get_mcp_client()
-            result = await client.call_tool("calendar.create_event", payload)
+            result = await client.call_tool("calendar_create_event", payload)
 
             if result.get("success"):
                 event_id = result.get("event_id", "")
@@ -973,7 +973,7 @@ class TrailScoutTool(BaseTool):
             if difficulty:
                 payload["difficulty"] = difficulty
 
-            data = await client.call_tool("weekend.get_trails", payload)
+            data = await client.call_tool("weekend_get_trails", payload)
             trails = data.get("trails", [])
             source = data.get("source", "unknown")
 
@@ -1054,7 +1054,7 @@ class ConcertAlertTool(BaseTool):
             if artists:
                 payload["artists"] = artists
 
-            data = await client.call_tool("weekend.get_concerts", payload)
+            data = await client.call_tool("weekend_get_concerts", payload)
             events = data.get("events", [])
             source = data.get("source", "unknown")
 
@@ -1118,7 +1118,7 @@ class ItineraryTool(BaseTool):
             if base_location:
                 payload["base_location"] = base_location
 
-            data = await client.call_tool("weekend.generate_itinerary", payload)
+            data = await client.call_tool("weekend_generate_itinerary", payload)
             pois = data.get("points_of_interest", [])
             transit = data.get("transit_estimates")
             source = data.get("source", "unknown")

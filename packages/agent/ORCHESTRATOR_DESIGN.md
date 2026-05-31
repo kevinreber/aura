@@ -129,7 +129,7 @@ async def validate_itinerary(
     legs, scheduled, issues = [], [], []
 
     for activity in sequence:
-        leg = await mobility.get_commute(
+        leg = await mobility_get_commute(
             origin=cursor_loc,
             destination=activity.location,
             departure_time=cursor,  # important: time-of-day affects traffic
@@ -150,7 +150,7 @@ async def validate_itinerary(
         cursor, cursor_loc = end, activity.location
 
     # 4. Close the loop — return-home leg
-    return_leg = await mobility.get_commute(cursor_loc, budget.home_base, departure_time=cursor)
+    return_leg = await mobility_get_commute(cursor_loc, budget.home_base, departure_time=cursor)
     legs.append(return_leg)
 
     # 5. Classify

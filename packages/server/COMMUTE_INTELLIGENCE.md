@@ -38,7 +38,7 @@ The Daily MCP Server includes a comprehensive **Commute Intelligence System** th
 
 ## 📋 Available Tools
 
-### `mobility.get_commute_options`
+### `mobility_get_commute_options`
 
 **Comprehensive commute analysis with driving AND transit options.**
 
@@ -58,7 +58,7 @@ The Daily MCP Server includes a comprehensive **Commute Intelligence System** th
 - MV Connector shuttle connections
 - AI recommendation comparing all options
 
-### `mobility.get_shuttle_schedule`
+### `mobility_get_shuttle_schedule`
 
 **Detailed MV Connector shuttle schedules between specific stops.**
 
@@ -77,7 +77,7 @@ The Daily MCP Server includes a comprehensive **Commute Intelligence System** th
 - Service hours and frequency
 - All stop information
 
-### `mobility.get_commute` (Enhanced)
+### `mobility_get_commute` (Enhanced)
 
 **Basic commute information with real-time traffic.**
 
@@ -165,7 +165,7 @@ print(f'🗺️ Google Maps: {\"✅ Configured\" if s.google_maps_api_key else \
 **Morning commute analysis:**
 
 ```bash
-curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
+curl -X POST http://localhost:8000/tools/mobility_get_commute_options \
   -H "Content-Type: application/json" \
   -d '{
     "direction": "to_work",
@@ -178,7 +178,7 @@ curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
 **Shuttle schedule query:**
 
 ```bash
-curl -X POST http://localhost:8000/tools/mobility.get_shuttle_schedule \
+curl -X POST http://localhost:8000/tools/mobility_get_shuttle_schedule \
   -H "Content-Type: application/json" \
   -d '{
     "origin": "mountain_view_caltrain",

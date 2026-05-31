@@ -89,13 +89,13 @@ class TodoTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.list", input_data.dict(), duration_ms)
+            log_tool_call("todo_list", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.list", input_data.dict(), duration_ms)
+            log_tool_call("todo_list", input_data.dict(), duration_ms)
             logger.error(f"Error getting todo items: {e}")
             raise
     
@@ -119,13 +119,13 @@ class TodoTool:
             )
             
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.create", input_data.dict(), duration_ms)
+            log_tool_call("todo_create", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.create", input_data.dict(), duration_ms)
+            log_tool_call("todo_create", input_data.dict(), duration_ms)
             logger.error(f"Error creating todo: {e}")
             return TodoCreateOutput(
                 success=False,
@@ -154,13 +154,13 @@ class TodoTool:
             )
             
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.update", input_data.dict(), duration_ms)
+            log_tool_call("todo_update", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.update", input_data.dict(), duration_ms)
+            log_tool_call("todo_update", input_data.dict(), duration_ms)
             logger.error(f"Error updating todo: {e}")
             return TodoUpdateOutput(
                 success=False,
@@ -190,13 +190,13 @@ class TodoTool:
             )
             
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.complete", input_data.dict(), duration_ms)
+            log_tool_call("todo_complete", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.complete", input_data.dict(), duration_ms)
+            log_tool_call("todo_complete", input_data.dict(), duration_ms)
             logger.error(f"Error completing todo: {e}")
             action = "complete" if input_data.completed else "uncomplete"
             return TodoCompleteOutput(
@@ -225,13 +225,13 @@ class TodoTool:
             )
             
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.delete", input_data.dict(), duration_ms)
+            log_tool_call("todo_delete", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("todo.delete", input_data.dict(), duration_ms)
+            log_tool_call("todo_delete", input_data.dict(), duration_ms)
             logger.error(f"Error deleting todo: {e}")
             return TodoDeleteOutput(
                 success=False,

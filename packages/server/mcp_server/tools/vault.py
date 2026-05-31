@@ -34,7 +34,7 @@ logger = get_logger("vault_tool")
 # How many lines of surrounding context to include in each hit snippet.
 _CONTEXT_LINES = 2
 
-# Hard cap on file size for vault.read to avoid loading huge files into memory.
+# Hard cap on file size for vault_read to avoid loading huge files into memory.
 _MAX_READ_BYTES = 1_000_000  # 1 MB
 
 # Wall-clock timeout for a single ripgrep invocation.
@@ -165,12 +165,12 @@ class VaultTool:
                 truncated=truncated,
             )
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.search", input_data.model_dump(), duration_ms)
+            log_tool_call("vault_search", input_data.model_dump(), duration_ms)
             return result
         except Exception as exc:
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.search", input_data.model_dump(), duration_ms)
-            logger.error(f"vault.search failed: {exc}")
+            log_tool_call("vault_search", input_data.model_dump(), duration_ms)
+            logger.error(f"vault_search failed: {exc}")
             raise
 
     async def _run_ripgrep(
@@ -188,7 +188,7 @@ class VaultTool:
             raise RuntimeError(
                 "ripgrep (`rg`) is not installed in this environment. "
                 "Install it (e.g. `apt-get install ripgrep` or `brew install ripgrep`) "
-                "to use vault.search."
+                "to use vault_search."
             ) from exc
 
         try:
@@ -199,7 +199,7 @@ class VaultTool:
             proc.kill()
             await proc.wait()
             raise RuntimeError(
-                f"vault.search timed out after {_RIPGREP_TIMEOUT_SECS}s"
+                f"vault_search timed out after {_RIPGREP_TIMEOUT_SECS}s"
             ) from exc
 
         # rg exit codes: 0 = matches found, 1 = no matches, 2 = error.
@@ -315,12 +315,12 @@ class VaultTool:
                 size_bytes=size,
             )
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.read", input_data.model_dump(), duration_ms)
+            log_tool_call("vault_read", input_data.model_dump(), duration_ms)
             return result
         except Exception as exc:
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.read", input_data.model_dump(), duration_ms)
-            logger.error(f"vault.read failed: {exc}")
+            log_tool_call("vault_read", input_data.model_dump(), duration_ms)
+            logger.error(f"vault_read failed: {exc}")
             raise
 
     # ---------------------------------------------------------------- list
@@ -363,10 +363,10 @@ class VaultTool:
                 total=len(entries),
             )
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.list", input_data.model_dump(), duration_ms)
+            log_tool_call("vault_list", input_data.model_dump(), duration_ms)
             return result
         except Exception as exc:
             duration_ms = (asyncio.get_event_loop().time() - start) * 1000
-            log_tool_call("vault.list", input_data.model_dump(), duration_ms)
-            logger.error(f"vault.list failed: {exc}")
+            log_tool_call("vault_list", input_data.model_dump(), duration_ms)
+            logger.error(f"vault_list failed: {exc}")
             raise

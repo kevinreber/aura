@@ -23,7 +23,7 @@ class TodoPriority(str, Enum):
 
 
 class TodoInput(BaseModel):
-    """Input schema for todo.list tool."""
+    """Input schema for todo_list tool."""
     
     bucket: Optional[TodoBucket] = Field(
         default=None,
@@ -63,7 +63,7 @@ class TodoItem(BaseModel):
 
 
 class TodoOutput(BaseModel):
-    """Output schema for todo.list tool."""
+    """Output schema for todo_list tool."""
     
     bucket: Optional[TodoBucket] = Field(description="Bucket/category queried (null if all buckets)")
     items: List[TodoItem] = Field(description="List of todo items")
@@ -97,7 +97,7 @@ class TodoOutput(BaseModel):
 # CRUD Operation Schemas
 
 class TodoCreateInput(BaseModel):
-    """Input schema for todo.create tool."""
+    """Input schema for todo_create tool."""
     
     title: str = Field(description="Todo item title/description")
     priority: TodoPriority = Field(default=TodoPriority.MEDIUM, description="Priority level")
@@ -120,7 +120,7 @@ class TodoCreateInput(BaseModel):
 
 
 class TodoCreateOutput(BaseModel):
-    """Output schema for todo.create tool."""
+    """Output schema for todo_create tool."""
     
     success: bool = Field(description="Whether the todo was created successfully")
     todo: Optional[TodoItem] = Field(description="The created todo item")
@@ -146,7 +146,7 @@ class TodoCreateOutput(BaseModel):
 
 
 class TodoUpdateInput(BaseModel):
-    """Input schema for todo.update tool."""
+    """Input schema for todo_update tool."""
     
     id: str = Field(description="Unique todo item identifier to update")
     title: Optional[str] = Field(default=None, description="New title/description")
@@ -167,7 +167,7 @@ class TodoUpdateInput(BaseModel):
 
 
 class TodoUpdateOutput(BaseModel):
-    """Output schema for todo.update tool."""
+    """Output schema for todo_update tool."""
     
     success: bool = Field(description="Whether the todo was updated successfully")
     todo: Optional[TodoItem] = Field(description="The updated todo item")
@@ -195,7 +195,7 @@ class TodoUpdateOutput(BaseModel):
 
 
 class TodoCompleteInput(BaseModel):
-    """Input schema for todo.complete tool."""
+    """Input schema for todo_complete tool."""
     
     id: str = Field(description="Unique todo item identifier to complete")
     completed: bool = Field(default=True, description="Whether to mark as completed (true) or uncompleted (false)")
@@ -210,7 +210,7 @@ class TodoCompleteInput(BaseModel):
 
 
 class TodoCompleteOutput(BaseModel):
-    """Output schema for todo.complete tool."""
+    """Output schema for todo_complete tool."""
     
     success: bool = Field(description="Whether the todo status was updated successfully")
     todo: Optional[TodoItem] = Field(description="The updated todo item")
@@ -236,7 +236,7 @@ class TodoCompleteOutput(BaseModel):
 
 
 class TodoDeleteInput(BaseModel):
-    """Input schema for todo.delete tool."""
+    """Input schema for todo_delete tool."""
     
     id: str = Field(description="Unique todo item identifier to delete")
     
@@ -249,7 +249,7 @@ class TodoDeleteInput(BaseModel):
 
 
 class TodoDeleteOutput(BaseModel):
-    """Output schema for todo.delete tool."""
+    """Output schema for todo_delete tool."""
     
     success: bool = Field(description="Whether the todo was deleted successfully")
     deleted_todo: Optional[TodoItem] = Field(description="The deleted todo item (for audit trail)")

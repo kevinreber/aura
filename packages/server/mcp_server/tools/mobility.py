@@ -62,13 +62,13 @@ class MobilityTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_commute", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_commute", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_commute", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_commute", input_data.dict(), duration_ms)
             logger.error(f"Error getting commute data: {e}")
             raise
     
@@ -497,13 +497,13 @@ class MobilityTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_commute_options", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_commute_options", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_commute_options", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_commute_options", input_data.dict(), duration_ms)
             logger.error(f"Error getting commute options: {e}")
             raise
     
@@ -574,13 +574,13 @@ class MobilityTool:
             
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_shuttle_schedule", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_shuttle_schedule", input_data.dict(), duration_ms)
             
             return result
             
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
-            log_tool_call("mobility.get_shuttle_schedule", input_data.dict(), duration_ms)
+            log_tool_call("mobility_get_shuttle_schedule", input_data.dict(), duration_ms)
             logger.error(f"Error getting shuttle schedule: {e}")
             raise
     

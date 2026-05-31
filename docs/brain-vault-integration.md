@@ -93,7 +93,7 @@ real privacy boundary, and `.auraignore` is the lever that controls it.
 
 **New file:** `packages/server/mcp_server/tools/vault.py` ✅
 
-- ✅ Implemented `vault.search`, `vault.read`, `vault.list`
+- ✅ Implemented `vault_search`, `vault_read`, `vault_list`
 - ✅ ripgrep backend via `rg --json`; runs with `cwd=root` so anchored
   `.auraignore` patterns work as expected (this was a subtle gotcha — see
   the file for the comment)

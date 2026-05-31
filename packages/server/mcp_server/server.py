@@ -43,154 +43,154 @@ class MCPServer:
     def __init__(self):
         """Initialize the MCP server with available tools."""
         self.tools = {
-            "weather.get_daily": {
+            "weather_get_daily": {
                 "tool": WeatherTool(),
                 "input_schema": WeatherInput,
                 "output_schema": WeatherOutput,
                 "description": "Get daily weather forecast for a location",
                 "method": "get_daily"
             },
-            "mobility.get_commute": {
+            "mobility_get_commute": {
                 "tool": MobilityTool(),
                 "input_schema": MobilityInput,
                 "output_schema": MobilityOutput,
                 "description": "Get commute information between two locations",
                 "method": "get_commute"
             },
-            "mobility.get_commute_options": {
+            "mobility_get_commute_options": {
                 "tool": MobilityTool(),
                 "input_schema": CommuteInput,
                 "output_schema": CommuteOutput,
                 "description": "Get comprehensive commute options with driving and transit (Caltrain + shuttle) for morning/evening commutes",
                 "method": "get_commute_options"
             },
-            "mobility.get_shuttle_schedule": {
+            "mobility_get_shuttle_schedule": {
                 "tool": MobilityTool(),
                 "input_schema": ShuttleScheduleInput,
                 "output_schema": ShuttleScheduleOutput,
                 "description": "Get MV Connector shuttle schedule between Mountain View Caltrain, LinkedIn Transit Center, and LinkedIn 950|1000",
                 "method": "get_shuttle_schedule"
             },
-            "calendar.list_events": {
+            "calendar_list_events": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarInput,
                 "output_schema": CalendarOutput,
                 "description": "List calendar events for a specific date",
                 "method": "list_events"
             },
-            "calendar.list_events_range": {
+            "calendar_list_events_range": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarRangeInput,
                 "output_schema": CalendarRangeOutput,
                 "description": "List calendar events for a date range (more efficient than multiple single-date calls)",
                 "method": "list_events_range"
             },
-            "calendar.create_event": {
+            "calendar_create_event": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarCreateInput,
                 "output_schema": CalendarCreateOutput,
                 "description": "Create a new calendar event with conflict detection and smart scheduling",
                 "method": "create_event"
             },
-            "calendar.update_event": {
+            "calendar_update_event": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarUpdateInput,
                 "output_schema": CalendarUpdateOutput,
                 "description": "Update an existing calendar event with conflict detection",
                 "method": "update_event"
             },
-            "calendar.delete_event": {
+            "calendar_delete_event": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarDeleteInput,
                 "output_schema": CalendarDeleteOutput,
                 "description": "Delete a calendar event",
                 "method": "delete_event"
             },
-            "calendar.find_free_time": {
+            "calendar_find_free_time": {
                 "tool": CalendarTool(),
                 "input_schema": CalendarFindFreeTimeInput,
                 "output_schema": CalendarFindFreeTimeOutput,
                 "description": "Find available time slots based on duration and constraints for smart scheduling",
                 "method": "find_free_time"
             },
-            "todo.list": {
+            "todo_list": {
                 "tool": TodoTool(),
                 "input_schema": TodoInput,
                 "output_schema": TodoOutput,
                 "description": "List todo items from a specific bucket",
                 "method": "list_todos"
             },
-            "todo.create": {
+            "todo_create": {
                 "tool": TodoTool(),
                 "input_schema": TodoCreateInput,
                 "output_schema": TodoCreateOutput,
                 "description": "Create a new todo item with smart categorization and natural language due dates",
                 "method": "create_todo"
             },
-            "todo.update": {
+            "todo_update": {
                 "tool": TodoTool(),
                 "input_schema": TodoUpdateInput,
                 "output_schema": TodoUpdateOutput,
                 "description": "Update an existing todo item (title, priority, due date, tags)",
                 "method": "update_todo"
             },
-            "todo.complete": {
+            "todo_complete": {
                 "tool": TodoTool(),
                 "input_schema": TodoCompleteInput,
                 "output_schema": TodoCompleteOutput,
                 "description": "Mark a todo item as completed or uncompleted",
                 "method": "complete_todo"
             },
-            "todo.delete": {
+            "todo_delete": {
                 "tool": TodoTool(),
                 "input_schema": TodoDeleteInput,
                 "output_schema": TodoDeleteOutput,
                 "description": "Delete a todo item permanently",
                 "method": "delete_todo"
             },
-            "financial.get_data": {
+            "financial_get_data": {
                 "tool": FinancialTool(),
                 "input_schema": FinancialInput,
                 "output_schema": FinancialOutput,
                 "description": "Get financial data for stocks and cryptocurrencies",
                 "method": "get_financial_data"
             },
-            "weekend.get_trails": {
+            "weekend_get_trails": {
                 "tool": WeekendTools(),
                 "input_schema": TrailSearchInput,
                 "output_schema": TrailSearchOutput,
                 "description": "Scout outdoor trails near a location, filtered by activity type and difficulty",
                 "method": "get_trails"
             },
-            "weekend.get_concerts": {
+            "weekend_get_concerts": {
                 "tool": WeekendTools(),
                 "input_schema": ConcertSearchInput,
                 "output_schema": ConcertSearchOutput,
                 "description": "Find upcoming concerts and live music events for tracked artists or by location",
                 "method": "get_concerts"
             },
-            "weekend.generate_itinerary": {
+            "weekend_generate_itinerary": {
                 "tool": WeekendTools(),
                 "input_schema": ItineraryInput,
                 "output_schema": ItineraryOutput,
                 "description": "Generate a structured multi-day itinerary with points of interest and transit estimates",
                 "method": "generate_itinerary"
             },
-            "vault.search": {
+            "vault_search": {
                 "tool": VaultTool(),
                 "input_schema": VaultSearchInput,
                 "output_schema": VaultSearchOutput,
                 "description": "Search Kevin's personal markdown vault (projects, career, meetings, decisions) by keyword or regex; returns ranked snippets with file paths and line numbers",
                 "method": "search"
             },
-            "vault.read": {
+            "vault_read": {
                 "tool": VaultTool(),
                 "input_schema": VaultReadInput,
                 "output_schema": VaultReadOutput,
-                "description": "Read a single markdown file from Kevin's personal vault by vault-relative path (use vault.search first to discover paths)",
+                "description": "Read a single markdown file from Kevin's personal vault by vault-relative path (use vault_search first to discover paths)",
                 "method": "read"
             },
-            "vault.list": {
+            "vault_list": {
                 "tool": VaultTool(),
                 "input_schema": VaultListInput,
                 "output_schema": VaultListOutput,

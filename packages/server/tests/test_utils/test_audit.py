@@ -15,7 +15,7 @@ class TestAuditLog:
         """Test basic audit logging."""
         with patch('mcp_server.utils.audit.audit_logger') as mock_logger:
             audit_log(
-                operation="calendar.create_event",
+                operation="calendar_create_event",
                 input_data={"title": "Test Event"},
                 result={"success": True, "event_id": "123"},
                 client_ip="127.0.0.1"
@@ -24,13 +24,13 @@ class TestAuditLog:
             mock_logger.info.assert_called_once()
             call_args = mock_logger.info.call_args[0][0]
             assert "AUDIT:" in call_args
-            assert "calendar.create_event" in call_args
+            assert "calendar_create_event" in call_args
 
     def test_audit_log_with_user_id(self):
         """Test audit logging with user ID."""
         with patch('mcp_server.utils.audit.audit_logger') as mock_logger:
             audit_log(
-                operation="todo.create",
+                operation="todo_create",
                 input_data={"title": "Test Todo"},
                 result={"success": True},
                 client_ip="192.168.1.1",
@@ -172,7 +172,7 @@ class TestAuditTrail:
     def test_get_by_operation(self):
         """Test filtering by operation."""
         AuditTrail.add({"operation": "calendar.create"})
-        AuditTrail.add({"operation": "todo.create"})
+        AuditTrail.add({"operation": "todo_create"})
         AuditTrail.add({"operation": "calendar.create"})
 
         calendar_ops = AuditTrail.get_by_operation("calendar.create")
@@ -191,7 +191,7 @@ class TestAuditTrail:
         AuditTrail.add({"operation": "calendar.create", "success": True})
         AuditTrail.add({"operation": "calendar.create", "success": True})
         AuditTrail.add({"operation": "calendar.create", "success": False})
-        AuditTrail.add({"operation": "todo.create", "success": True})
+        AuditTrail.add({"operation": "todo_create", "success": True})
 
         stats = AuditTrail.get_stats()
 

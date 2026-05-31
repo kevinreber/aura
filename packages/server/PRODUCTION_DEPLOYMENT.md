@@ -65,7 +65,7 @@ Test the production deployment:
 
 ```bash
 # Test Google Calendar endpoint
-curl https://your-railway-url.up.railway.app/tools/calendar.list_events \
+curl https://your-railway-url.up.railway.app/tools/calendar_list_events \
   -H "Content-Type: application/json" \
   -d '{"date": "2025-08-18"}'
 

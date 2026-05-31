@@ -12,7 +12,7 @@
 ## 2) High-Level Architecture
 
 - [ ] **Agent layer:** Coordinator agent (planner/orchestrator); any specialist agents?
-- [ ] **MCP server(s):** single to start; list tool namespace (e.g., `weather.get_daily`, `mobility.get_commute`, `calendar.list_events`, `todo.list`)
+- [ ] **MCP server(s):** single to start; list tool namespace (e.g., `weather_get_daily`, `mobility_get_commute`, `calendar_list_events`, `todo_list`)
 - [ ] **Backends:** which APIs/SDKs each tool wraps
 - [ ] **UI/API:** web/mobile app → BFF/GraphQL → agent sessions
 - [ ] **State:** what we store (session memory, preferences), where (KV/DB), retention
@@ -46,13 +46,13 @@
 **User request → response (read path):**
 
 1. UI/BFF receives request ➜ creates agent session (corr. ID)
-2. Agent plans ➜ selects `weather.get_daily` → MCP validates → calls provider
-3. Agent selects next tools (`calendar.list_events`, `mobility.get_commute`)
+2. Agent plans ➜ selects `weather_get_daily` → MCP validates → calls provider
+3. Agent selects next tools (`calendar_list_events`, `mobility_get_commute`)
 4. MCP normalizes outputs ➜ agent summarizes ➜ BFF returns to UI
 
 **Write-action path (future):**
 
-1. Agent proposes write (e.g., `calendar.create_event`) ➜ MCP policy check (RBAC, idempotency key)
+1. Agent proposes write (e.g., `calendar_create_event`) ➜ MCP policy check (RBAC, idempotency key)
 2. Execute ➜ audit log (who/what/when/params) ➜ return typed result
 
 **Failure handling:**
@@ -62,7 +62,7 @@
 
 ## 7) MCP Tool Contracts (pre-filled examples)
 
-### 1. weather.get_daily
+### 1. weather_get_daily
 
 **Input schema:**
 
@@ -96,7 +96,7 @@
 }
 ```
 
-### 2. mobility.get_commute
+### 2. mobility_get_commute
 
 **Input schema:**
 
@@ -129,7 +129,7 @@
 }
 ```
 
-### 3. calendar.list_events
+### 3. calendar_list_events
 
 **Input schema:**
 
@@ -166,7 +166,7 @@
 }
 ```
 
-### 4. todo.list
+### 4. todo_list
 
 **Input schema:**
 
@@ -245,7 +245,7 @@
 
 **Phase 2 – Productize (weeks 6–10)**
 
-- Add **first write tool** (e.g., `calendar.create_event`) with idempotency + audit
+- Add **first write tool** (e.g., `calendar_create_event`) with idempotency + audit
 - Multi-tenant scoping in MCP; per-tenant creds; usage metering/billing hooks
 - Security review, runbooks, error budgets
 
