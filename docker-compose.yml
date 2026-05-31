@@ -21,9 +21,15 @@ services:
       - OUTDOORACTIVE_API_KEY=${OUTDOORACTIVE_API_KEY:-}
       - HOME_ADDRESS=${HOME_ADDRESS:-}
       - WORK_ADDRESS=${WORK_ADDRESS:-}
+      - VAULT_ROOT=${VAULT_ROOT:-/vault}
     volumes:
       - ./packages/server/mcp_server:/app/mcp_server
       - ./packages/server/run.py:/app/run.py
+      # Brain-vault bind-mount for dev. Override VAULT_HOST_PATH in .env if
+      # your vault lives elsewhere. Read-only — vault tools never write.
+      # NB: use ${HOME} not ~; docker-compose does not expand tildes inside
+      # the ${VAR:-default} fallback, but ${HOME} is shell-style and works.
+      - ${VAULT_HOST_PATH:-${HOME}/Projects/brain-vault}:/vault:ro
     depends_on:
       redis:
         condition: service_healthy

@@ -1,6 +1,6 @@
 # Brain-Vault Integration
 
-**Status:** planned, not started · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours
+**Status:** Phase 1 shipped (PR #22, 2026-05-30) · Phases 2–5 pending · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours
 
 Expose Kevin's personal knowledge base (`~/Projects/brain-vault/`) to the Aura
 agent so chat can answer questions about his projects, career, meetings, and
@@ -89,33 +89,38 @@ real privacy boundary, and `.auraignore` is the lever that controls it.
 
 ## Implementation plan
 
-### Phase 1 — MCP server tools (2–3 hrs)
+### Phase 1 — MCP server tools (2–3 hrs) ✅ SHIPPED 2026-05-30 (PR #22)
 
-**New file:** `packages/server/mcp_server/tools/vault.py`
+**New file:** `packages/server/mcp_server/tools/vault.py` ✅
 
-- Implement `vault_search`, `vault_read`, `vault_list` per the spec above
-- ripgrep backend (shell out to `rg --json` and parse, or use `ripgrepy`)
-- Path-traversal guards on all `path` args (reject `..`, absolute paths)
-- `.auraignore` parsing (gitignore-style; cache parsed patterns)
-- Register tools in the MCP tool registry (mirror existing tools like
-  weather/calendar)
-- Read `VAULT_ROOT` from env, default to `/vault`
+- ✅ Implemented `vault.search`, `vault.read`, `vault.list`
+- ✅ ripgrep backend via `rg --json`; runs with `cwd=root` so anchored
+  `.auraignore` patterns work as expected (this was a subtle gotcha — see
+  the file for the comment)
+- ✅ Path-traversal guards: `VaultPathError` on `..`, absolute paths, and
+  paths that escape root after `resolve()`
+- ✅ `.auraignore` parsing via `rg --ignore-file`
+- ✅ Registered in `mcp_server/server.py` tools dict; routes in
+  `mcp_server/app.py` under `/tools/vault.*`
+- ✅ `VAULT_ROOT` read from `mcp_server/config.py` settings
 
-**Modify:** `docker/server.Dockerfile`
-- Install `ripgrep` (`apk add ripgrep` or `apt-get install ripgrep`)
+**Modified:** `docker/server.Dockerfile` ✅ — installs `ripgrep`
 
-**Modify:** `docker-compose.yml`
-- Add bind mount on the server service:
-  `~/Projects/brain-vault:/vault:ro`
-- Add `VAULT_ROOT=/vault` to server env
+**Modified:** `docker-compose.yml` ✅ — bind-mounts vault at `/vault:ro`;
+`VAULT_HOST_PATH` env var lets you point at a non-default location
 
-**New tests:** `packages/server/tests/test_vault.py`
-- Fixture vault under `tests/fixtures/vault/`
-- Cover: basic search, folder filter, `.auraignore` exclusion, path-traversal
-  rejection, non-existent path
+**New tests:** `packages/server/tests/test_tools/test_vault.py` ✅ — 19 tests
+covering search, folder filter, `.auraignore`, truncation, path-traversal,
+flag injection (`-h` query), input validation, and the vault-unavailable
+error path. All passing.
 
-**Done when:** ripgrep-searching the real vault works via Claude Desktop /
-MCP inspector. No agent changes yet.
+**Hardening past the original plan:** PR #22 added a 15s ripgrep timeout,
+a `--` flag separator (defense against `-`-prefixed queries), bounded
+match-event memory for pathological queries, and a clear error if the `rg`
+binary is missing.
+
+**Done.** Vault is searchable from any MCP client (Claude Desktop, Cursor)
+via `http://localhost:8000/mcp/sse`. No agent changes yet — see Phase 3.
 
 ### Phase 2 — Git sync on server (1–2 hrs)
 
