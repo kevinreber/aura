@@ -40,8 +40,10 @@ SYNC_INTERVAL_SECS = 15 * 60
 
 # How long a single git invocation may run before we give up on it. Network
 # hiccups happen; we'd rather time out and try again next cycle than block
-# the loop indefinitely.
-GIT_TIMEOUT_SECS = 60.0
+# the loop indefinitely. Tuned for the brain-vault size (~400 MB, mostly
+# Obsidian attachments) — a cold clone over the Fly-to-GitHub link can take
+# 1-3 minutes; periodic pulls are usually under a second.
+GIT_TIMEOUT_SECS = 300.0
 
 
 class VaultSync:
