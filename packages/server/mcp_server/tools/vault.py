@@ -4,17 +4,31 @@ Exposes the user's personal knowledge base (Obsidian-style markdown notes) to
 the agent so chat can answer questions about projects, career, meetings,
 and past decisions directly from primary sources.
 
-Backed by `rg --json` for speed. Vault location is `settings.vault_root`
-(env: `VAULT_ROOT`). All input paths are vault-relative and validated
-against directory traversal. A `.auraignore` file at the vault root
-(gitignore syntax) controls which files are visible.
+Search is a two-stage pipeline:
+
+1. **Candidate selection (ripgrep)** — `rg --json` scans every markdown file
+   in the vault for literal/regex matches of the query. Cheap and fast even
+   on a vault with thousands of files.
+2. **Re-ranking (BM25)** — once we have the set of files that contain a
+   match, we re-rank them by Okapi BM25 against the query so the file with
+   the densest, most-meaningful matches surfaces first. Ripgrep alone
+   returns hits in filesystem-walk order (basically alphabetical), which
+   leads the agent to read whichever note happened to sort earliest rather
+   than whichever is most relevant.
+
+Vault location is `settings.vault_root` (env: `VAULT_ROOT`). All input paths
+are vault-relative and validated against directory traversal. A `.auraignore`
+file at the vault root (gitignore syntax) controls which files are visible.
 """
 
 import asyncio
 import json
 import re
+from collections import OrderedDict
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
+
+import bm25s
 
 from ..schemas.vault import (
     VaultSearchInput,
@@ -155,7 +169,9 @@ class VaultTool:
             # get parsed as a flag.
             cmd.extend(["--", input_data.query, relative_search])
 
-            hits, truncated = await self._run_ripgrep(cmd, root, input_data.limit)
+            hits, truncated = await self._run_ripgrep(
+                cmd, root, input_data.limit, input_data.query
+            )
 
             result = VaultSearchOutput(
                 query=input_data.query,
@@ -174,9 +190,9 @@ class VaultTool:
             raise
 
     async def _run_ripgrep(
-        self, cmd: List[str], root: Path, limit: int
+        self, cmd: List[str], root: Path, limit: int, query: str
     ) -> tuple[List[VaultSearchHit], bool]:
-        """Execute ripgrep (in cwd=root) and parse its --json output."""
+        """Execute ripgrep (in cwd=root), parse output, and BM25-rank hits."""
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -209,8 +225,9 @@ class VaultTool:
 
         # Parse `match` events, capped at a small multiple of `limit` so a
         # pathological query (e.g. regex 'a' across the whole vault) can't
-        # balloon memory. We still parse `limit + 1` to detect truncation.
-        max_parsed = limit * 10 + 1
+        # balloon memory. We still parse enough to compute a meaningful BM25
+        # ranking — a tight cap (limit + 1) would defeat the rerank.
+        max_parsed = limit * 20 + 1
         match_events: List[dict] = []
         for raw_line in stdout.splitlines():
             try:
@@ -222,47 +239,119 @@ class VaultTool:
                 if len(match_events) >= max_parsed:
                     break
 
+        # Group matches by vault-relative file path, preserving rg's natural
+        # within-file ordering. OrderedDict keys give us deterministic file
+        # iteration order for BM25 corpus construction.
+        file_matches: "OrderedDict[str, List[dict]]" = OrderedDict()
+        for event in match_events:
+            rel_path = self._normalize_match_path(event, root)
+            if rel_path is None:
+                continue
+            file_matches.setdefault(str(rel_path), []).append(event)
+
+        if not file_matches:
+            return [], False
+
+        # Re-rank the matched files by BM25 against the query. We score on
+        # full file content (not just snippets) so notes that repeat the
+        # query terms in headings + body — which is usually the right note —
+        # bubble to the top.
+        ranked_paths = self._bm25_rank(list(file_matches.keys()), query, root)
+
         hits: List[VaultSearchHit] = []
-        for event in match_events[:limit]:
-            data = event.get("data", {})
-            file_path_str = data.get("path", {}).get("text")
-            if not file_path_str:
-                continue
+        for rel_path_str in ranked_paths:
+            for event in file_matches[rel_path_str]:
+                if len(hits) >= limit:
+                    break
+                hit = self._event_to_hit(event, rel_path_str, root)
+                if hit is not None:
+                    hits.append(hit)
+            if len(hits) >= limit:
+                break
 
-            # rg was run with cwd=root, so its path strings are relative
-            # (possibly with a leading "./"). Normalize to a vault-relative
-            # path and re-derive an absolute path for context extraction.
-            rel_path = Path(file_path_str)
-            if rel_path.is_absolute():
-                try:
-                    rel_path = rel_path.relative_to(root)
-                except ValueError:
-                    continue
-            else:
-                # Strip a leading "./" if present.
-                parts = [p for p in rel_path.parts if p != "."]
-                rel_path = Path(*parts) if parts else Path(".")
-
-            abs_path = (root / rel_path).resolve()
-
-            line_no = data.get("line_number")
-            line_text = data.get("lines", {}).get("text", "").rstrip("\n")
-            if line_no is None or not line_text:
-                continue
-
-            snippet, heading = self._extract_context(abs_path, line_no)
-
-            hits.append(
-                VaultSearchHit(
-                    path=str(rel_path),
-                    line_no=line_no,
-                    snippet=snippet,
-                    preceding_heading=heading,
-                )
-            )
-
-        truncated = len(match_events) > limit
+        # Truncation: we have more hits available than `limit` allowed, OR
+        # we cut off parsing at max_parsed (so there may have been more rg
+        # matches beyond what we even saw).
+        total_available = sum(len(v) for v in file_matches.values())
+        truncated = total_available > len(hits) or len(match_events) >= max_parsed
         return hits, truncated
+
+    def _normalize_match_path(self, event: dict, root: Path) -> Optional[Path]:
+        """Pull the file path out of an rg match event, vault-relative."""
+        file_path_str = event.get("data", {}).get("path", {}).get("text")
+        if not file_path_str:
+            return None
+        rel_path = Path(file_path_str)
+        if rel_path.is_absolute():
+            try:
+                return rel_path.relative_to(root)
+            except ValueError:
+                return None
+        # Strip a leading "./" if present.
+        parts = [p for p in rel_path.parts if p != "."]
+        return Path(*parts) if parts else Path(".")
+
+    def _event_to_hit(
+        self, event: dict, rel_path_str: str, root: Path
+    ) -> Optional[VaultSearchHit]:
+        """Build a VaultSearchHit from a single rg match event."""
+        data = event.get("data", {})
+        line_no = data.get("line_number")
+        line_text = data.get("lines", {}).get("text", "").rstrip("\n")
+        if line_no is None or not line_text:
+            return None
+        abs_path = (root / rel_path_str).resolve()
+        snippet, heading = self._extract_context(abs_path, line_no)
+        return VaultSearchHit(
+            path=rel_path_str,
+            line_no=line_no,
+            snippet=snippet,
+            preceding_heading=heading,
+        )
+
+    def _bm25_rank(
+        self, rel_paths: List[str], query: str, root: Path
+    ) -> List[str]:
+        """Return `rel_paths` sorted by BM25 score against `query`, descending.
+
+        We score against full file content rather than snippets so that a
+        note that mentions the query in its frontmatter, headings, AND body
+        outranks one that has a single inline reference.
+
+        For trivial corpora (0-1 documents) we skip BM25 — it's pointless
+        and bm25s warns on empty corpora.
+        """
+        if len(rel_paths) <= 1:
+            return rel_paths
+
+        corpus: List[str] = []
+        for rel_path in rel_paths:
+            abs_path = (root / rel_path).resolve()
+            try:
+                content = abs_path.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                logger.warning(f"bm25_rank: failed to read {abs_path}: {exc}")
+                content = ""  # zero-score document
+            corpus.append(content)
+
+        try:
+            retriever = bm25s.BM25()
+            corpus_tokens = bm25s.tokenize(corpus, show_progress=False)
+            retriever.index(corpus_tokens, show_progress=False)
+            query_tokens = bm25s.tokenize([query], show_progress=False)
+            # k=len(corpus) so we get back every candidate, sorted.
+            results, _scores = retriever.retrieve(
+                query_tokens, k=len(corpus), show_progress=False
+            )
+        except Exception as exc:
+            # BM25 should never fail on well-formed input, but if it does we
+            # want vault_search to keep working — just return rg's order.
+            logger.warning(f"bm25_rank: scoring failed, falling back to rg order: {exc}")
+            return rel_paths
+
+        # results is a 2D array shaped (n_queries=1, k); the row is the
+        # ranking of indices into our corpus, best first.
+        return [rel_paths[idx] for idx in results[0]]
 
     def _extract_context(self, file_path: Path, line_no: int) -> tuple[str, Optional[str]]:
         """Read the file once and return (snippet, preceding_heading) for `line_no`.

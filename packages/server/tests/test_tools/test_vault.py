@@ -110,6 +110,29 @@ class TestVaultSearch:
         paths = [hit.path for hit in result.hits]
         assert "dash.md" in paths
 
+    @pytest.mark.asyncio
+    async def test_bm25_ranks_dense_match_above_sparse(self, vault_tool, fake_vault):
+        # Two files both contain the query term, but at very different
+        # densities. BM25 should put the dense one first regardless of
+        # alphabetical order (the sparse one sorts earlier alphabetically).
+        (fake_vault / "a-sparse.md").write_text(
+            "# Sparse note\n\n" + "filler line\n" * 200 + "asyncresil mentioned once\n"
+        )
+        (fake_vault / "z-dense.md").write_text(
+            "# asyncresil deep dive\n\n"
+            "## asyncresil internals\n\n"
+            "The asyncresil library does X. asyncresil does Y. "
+            "Why asyncresil? Because asyncresil.\n"
+        )
+        result = await vault_tool.search(VaultSearchInput(query="asyncresil"))
+        paths_in_order = [hit.path for hit in result.hits]
+        assert "z-dense.md" in paths_in_order
+        assert "a-sparse.md" in paths_in_order
+        # The dense file should outrank the sparse one despite worse alpha order.
+        assert paths_in_order.index("z-dense.md") < paths_in_order.index(
+            "a-sparse.md"
+        )
+
 
 class TestVaultRead:
     @pytest.mark.asyncio
