@@ -48,6 +48,7 @@ ENVIRONMENT=development
 | `/auth/logout` | Clears the session |
 | `/api/v1/chat` (POST) | Proxies to Agent `/chat` with auth headers |
 | `/api/v1/chat/stream` (POST) | SSE streaming chat proxy |
+| `/api/v1/briefing/tomorrow` (GET) | Proxies to Agent `/briefing/tomorrow` |
 | `/api/v1/preferences` (GET/PUT) | Weekend orchestrator preferences proxy |
 | `/api/v1/todos` (GET) | Proxies to Agent `/tools/todos` |
 | `/api/v1/financial` (POST) | Proxies to Agent `/tools/financial` |
