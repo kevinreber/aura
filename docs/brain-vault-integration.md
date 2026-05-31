@@ -1,6 +1,6 @@
 # Brain-Vault Integration
 
-**Status:** Phases 1 + 3 + tool rename shipped (#22, #24, #25, 2026-05-30) · Phase 2 ready to deploy (#26, 2026-05-31) · Phases 4–5 pending · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours
+**Status:** Phases 1 + 2 + 3 + tool rename ✅ **live in production** (#22, #24, #25, #26, #27, 2026-05-31) · Phase 4 (`.auraignore` opt-out) pending · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours · **Actual:** ~one Sunday
 
 Expose Kevin's personal knowledge base (`~/Projects/brain-vault/`) to the Aura
 agent so chat can answer questions about his projects, career, meetings, and
@@ -10,6 +10,19 @@ This doc captures the plan so it doesn't get lost between now and whenever it
 gets prioritized. The broader strategic framing (priority vs. Anthropic spine
 projects, when to promote this) lives in the brain-vault itself at
 `Backlog/ideas.md#2026-05-27`.
+
+---
+
+## Plan / progress
+
+5/6 done. The single open item is opt-out only — the integration is fully usable today.
+
+- [x] **Phase 1 — MCP server tools** — `vault_search` / `vault_read` / `vault_list`, ripgrep-backed, `.auraignore` support, path-traversal guards ([PR #22](https://github.com/kevinreber/aura/pull/22), 2026-05-30)
+- [x] **Tool name rename** — `namespace.action` → `namespace_action` for Claude Desktop chat-API compatibility ([PR #24](https://github.com/kevinreber/aura/pull/24), closes #23, 2026-05-30)
+- [x] **Phase 3 — Agent LangChain wrapper** — `VaultSearchTool` / `VaultReadTool` / `VaultListTool` + system-prompt routing so the Aura UI chat picks them automatically ([PR #25](https://github.com/kevinreber/aura/pull/25), 2026-05-30)
+- [x] **Phase 2 — Server git sync** — clone on boot + 15-min `git pull` via asyncio background task, GitHub fine-grained PAT auth ([PR #26](https://github.com/kevinreber/aura/pull/26) + [#27](https://github.com/kevinreber/aura/pull/27) permission hotfix, 2026-05-31)
+- [x] **Phase 5 — Production deploy** — Fly secrets set on `aura-mcp-server` + `aura-agent`, both deployed, verified end-to-end via the live Vercel UI returning real vault content (2026-05-31)
+- [ ] **Phase 4 — Brain-vault repo prep** — add `.auraignore` to the brain-vault root for opt-out folders (e.g. `.obsidian/`, `_attachments/`, anything sensitive). Optional, not blocking; the integration is fully functional without it.
 
 ---
 
