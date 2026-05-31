@@ -37,7 +37,7 @@ This package lives inside the [Aura monorepo](../../README.md); see the root `CL
 
 ### 📊 **Read Operations**
 
-#### 🌤️ Weather (`weather.get_daily`)
+#### 🌤️ Weather (`weather_get_daily`)
 
 Get daily weather forecasts powered by OpenWeatherMap with intelligent caching.
 
@@ -46,7 +46,7 @@ Get daily weather forecasts powered by OpenWeatherMap with intelligent caching.
 - **Real API**: ✅ OpenWeatherMap integration
 - **Caching**: 🔥 Geocoding (7 days), Forecasts (30 min) - dramatically faster for repeated locations
 
-#### 🚗 Basic Mobility (`mobility.get_commute`)
+#### 🚗 Basic Mobility (`mobility_get_commute`)
 
 Get basic commute information between any two locations.
 
@@ -55,7 +55,7 @@ Get basic commute information between any two locations.
 - **Real API**: ✅ Google Maps Directions API
 - **Caching**: 🔥 Routes cached for 15 minutes - eliminates repeated API calls
 
-#### 🚗🚂 **Commute Intelligence (`mobility.get_commute_options`)** 🆕
+#### 🚗🚂 **Commute Intelligence (`mobility_get_commute_options`)** 🆕
 
 **Get comprehensive commute analysis with driving AND transit options!**
 
@@ -73,7 +73,7 @@ Get basic commute information between any two locations.
 - **Perfect For**: _"How should I get to work?"_, _"What's the best way home?"_
 - **Real APIs**: ✅ Google Maps + Caltrain GTFS + MV Connector data
 
-#### 🚌 **Shuttle Schedules (`mobility.get_shuttle_schedule`)** 🆕
+#### 🚌 **Shuttle Schedules (`mobility_get_shuttle_schedule`)** 🆕
 
 **Get detailed MV Connector shuttle schedules between specific stops.**
 
@@ -88,7 +88,7 @@ Get basic commute information between any two locations.
 - **Perfect For**: _"When's the next shuttle to LinkedIn?"_, _"What time does the shuttle leave MV Caltrain?"_
 - **Data Source**: ✅ Official MV Connector timetables
 
-#### 💰 Financial (`financial.get_data`)
+#### 💰 Financial (`financial_get_data`)
 
 Live stock and cryptocurrency data with smart caching to prevent rate limits.
 
@@ -97,7 +97,7 @@ Live stock and cryptocurrency data with smart caching to prevent rate limits.
 - **Real APIs**: ✅ Alpha Vantage (stocks) + CoinGecko (crypto)
 - **Caching**: 🔥 Stocks (5 min), Crypto (2 min) - critical for Alpha Vantage's 5 calls/minute limit
 
-#### 📅 Calendar (`calendar.list_events`)
+#### 📅 Calendar (`calendar_list_events`)
 
 List calendar events for any date with multi-calendar support.
 
@@ -105,7 +105,7 @@ List calendar events for any date with multi-calendar support.
 - **Output**: Events with times, locations, descriptions, attendees
 - **Real API**: ✅ Google Calendar (Primary, Runna, Family calendars)
 
-#### 📅 Calendar Range (`calendar.list_events_range`)
+#### 📅 Calendar Range (`calendar_list_events_range`)
 
 Efficiently get events for date ranges (much faster than multiple single-date calls).
 
@@ -115,7 +115,7 @@ Efficiently get events for date ranges (much faster than multiple single-date ca
 
 #### ✅ Todo Operations - **Full CRUD with Todoist Integration!**
 
-**✅ List Todos (`todo.list`)**
+**✅ List Todos (`todo_list`)**
 
 List todo items with smart filtering and categorization.
 
@@ -123,7 +123,7 @@ List todo items with smart filtering and categorization.
 - **Output**: Todos with priorities, due dates, completion status
 - **API Status**: ✅ **Real Todoist API integration** with mock fallback
 
-**✅➕ Create Todos (`todo.create`)**
+**✅➕ Create Todos (`todo_create`)**
 
 Create new todo items with smart categorization and natural language due dates.
 
@@ -135,7 +135,7 @@ Create new todo items with smart categorization and natural language due dates.
   - Auto-categorization and priority mapping
 - **API Status**: ✅ **Real Todoist API integration**
 
-**✅✏️ Update Todos (`todo.update`)**
+**✅✏️ Update Todos (`todo_update`)**
 
 Update existing todo items with granular field changes.
 
@@ -147,7 +147,7 @@ Update existing todo items with granular field changes.
   - Priority and due date updates with smart parsing
 - **API Status**: ✅ **Real Todoist API integration**
 
-**✅✓ Complete Todos (`todo.complete`)**
+**✅✓ Complete Todos (`todo_complete`)**
 
 Mark todo items as completed or uncompleted.
 
@@ -159,7 +159,7 @@ Mark todo items as completed or uncompleted.
   - Supports both completing and uncompleting tasks
 - **API Status**: ✅ **Real Todoist API integration**
 
-**✅🗑️ Delete Todos (`todo.delete`)**
+**✅🗑️ Delete Todos (`todo_delete`)**
 
 Delete todo items permanently with audit trail.
 
@@ -171,7 +171,7 @@ Delete todo items permanently with audit trail.
   - Permanent removal from Todoist
 - **API Status**: ✅ **Real Todoist API integration**
 
-#### 💰 Financial (`financial.get_data`)
+#### 💰 Financial (`financial_get_data`)
 
 Real-time stock and cryptocurrency market data.
 
@@ -181,7 +181,7 @@ Real-time stock and cryptocurrency market data.
 
 ### ✨ **Write Operations**
 
-#### 📅+ Calendar Create (`calendar.create_event`)
+#### 📅+ Calendar Create (`calendar_create_event`)
 
 **Create new calendar events with intelligent conflict detection!**
 
@@ -194,7 +194,7 @@ Real-time stock and cryptocurrency market data.
   - 📧 **Attendee Management** - Email invitations and notifications
 - **Real API**: ✅ Google Calendar Events API with write permissions
 
-#### 📅✏️ Calendar Update (`calendar.update_event`) 🆕
+#### 📅✏️ Calendar Update (`calendar_update_event`) 🆕
 
 **Update existing calendar events with granular field changes!**
 
@@ -208,7 +208,7 @@ Real-time stock and cryptocurrency market data.
   - 📊 **Before/After Comparison** - Returns both original and updated event details
 - **Real API**: ✅ Google Calendar Events API with update permissions
 
-#### 📅🗑️ Calendar Delete (`calendar.delete_event`) 🆕
+#### 📅🗑️ Calendar Delete (`calendar_delete_event`) 🆕
 
 **Safely delete calendar events with confirmation details!**
 
@@ -223,7 +223,7 @@ Real-time stock and cryptocurrency market data.
 
 ### 🧠 **Smart Scheduling**
 
-#### 📅🔍 Find Free Time (`calendar.find_free_time`) 🆕
+#### 📅🔍 Find Free Time (`calendar_find_free_time`) 🆕
 
 **AI-powered smart scheduling that finds optimal available time slots!**
 
@@ -302,7 +302,7 @@ curl http://localhost:8000/tools
 ### Test Weather Tool
 
 ```bash
-curl -X POST http://localhost:8000/tools/weather.get_daily \
+curl -X POST http://localhost:8000/tools/weather_get_daily \
   -H "Content-Type: application/json" \
   -d '{"location": "San Francisco, CA", "when": "today"}'
 ```
@@ -310,7 +310,7 @@ curl -X POST http://localhost:8000/tools/weather.get_daily \
 ### Test Basic Mobility Tool
 
 ```bash
-curl -X POST http://localhost:8000/tools/mobility.get_commute \
+curl -X POST http://localhost:8000/tools/mobility_get_commute \
   -H "Content-Type: application/json" \
   -d '{"origin": "San Francisco", "destination": "Oakland", "mode": "driving"}'
 ```
@@ -319,7 +319,7 @@ curl -X POST http://localhost:8000/tools/mobility.get_commute \
 
 ```bash
 # Get complete morning commute analysis
-curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
+curl -X POST http://localhost:8000/tools/mobility_get_commute_options \
   -H "Content-Type: application/json" \
   -d '{
     "direction": "to_work",
@@ -329,7 +329,7 @@ curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
   }'
 
 # Get evening commute options
-curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
+curl -X POST http://localhost:8000/tools/mobility_get_commute_options \
   -H "Content-Type: application/json" \
   -d '{
     "direction": "from_work",
@@ -343,7 +343,7 @@ curl -X POST http://localhost:8000/tools/mobility.get_commute_options \
 
 ```bash
 # Get next shuttles from Mountain View Caltrain to LinkedIn
-curl -X POST http://localhost:8000/tools/mobility.get_shuttle_schedule \
+curl -X POST http://localhost:8000/tools/mobility_get_shuttle_schedule \
   -H "Content-Type: application/json" \
   -d '{
     "origin": "mountain_view_caltrain",
@@ -355,7 +355,7 @@ curl -X POST http://localhost:8000/tools/mobility.get_shuttle_schedule \
 ### Test Calendar Tool
 
 ```bash
-curl -X POST http://localhost:8000/tools/calendar.list_events \
+curl -X POST http://localhost:8000/tools/calendar_list_events \
   -H "Content-Type: application/json" \
   -d '{"date": "2024-01-15"}'
 ```
@@ -363,7 +363,7 @@ curl -X POST http://localhost:8000/tools/calendar.list_events \
 ### 🆕 Test Calendar Event Creation
 
 ```bash
-curl -X POST http://localhost:8000/tools/calendar.create_event \
+curl -X POST http://localhost:8000/tools/calendar_create_event \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Team Meeting",
@@ -379,7 +379,7 @@ curl -X POST http://localhost:8000/tools/calendar.create_event \
 ### 🆕 Test Calendar Event Update
 
 ```bash
-curl -X POST http://localhost:8000/tools/calendar.update_event \
+curl -X POST http://localhost:8000/tools/calendar_update_event \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "your_event_id_here",
@@ -393,7 +393,7 @@ curl -X POST http://localhost:8000/tools/calendar.update_event \
 ### 🆕 Test Calendar Event Deletion
 
 ```bash
-curl -X POST http://localhost:8000/tools/calendar.delete_event \
+curl -X POST http://localhost:8000/tools/calendar_delete_event \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "your_event_id_here",
@@ -404,7 +404,7 @@ curl -X POST http://localhost:8000/tools/calendar.delete_event \
 ### 🆕 Test Smart Time Finding
 
 ```bash
-curl -X POST http://localhost:8000/tools/calendar.find_free_time \
+curl -X POST http://localhost:8000/tools/calendar_find_free_time \
   -H "Content-Type: application/json" \
   -d '{
     "duration_minutes": 60,
@@ -421,12 +421,12 @@ curl -X POST http://localhost:8000/tools/calendar.find_free_time \
 
 ```bash
 # List todos
-curl -X POST http://localhost:8000/tools/todo.list \
+curl -X POST http://localhost:8000/tools/todo_list \
   -H "Content-Type: application/json" \
   -d '{"bucket": "work", "include_completed": false}'
 
 # Create new todo
-curl -X POST http://localhost:8000/tools/todo.create \
+curl -X POST http://localhost:8000/tools/todo_create \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Review quarterly reports",
@@ -438,7 +438,7 @@ curl -X POST http://localhost:8000/tools/todo.create \
   }'
 
 # Update todo
-curl -X POST http://localhost:8000/tools/todo.update \
+curl -X POST http://localhost:8000/tools/todo_update \
   -H "Content-Type: application/json" \
   -d '{
     "id": "your_todo_id_here",
@@ -448,7 +448,7 @@ curl -X POST http://localhost:8000/tools/todo.update \
   }'
 
 # Complete todo
-curl -X POST http://localhost:8000/tools/todo.complete \
+curl -X POST http://localhost:8000/tools/todo_complete \
   -H "Content-Type: application/json" \
   -d '{
     "id": "your_todo_id_here",
@@ -456,7 +456,7 @@ curl -X POST http://localhost:8000/tools/todo.complete \
   }'
 
 # Delete todo
-curl -X POST http://localhost:8000/tools/todo.delete \
+curl -X POST http://localhost:8000/tools/todo_delete \
   -H "Content-Type: application/json" \
   -d '{
     "id": "your_todo_id_here"

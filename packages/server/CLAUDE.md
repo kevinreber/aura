@@ -61,28 +61,28 @@ The server provides ~22 tools organized by domain:
 
 | Tool | Type | Description |
 |------|------|-------------|
-| `weather.get_daily` | Read | Weather forecast via OpenWeatherMap |
-| `mobility.get_commute` | Read | Basic commute info via Google Maps |
-| `mobility.get_commute_options` | Read | Comprehensive commute analysis (driving + transit) |
-| `mobility.get_shuttle_schedule` | Read | MV Connector shuttle schedules |
-| `calendar.list_events` | Read | List events for a date |
-| `calendar.list_events_range` | Read | List events for date range |
-| `calendar.create_event` | Write | Create event with conflict detection |
-| `calendar.update_event` | Write | Update existing event |
-| `calendar.delete_event` | Write | Delete event |
-| `calendar.find_free_time` | Read | Find available time slots |
-| `todo.list` | Read | List todos from Todoist |
-| `todo.create` | Write | Create todo with natural language dates |
-| `todo.update` | Write | Update todo |
-| `todo.complete` | Write | Mark todo complete/incomplete |
-| `todo.delete` | Write | Delete todo |
-| `financial.get_data` | Read | Stock/crypto prices |
-| `weekend.get_trails` | Read | Scout hiking/biking trails near a location (Google Places + fixtures fallback) |
-| `weekend.get_concerts` | Read | Concert listings near a location (Ticketmaster Discovery + fixtures fallback) |
-| `weekend.generate_itinerary` | Read | Combine trails/POIs/concerts + weather into a multi-day itinerary |
-| `vault.search` | Read | Ripgrep-backed search across the brain-vault (`VAULT_ROOT`), with `.auraignore` support and folder scoping |
-| `vault.read` | Read | Read a single markdown file from the vault (1 MB cap, path-traversal guarded) |
-| `vault.list` | Read | List immediate children of a vault folder (one level deep, dotfiles hidden) |
+| `weather_get_daily` | Read | Weather forecast via OpenWeatherMap |
+| `mobility_get_commute` | Read | Basic commute info via Google Maps |
+| `mobility_get_commute_options` | Read | Comprehensive commute analysis (driving + transit) |
+| `mobility_get_shuttle_schedule` | Read | MV Connector shuttle schedules |
+| `calendar_list_events` | Read | List events for a date |
+| `calendar_list_events_range` | Read | List events for date range |
+| `calendar_create_event` | Write | Create event with conflict detection |
+| `calendar_update_event` | Write | Update existing event |
+| `calendar_delete_event` | Write | Delete event |
+| `calendar_find_free_time` | Read | Find available time slots |
+| `todo_list` | Read | List todos from Todoist |
+| `todo_create` | Write | Create todo with natural language dates |
+| `todo_update` | Write | Update todo |
+| `todo_complete` | Write | Mark todo complete/incomplete |
+| `todo_delete` | Write | Delete todo |
+| `financial_get_data` | Read | Stock/crypto prices |
+| `weekend_get_trails` | Read | Scout hiking/biking trails near a location (Google Places + fixtures fallback) |
+| `weekend_get_concerts` | Read | Concert listings near a location (Ticketmaster Discovery + fixtures fallback) |
+| `weekend_generate_itinerary` | Read | Combine trails/POIs/concerts + weather into a multi-day itinerary |
+| `vault_search` | Read | Ripgrep-backed search across the brain-vault (`VAULT_ROOT`), with `.auraignore` support and folder scoping |
+| `vault_read` | Read | Read a single markdown file from the vault (1 MB cap, path-traversal guarded) |
+| `vault_list` | Read | List immediate children of a vault folder (one level deep, dotfiles hidden) |
 
 ## Development Commands
 
@@ -216,7 +216,7 @@ WORK_ADDRESS=full_work_address
 GOOGLE_CALENDAR_CREDENTIALS_PATH=./credentials.json
 TODOIST_API_KEY=your_todoist_key
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
-TICKETMASTER_API_KEY=your_ticketmaster_key   # weekend.get_concerts (falls back to fixtures)
+TICKETMASTER_API_KEY=your_ticketmaster_key   # weekend_get_concerts (falls back to fixtures)
 REDIS_URL=redis://localhost:6379
 
 # Weekend Orchestrator preferences (where the JSON config lives)
@@ -238,12 +238,12 @@ curl http://localhost:8000/health
 curl http://localhost:8000/tools
 
 # Weather
-curl -X POST http://localhost:8000/tools/weather.get_daily \
+curl -X POST http://localhost:8000/tools/weather_get_daily \
   -H "Content-Type: application/json" \
   -d '{"location": "San Francisco, CA", "when": "today"}'
 
 # Calendar events
-curl -X POST http://localhost:8000/tools/calendar.list_events \
+curl -X POST http://localhost:8000/tools/calendar_list_events \
   -H "Content-Type: application/json" \
   -d '{"date": "2024-01-15"}'
 ```
@@ -328,8 +328,8 @@ name is `aura-server-1` (or similar — check `docker compose ps`).
 ```
 
 > **Known limitation — Claude Desktop chat compatibility:** All tools on this
-> server use a `namespace.action` naming convention (`weather.get_daily`,
-> `vault.search`, etc.). Claude Desktop's chat API enforces the regex
+> server use a `namespace.action` naming convention (`weather_get_daily`,
+> `vault_search`, etc.). Claude Desktop's chat API enforces the regex
 > `^[a-zA-Z0-9_-]{1,64}$` on tool names, which **rejects the dots**. The
 > connector and tool list will load fine, but trying to actually use the tools
 > in a chat will error. Other MCP clients (Cursor, raw SDK, the Aura UI's own

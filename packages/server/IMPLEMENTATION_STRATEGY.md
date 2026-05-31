@@ -47,15 +47,15 @@
 
 ```
 Day 1-2: Project setup + MCP server skeleton
-Day 3-4: Implement weather.get_daily tool
+Day 3-4: Implement weather_get_daily tool
 Day 5: Basic agent + simple CLI interface
 ```
 
 **Sprint 2 (Week 2):**
 
 ```
-Day 1-2: Add mobility.get_commute + calendar.list_events
-Day 3-4: Add todo.list + agent orchestration logic
+Day 1-2: Add mobility_get_commute + calendar_list_events
+Day 3-4: Add todo_list + agent orchestration logic
 Day 5: End-to-end demo + basic error handling
 ```
 
@@ -90,8 +90,8 @@ Day 5: End-to-end demo + basic error handling
 **Sprint 3: Calendar Write Operations**
 
 ```
-Day 1-2: Implement calendar.create_event tool
-Day 3-4: Add calendar.update_event and calendar.delete_event
+Day 1-2: Implement calendar_create_event tool
+Day 3-4: Add calendar_update_event and calendar_delete_event
 Day 5: Integration testing + UI support for calendar creation
 ```
 
@@ -258,10 +258,10 @@ daily-mcp-server/              # This repository
 │   ├── server.py            # MCP protocol implementation
 │   ├── tools/               # Individual tool implementations
 │   │   ├── __init__.py
-│   │   ├── weather.py       # weather.get_daily
-│   │   ├── mobility.py      # mobility.get_commute
-│   │   ├── calendar.py      # calendar.list_events
-│   │   └── todo.py          # todo.list
+│   │   ├── weather.py       # weather_get_daily
+│   │   ├── mobility.py      # mobility_get_commute
+│   │   ├── calendar.py      # calendar_list_events
+│   │   └── todo.py          # todo_list
 │   ├── schemas/             # Pydantic schemas & validation
 │   │   ├── __init__.py
 │   │   ├── weather.py
@@ -409,7 +409,7 @@ pytest --cov=mcp_server --cov-report=html
 pytest tests/test_tools/test_weather.py -v
 
 # Test specific endpoints
-curl http://localhost:8000/tools/weather.get_daily \
+curl http://localhost:8000/tools/weather_get_daily \
   -H "Content-Type: application/json" \
   -d '{"location": "San Francisco", "when": "today"}'
 ```
@@ -554,7 +554,7 @@ ngrok http 8000
 
 **Week 4-5: First Write Tool Implementation**
 
-1. **Days 1-3**: Add calendar.create_event with natural language parsing
+1. **Days 1-3**: Add calendar_create_event with natural language parsing
 2. **Days 4-5**: Implement smart scheduling and conflict detection
 3. **Weekend**: Test "Schedule lunch with John tomorrow at noon" capabilities
 
@@ -576,7 +576,7 @@ ngrok http 8000
 
 ### **What Was Accomplished:**
 
-✅ **Calendar Event Creation**: `calendar.create_event` with natural language support
+✅ **Calendar Event Creation**: `calendar_create_event` with natural language support
 ✅ **Smart Conflict Detection**: Warns about overlapping events automatically  
 ✅ **Multi-Calendar Support**: Target Primary, Runna, Family, or custom calendars
 ✅ **Google Calendar Integration**: Events appear in Google Calendar instantly
@@ -613,13 +613,13 @@ ngrok http 8000
 
 **Tools to Implement:**
 
-1. **`calendar.update_event`** - Modify existing calendar events
+1. **`calendar_update_event`** - Modify existing calendar events
 
    - Change times, locations, attendees, descriptions
    - Smart rescheduling with conflict detection
    - Support for recurring event updates
 
-2. **`calendar.delete_event`** - Remove calendar events
+2. **`calendar_delete_event`** - Remove calendar events
    - Safe deletion with confirmation
    - Bulk delete capabilities for recurring events
    - Undo/recovery mechanisms
@@ -755,10 +755,10 @@ ngrok http 8000
 
 **Tools to Implement:**
 
-1. **`todo.create`** - Add new tasks with smart categorization
-2. **`todo.update`** - Modify existing tasks (priority, due date, status)
-3. **`todo.complete`** - Mark tasks as done with completion tracking
-4. **`todo.delete`** - Remove tasks safely
+1. **`todo_create`** - Add new tasks with smart categorization
+2. **`todo_update`** - Modify existing tasks (priority, due date, status)
+3. **`todo_complete`** - Mark tasks as done with completion tracking
+4. **`todo_delete`** - Remove tasks safely
 
 **Smart Features:**
 
@@ -881,8 +881,8 @@ ngrok http 8000
 
 ### **This Week: Calendar Update & Delete Implementation**
 
-1. **Day 1-2**: Implement `calendar.update_event` in MCP server
-2. **Day 3-4**: Add `calendar.delete_event` with safety features
+1. **Day 1-2**: Implement `calendar_update_event` in MCP server
+2. **Day 3-4**: Add `calendar_delete_event` with safety features
 3. **Day 5**: Integration testing and AI agent tool updates
 4. **Weekend**: UI enhancements and user testing
 

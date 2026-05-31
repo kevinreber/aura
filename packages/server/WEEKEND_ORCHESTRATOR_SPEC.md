@@ -37,11 +37,11 @@ A key advantage of building inside the existing Aura server is leveraging tools 
 
 | Existing Tool | Weekend Use Case |
 |---------------|-----------------|
-| `weather.get_daily` | Check forecast before recommending outdoor trails. Rainy Saturday? Suggest indoor concerts instead. |
-| `calendar.list_events` / `calendar.find_free_time` | Identify open weekends before planning. No point scouting trails if Saturday is fully booked. |
-| `calendar.create_event` | **Write-back**: When user accepts a plan, auto-create calendar events for the trip, concert, trail outing. |
-| `mobility.get_commute` | Estimate drive time from home to trailhead or concert venue. |
-| `todo.create` | Save a proposed weekend plan as a todo item for later review ("Research Airbnbs in Denver"). |
+| `weather_get_daily` | Check forecast before recommending outdoor trails. Rainy Saturday? Suggest indoor concerts instead. |
+| `calendar_list_events` / `calendar_find_free_time` | Identify open weekends before planning. No point scouting trails if Saturday is fully booked. |
+| `calendar_create_event` | **Write-back**: When user accepts a plan, auto-create calendar events for the trip, concert, trail outing. |
+| `mobility_get_commute` | Estimate drive time from home to trailhead or concert venue. |
+| `todo_create` | Save a proposed weekend plan as a todo item for later review ("Research Airbnbs in Denver"). |
 
 This cross-referencing happens at the **agent layer** (not the server), but the spec should make the data dependencies explicit so tool outputs are compatible.
 
@@ -49,7 +49,7 @@ This cross-referencing happens at the **agent layer** (not the server), but the 
 
 ## 3. Tool Definitions
 
-### 3.1 `weekend.get_trails`
+### 3.1 `weekend_get_trails`
 
 Scout outdoor trails and activities near a given location.
 
@@ -80,7 +80,7 @@ Output:
 
 **Cache TTL**: 24 hours (trail data doesn't change frequently)
 
-### 3.2 `weekend.get_concerts`
+### 3.2 `weekend_get_concerts`
 
 Find upcoming concerts and live music events for tracked artists or by location.
 
@@ -109,7 +109,7 @@ Output:
 
 **Cache TTL**: 1 hour (event listings update frequently near show dates)
 
-### 3.3 `weekend.generate_itinerary`
+### 3.3 `weekend_generate_itinerary`
 
 Generate a structured multi-day itinerary for a destination.
 
@@ -191,19 +191,19 @@ Create `tests/test_tools/test_weekend.py`:
 #### Step 5: LangChain Tools
 
 Add to `agent/tools.py`:
-- `TrailScoutTool` - wraps `weekend.get_trails`
-- `ConcertAlertTool` - wraps `weekend.get_concerts`
-- `ItineraryTool` - wraps `weekend.generate_itinerary`
+- `TrailScoutTool` - wraps `weekend_get_trails`
+- `ConcertAlertTool` - wraps `weekend_get_concerts`
+- `ItineraryTool` - wraps `weekend_generate_itinerary`
 
 Register in `agent/orchestrator.py`.
 
 #### Step 6: Weekend Planner Prompt
 
 Create a specialized prompt/chain that:
-1. Checks calendar for free weekends (using existing `calendar.find_free_time`)
-2. Calls `weekend.get_trails` and `weekend.get_concerts` for the user's location
+1. Checks calendar for free weekends (using existing `calendar_find_free_time`)
+2. Calls `weekend_get_trails` and `weekend_get_concerts` for the user's location
 3. Cross-references interests with available activities
-4. Uses `weekend.generate_itinerary` if a trip is warranted
+4. Uses `weekend_generate_itinerary` if a trip is warranted
 5. Synthesizes a cohesive weekend proposal
 
 This is the "Friday Morning Routine" - an agent-layer orchestration, not a server tool.
@@ -336,7 +336,7 @@ Trail and activity recommendations should be context-aware:
 
 | Factor | How It Affects Recommendations | Data Source |
 |--------|-------------------------------|-------------|
-| **Weather** | Rain/snow → deprioritize outdoor trails, promote indoor events | `weather.get_daily` (existing tool) |
+| **Weather** | Rain/snow → deprioritize outdoor trails, promote indoor events | `weather_get_daily` (existing tool) |
 | **Season** | Winter → ski trails, snowshoeing; Summer → water activities, shade preference | Date-based logic |
 | **Time of day** | Sunset time affects trail feasibility, evening = concert window | Computed from location/date |
 | **Trail conditions** | Seasonal closures, wildfire alerts, flood warnings | Outdooractive API metadata / NWS alerts |
@@ -353,8 +353,8 @@ These examples show how the tools compose in the agent layer.
 ```
 User: "Find me some good cycling trails near San Jose"
 
-Agent calls: weekend.get_trails(location="San Jose, CA", activity_type="cycling")
-Agent calls: weather.get_daily(location="San Jose, CA", when="today")
+Agent calls: weekend_get_trails(location="San Jose, CA", activity_type="cycling")
+Agent calls: weather_get_daily(location="San Jose, CA", when="today")
 
 Agent: "I found 4 cycling trails near San Jose. Here are the top picks:
   1. Coyote Creek Trail - 12 mi, easy, ★ 4.6
@@ -368,16 +368,16 @@ Agent: "I found 4 cycling trails near San Jose. Here are the top picks:
 ```
 Agent (proactive, Friday 9am):
 
-Agent calls: calendar.find_free_time(start_date="2026-02-28", end_date="2026-03-01")
+Agent calls: calendar_find_free_time(start_date="2026-02-28", end_date="2026-03-01")
 → Saturday 8am-10pm free, Sunday 8am-6pm free
 
-Agent calls: weekend.get_concerts(location="San Francisco, CA", artists=["Khruangbin", "Tycho"])
+Agent calls: weekend_get_concerts(location="San Francisco, CA", artists=["Khruangbin", "Tycho"])
 → Tycho at The Fillmore, Saturday 8pm, tickets available
 
-Agent calls: weekend.get_trails(location="San Francisco, CA", activity_type="hiking")
+Agent calls: weekend_get_trails(location="San Francisco, CA", activity_type="hiking")
 → Lands End Trail, Marin Headlands Loop, Mt Tam Summit
 
-Agent calls: weather.get_daily(location="San Francisco, CA", when="tomorrow")
+Agent calls: weather_get_daily(location="San Francisco, CA", when="tomorrow")
 → 65°F, partly cloudy, 10% rain
 
 Agent: "Your weekend is wide open! Here's what I found:
@@ -394,11 +394,11 @@ Agent: "Your weekend is wide open! Here's what I found:
 ```
 User: "Plan a long weekend trip to Denver - I want hiking, live music, and good food"
 
-Agent calls: weekend.get_trails(location="Denver, CO", activity_type="hiking")
-Agent calls: weekend.get_concerts(location="Denver, CO", radius_miles=30)
-Agent calls: weekend.generate_itinerary(destination="Denver, CO", duration_days=3,
+Agent calls: weekend_get_trails(location="Denver, CO", activity_type="hiking")
+Agent calls: weekend_get_concerts(location="Denver, CO", radius_miles=30)
+Agent calls: weekend_generate_itinerary(destination="Denver, CO", duration_days=3,
               interests=["outdoors", "live music", "food"])
-Agent calls: weather.get_daily(location="Denver, CO", when="tomorrow")
+Agent calls: weather_get_daily(location="Denver, CO", when="tomorrow")
 
 Agent: "Here's a 3-day Denver weekend plan:
 
@@ -435,19 +435,19 @@ What happens when things go wrong:
 
 ## 14. Calendar Write-Back (Accepted Plans)
 
-When the user says "book it" or "add to calendar", the agent should create calendar events using the existing `calendar.create_event` tool. This requires no new server work - it's agent orchestration.
+When the user says "book it" or "add to calendar", the agent should create calendar events using the existing `calendar_create_event` tool. This requires no new server work - it's agent orchestration.
 
 Example write-back for an accepted weekend trip:
 
 ```python
 # Agent creates these events after user approval:
-calendar.create_event(
+calendar_create_event(
     title="🥾 Marin Headlands Hike",
     start="2026-03-01T08:00:00",
     end="2026-03-01T12:00:00",
     description="Marin Headlands Loop - 6.2 mi, moderate. Trailhead parking at..."
 )
-calendar.create_event(
+calendar_create_event(
     title="🎵 Tycho @ The Fillmore",
     start="2026-03-01T19:30:00",
     end="2026-03-01T23:00:00",
@@ -668,7 +668,7 @@ This means Spotify should **augment, not replace**, explicit user preferences.
 
 The JSON file stops being the SOT and becomes an **override layer** — pins and excludes only.
 
-### Proposed Tool: `weekend.get_user_artists`
+### Proposed Tool: `weekend_get_user_artists`
 
 A new server tool that returns the resolved artist list:
 
@@ -689,7 +689,7 @@ Output:
   cached: bool
 ```
 
-The agent calls this **before** `weekend.get_concerts`, then passes the artist names through.
+The agent calls this **before** `weekend_get_concerts`, then passes the artist names through.
 
 ### OAuth Implementation Cost
 
@@ -707,7 +707,7 @@ For a personal single-user tool, OAuth is one-time setup, so this is more fricti
 
 **v1 (Phase 1–3, current spec)**: Ship JSON-only. Zero OAuth setup keeps the critical path short. Validates the trail/concert/itinerary tools end-to-end.
 
-**v1.5 (this enhancement)**: Add `weekend.get_user_artists` tool with Spotify integration. JSON file demoted to override layer. Agent prefers Spotify when configured, falls back to JSON when not.
+**v1.5 (this enhancement)**: Add `weekend_get_user_artists` tool with Spotify integration. JSON file demoted to override layer. Agent prefers Spotify when configured, falls back to JSON when not.
 
 **v2 (cron-driven proactive)**: Combined with the "Friday Morning Routine" cron, the agent automatically catches new artists the user has started listening to and surfaces upcoming shows without any manual prompt.
 
@@ -715,7 +715,7 @@ For a personal single-user tool, OAuth is one-time setup, so this is more fricti
 
 1. **OAuth is on the critical path** — adding it to v1 delays the testable slice by 1–2 hours minimum, plus debugging.
 2. **Mock data + JSON file is enough** to validate the agent flow end-to-end, which is what Phase 1 needs to prove.
-3. **The interface stays clean** — adding `weekend.get_user_artists` later doesn't break `weekend.get_concerts`. They're decoupled.
+3. **The interface stays clean** — adding `weekend_get_user_artists` later doesn't break `weekend_get_concerts`. They're decoupled.
 
 ### Why Not Defer Past v1.5
 
@@ -801,27 +801,27 @@ Response:
       "label": "Trails & Outdoors",
       "description": "Hiking, cycling, and outdoor activity recommendations",
       "default_enabled": true,
-      "tools": ["weekend.get_trails"]
+      "tools": ["weekend_get_trails"]
     },
     {
       "id": "concerts",
       "label": "Live Music",
       "description": "Concerts and live music events for your favorite artists",
       "default_enabled": true,
-      "tools": ["weekend.get_concerts"]
+      "tools": ["weekend_get_concerts"]
     },
     {
       "id": "itinerary",
       "label": "Multi-day Trips",
       "description": "Full weekend trip planning with points of interest",
       "default_enabled": true,
-      "tools": ["weekend.generate_itinerary"]
+      "tools": ["weekend_generate_itinerary"]
     }
   ]
 }
 ```
 
-When you add `weekend.get_food_tours` or `weekend.get_sports_events` later, you add an entry here and the UI picks it up without any frontend redeploy.
+When you add `weekend_get_food_tours` or `weekend_get_sports_events` later, you add an entry here and the UI picks it up without any frontend redeploy.
 
 ### Agent Behavior
 
@@ -840,12 +840,12 @@ These are illustrative — not part of v1. They're listed here so the schema acc
 
 | Category ID | Tool(s) | Provider(s) | Notes |
 |---|---|---|---|
-| `running` / `cycling` | `weekend.get_strava_segments` | Strava `/segments/explore` | Per-user OAuth. User-curated rated route segments with distance + elevation + popularity. Best-in-class for running and cycling routes. |
-| `climbing` | `weekend.get_climbing_routes` | **OpenBeta** (https://openbeta.io) GraphQL API | Open-source replacement for the now-dead Mountain Project API. No auth required. Growing US route dataset. |
-| `camping` | `weekend.get_camping` | **RIDB** (recreation.gov) via api.data.gov | Federal lands (NPS, USFS, BLM, Army Corps). Sign up at https://api.data.gov/signup/ — instant, free, NOT through recreation.gov consumer account. |
-| `festivals` | `weekend.get_festivals` | TBD | Music festivals, food fests — separate from individual concerts |
-| `food_tours` | `weekend.get_food_tours` | TBD | Curated multi-stop food experiences, brewery tours, cocktail crawls |
-| `sports` | `weekend.get_sports_events` | Ticketmaster `classificationName=sports` | Local games — actually doable with the existing Ticketmaster integration |
+| `running` / `cycling` | `weekend_get_strava_segments` | Strava `/segments/explore` | Per-user OAuth. User-curated rated route segments with distance + elevation + popularity. Best-in-class for running and cycling routes. |
+| `climbing` | `weekend_get_climbing_routes` | **OpenBeta** (https://openbeta.io) GraphQL API | Open-source replacement for the now-dead Mountain Project API. No auth required. Growing US route dataset. |
+| `camping` | `weekend_get_camping` | **RIDB** (recreation.gov) via api.data.gov | Federal lands (NPS, USFS, BLM, Army Corps). Sign up at https://api.data.gov/signup/ — instant, free, NOT through recreation.gov consumer account. |
+| `festivals` | `weekend_get_festivals` | TBD | Music festivals, food fests — separate from individual concerts |
+| `food_tours` | `weekend_get_food_tours` | TBD | Curated multi-stop food experiences, brewery tours, cocktail crawls |
+| `sports` | `weekend_get_sports_events` | Ticketmaster `classificationName=sports` | Local games — actually doable with the existing Ticketmaster integration |
 | `art` | `weekend.get_art_events` | TBD | Gallery openings, exhibits, artist talks |
 | `comedy` | `weekend.get_comedy` | Ticketmaster `classificationName=arts` | Stand-up shows, improv |
 | `theater` | `weekend.get_theater` | Ticketmaster `classificationName=arts` | Plays, musicals, dance performances |
