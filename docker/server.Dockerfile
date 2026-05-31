@@ -23,6 +23,12 @@ RUN uv pip install --system -r requirements.txt
 COPY packages/server/ .
 RUN chown -R appuser:appuser /app
 
+# Pre-create the vault mount/clone target owned by appuser so vault_sync
+# can clone into it without root permissions. In dev this is overridden
+# by the docker-compose bind-mount; in prod (Fly) this is where the
+# server git-clones brain-vault to on boot.
+RUN mkdir -p /vault && chown -R appuser:appuser /vault
+
 USER appuser
 EXPOSE 8000
 
