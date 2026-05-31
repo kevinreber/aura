@@ -84,10 +84,18 @@ async def lifespan(app: FastAPI):
     stats = await cache_service.get_cache_stats()
     logger.info(f"Cache service initialized: {stats}")
 
+    # Brain-vault git sync (no-op when VAULT_GIT_URL is unset).
+    from .vault_sync import VaultSync
+    vault_sync = VaultSync()
+    await vault_sync.initial_sync()
+    vault_sync.start_periodic_sync()
+    app.state.vault_sync = vault_sync
+
     yield
 
     # Shutdown
     logger.info("Shutting down MCP Server...")
+    await vault_sync.stop_periodic_sync()
 
 
 def create_app() -> FastAPI:

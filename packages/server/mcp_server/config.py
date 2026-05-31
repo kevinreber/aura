@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # Brain-vault integration (optional — when unset, vault tools return a
     # "vault not configured" error rather than crashing the server).
     vault_root: Optional[str] = None  # Filesystem path to the markdown vault root
+    # Remote vault sync (Phase 2). Both unset = no sync; both set = clone on
+    # boot + periodic pull. The token is a GitHub fine-grained PAT scoped to
+    # the brain-vault repo with Contents: Read-only.
+    vault_git_url: Optional[str] = None  # https://github.com/owner/brain-vault.git
+    vault_git_token: Optional[str] = None  # Fine-grained PAT, injected at URL build time
 
     # Caching (optional)
     redis_url: Optional[str] = None

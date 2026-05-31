@@ -1,6 +1,6 @@
 # Brain-Vault Integration
 
-**Status:** Phase 1 shipped (PR #22, 2026-05-30) · Phases 2–5 pending · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours
+**Status:** Phases 1 + 3 + tool rename shipped (#22, #24, #25, 2026-05-30) · Phase 2 ready to deploy (#26, 2026-05-31) · Phases 4–5 pending · **Logged:** 2026-05-27 · **Effort:** ~6–10 focused hours
 
 Expose Kevin's personal knowledge base (`~/Projects/brain-vault/`) to the Aura
 agent so chat can answer questions about his projects, career, meetings, and
@@ -122,20 +122,40 @@ binary is missing.
 **Done.** Vault is searchable from any MCP client (Claude Desktop, Cursor)
 via `http://localhost:8000/mcp/sse`. No agent changes yet — see Phase 3.
 
-### Phase 2 — Git sync on server (1–2 hrs)
+### Phase 2 — Git sync on server (1–2 hrs) ✅ CODE READY (PR #26, 2026-05-31)
 
-**New file:** `packages/server/mcp_server/vault_sync.py`
+**New file:** `packages/server/mcp_server/vault_sync.py` ✅
 
-- On boot: if `VAULT_ROOT` is empty and `VAULT_GIT_URL` is set, clone the
-  repo using the SSH deploy key from `VAULT_GIT_SSH_KEY` (env-mounted)
-- Background task: `git pull` every 15 min (asyncio task or APScheduler)
-- Graceful degradation: if sync fails, log and continue serving stale data
-  rather than crashing
-- In dev (bind-mount): detect the bind-mount and skip sync entirely
+- ✅ On boot: clones the repo if `VAULT_GIT_URL` is set and the target
+  directory is missing/empty; pulls (`--ff-only`) if a `.git` already exists
+- ✅ Background task: `asyncio.create_task` loop with 15-minute sleep
+- ✅ Graceful degradation: every git failure is logged via `logger.warning/error`
+  and the loop continues; the server never refuses to boot because sync failed
+- ✅ Dev (bind-mount): detects populated-but-not-a-git-checkout directories
+  and skips with a clear "treating as a bind-mount" warning
 
-**Modify:** server startup to launch the sync task
+**Auth model — revised from the original plan:** Uses an **HTTPS fine-grained
+PAT** (env: `VAULT_GIT_TOKEN`) instead of SSH deploy keys. Same security
+posture (single-repo, read-only), simpler container setup (no SSH key file,
+no `known_hosts` write, no `ssh-agent`). The PAT is injected into the clone
+URL at call time and never persists in `git config`.
 
-**Done when:** server boots on Fly, clones the vault, and stays fresh.
+**Modified:** `mcp_server/app.py` lifespan ✅ — runs `initial_sync()` after
+cache init and launches the periodic loop. `app.state.vault_sync` holds the
+instance so the FastAPI shutdown handler can cancel cleanly.
+
+**Modified:** `docker/server.Dockerfile` ✅ — adds `git` to the apt install
+layer alongside `ripgrep`.
+
+**Modified:** `docker-compose.yml` ✅ — passes `VAULT_GIT_URL` and
+`VAULT_GIT_TOKEN` through to the server service.
+
+**Tests:** 12 tests in `tests/test_vault_sync.py` ✅ — enabled flag, PAT URL
+construction, the boot decision matrix, the missing-git-binary case, and a
+real local-origin clone+pull cycle (no network).
+
+**Done when (code):** all of the above ✅
+**Done when (prod):** see Phase 5 — Fly secrets + deploy.
 
 ### Phase 3 — Agent LangChain wrapper (30–60 min)
 
