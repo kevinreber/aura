@@ -145,16 +145,66 @@ Hooks are shell scripts that automatically run at specific events. They're locat
 ### Available Hooks
 
 #### `pre-commit.sh`
-Runs before each commit to ensure code quality.
+Runs before each commit to ensure code quality and doc freshness.
 
 **What it checks**:
 - **Server**: Black formatting, Flake8 linting, MyPy type checking
 - **Agent**: Black formatting, isort imports, MyPy type checking
 - **UI**: TypeScript type checking
+- **Docs**: Drift detection via `check-docs-drift.sh` (see below)
 
 **Auto-fixes**: Formatting issues are automatically fixed and re-staged.
 
 **Bypass**: If needed, use `git commit --no-verify` (not recommended).
+
+---
+
+#### `check-docs-drift.sh`
+Invoked by `pre-commit.sh`. Detects when the staged diff touches
+user-facing surfaces that have matching documentation (MCP tools, agent
+endpoints, UI API routes, env vars) without updating the corresponding
+README / CLAUDE.md, and — outside a Claude Code session — invokes
+Claude headlessly to refresh the affected docs and re-stage them.
+
+**Triggers** (heuristic, all four enabled by default):
+
+| Trigger | What it watches for | Docs flagged for review |
+|---|---|---|
+| New / changed MCP tool | New file under `packages/server/mcp_server/tools/` or new `"<name>": {` entry in `server.py`'s registry | server README + CLAUDE.md, root README, agent `tools.py`, agent README/CLAUDE.md |
+| New agent endpoint | New `@app.route(` in `packages/agent/src/daily_ai_agent/api.py` | agent README + CLAUDE.md |
+| New UI API route | New file matching `packages/ui/app/routes/api.v1.*.ts` | UI README + CLAUDE.md |
+| New env var | Change to any `*.env.example` or a new Pydantic field in `packages/*/.../config.py` | root + every package's README + CLAUDE.md |
+
+**Filtered out automatically**:
+- Docs-only commits (only `.md`, `CHANGELOG.md`, or files under `docs/` are staged)
+- Doc files that were *already* edited alongside the code in the same commit
+
+**Behavior matrix**:
+
+| State | Default action |
+|---|---|
+| No drift triggers fire | Silent — exit 0 |
+| Drift detected, **inside** a Claude Code session (`CLAUDECODE=1`) | Print drift report; do not call Claude (parent agent will handle); exit 0 |
+| Drift detected, **outside** a Claude session, `claude` CLI present | Invoke `claude -p` with a focused prompt + allowed tools `Read,Edit,Bash(git diff:*)`; re-stage edited docs; exit 0 |
+| Drift detected, **outside** a session, `claude` CLI missing | Print drift report and a manual-fix hint; exit 0 |
+| Headless Claude exits non-zero or times out | Print warning; exit 0 (commit proceeds without doc updates) |
+
+**Tunable env vars**:
+
+```bash
+AURA_SKIP_DOC_CHECK=1           # Opt out entirely for a single commit
+AURA_DOC_CHECK_MODE=warn        # Print report only, never invoke Claude
+AURA_DOC_CHECK_MODE=update      # (default) Invoke Claude outside a session
+AURA_DOC_CHECK_MODE=block       # Refuse the commit if drift is detected
+AURA_DOC_CHECK_TIMEOUT=120      # Seconds before killing the headless Claude call
+```
+
+**Safeguards**:
+- Recursion guard via `AURA_DOC_CHECK_REENTRY=1` — if Claude itself commits during a doc refresh, the nested pre-commit run skips the check.
+- The headless prompt restricts Claude to `Read,Edit` plus a single read-only `git diff` Bash form. It cannot run other shell commands or touch files outside the flagged list.
+- Always exits 0 unless `AURA_DOC_CHECK_MODE=block` — the hook is designed to help, not gate.
+
+**Bypass**: `AURA_SKIP_DOC_CHECK=1 git commit ...` for one commit, or `git commit --no-verify` to skip every pre-commit hook.
 
 ---
 
