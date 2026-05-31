@@ -224,7 +224,18 @@ WEEKEND_PREFS_PATH=/data/weekend_preferences.json
 
 # Brain-vault MCP tools (optional — tools degrade gracefully if unset)
 VAULT_ROOT=/vault                # In-container path where the vault is mounted
+
+# Brain-vault git sync (optional — only needed in prod where there's no bind-mount)
+VAULT_GIT_URL=https://github.com/you/brain-vault.git
+VAULT_GIT_TOKEN=ghp_...          # Fine-grained PAT, Contents: Read-only on one repo
 ```
+
+Vault git sync behavior:
+- Unset `VAULT_GIT_URL` → no sync (local dev uses the docker-compose bind-mount).
+- Set both → server clones on boot if `VAULT_ROOT` is empty, then `git pull`s
+  every 15 minutes via an asyncio background task.
+- Bind-mount detected (populated dir, no `.git`) → server warns and skips sync.
+- All sync failures are logged and swallowed; the server never refuses to boot.
 
 Configuration is managed via Pydantic Settings in `mcp_server/config.py`.
 

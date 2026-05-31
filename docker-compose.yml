@@ -22,6 +22,8 @@ services:
       - HOME_ADDRESS=${HOME_ADDRESS:-}
       - WORK_ADDRESS=${WORK_ADDRESS:-}
       - VAULT_ROOT=${VAULT_ROOT:-/vault}
+      - VAULT_GIT_URL=${VAULT_GIT_URL:-}
+      - VAULT_GIT_TOKEN=${VAULT_GIT_TOKEN:-}
     volumes:
       - ./packages/server/mcp_server:/app/mcp_server
       - ./packages/server/run.py:/app/run.py
