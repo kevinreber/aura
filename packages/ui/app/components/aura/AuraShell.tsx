@@ -6,6 +6,7 @@ import { Icon, type IconName } from './icons';
 import {
   WeatherCard, MarketsCard, ScheduleCard, TasksCard, TomorrowCard,
   CommuteCard, HabitsCard, NotesCard, CardHead, marketSummary,
+  ScheduleTabsCard,
 } from './widgets';
 import { Copilot } from './Copilot';
 import { WEEKEND_CATS } from './types';
@@ -240,23 +241,48 @@ export function AuraShell(props: AuraShellProps) {
                 <div className="kpi"><span className="k"><Icon.CloudSun /> Now</span><span className="v">{Math.round(weather.current_temp)}°</span></div>
               </div>
             </div>
-            <div className="section-title">At a glance</div>
-            <div className="bento">
-              <ScheduleCard events={events} className="span-3" />
-              <div className="span-3" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <WeatherCard wx={weather} />
-                <MarketsCard mkt={markets} />
+            {/* Desktop layout — standard bento sections. */}
+            <div className="only-desktop">
+              <div className="section-title">At a glance</div>
+              <div className="bento">
+                <ScheduleCard events={events} className="span-3" />
+                <div className="span-3" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <WeatherCard wx={weather} />
+                  <MarketsCard mkt={markets} />
+                </div>
+              </div>
+              <div className="section-title">On your plate</div>
+              <div className="bento">
+                <TasksCard tasks={tasks} onToggle={onToggleTodo} className="span-4" />
+                <TomorrowCard t={tomorrow} className="span-2" />
+              </div>
+              <div className="section-title">Looking ahead</div>
+              <div className="bento">
+                <CommuteCard c={commute} className="span-3" />
+                <HabitsCard habits={habits} className="span-3" />
               </div>
             </div>
-            <div className="section-title">On your plate</div>
-            <div className="bento">
-              <TasksCard tasks={tasks} onToggle={onToggleTodo} className="span-4" />
-              <TomorrowCard t={tomorrow} className="span-2" />
-            </div>
-            <div className="section-title">Looking ahead</div>
-            <div className="bento">
-              <CommuteCard c={commute} className="span-3" />
-              <HabitsCard habits={habits} className="span-3" />
+
+            {/* Mobile layout — reordered for phone IA:
+                  At a glance → tabbed Schedule + Commute (what's next + how to get there)
+                  On your plate → Tasks
+                  Looking ahead → Weather (compact), Markets, Habits */}
+            <div className="only-mobile">
+              <div className="section-title">At a glance</div>
+              <div className="bento">
+                <ScheduleTabsCard events={events} tomorrow={tomorrow} className="span-6" />
+                <CommuteCard c={commute} className="span-6" />
+              </div>
+              <div className="section-title">On your plate</div>
+              <div className="bento">
+                <TasksCard tasks={tasks} onToggle={onToggleTodo} className="span-6" />
+              </div>
+              <div className="section-title">Looking ahead</div>
+              <div className="bento">
+                <WeatherCard wx={weather} className="span-6" />
+                <MarketsCard mkt={markets} className="span-6" />
+                <HabitsCard habits={habits} className="span-6" />
+              </div>
             </div>
           </>
         )}
@@ -317,8 +343,9 @@ export function AuraShell(props: AuraShellProps) {
           <>
             <ViewHeader eyebrow="Calendar" title="Today's schedule" sub={`${events.length} events on your calendar. Tomorrow: ${tomorrow.events.length} event(s).`} />
             <div className="bento">
-              <ScheduleCard events={events} className="span-3" />
-              <TomorrowCard t={tomorrow} className="span-3" />
+              <ScheduleTabsCard events={events} tomorrow={tomorrow} className="span-6 only-mobile" />
+              <ScheduleCard events={events} className="span-3 only-desktop" />
+              <TomorrowCard t={tomorrow} className="span-3 only-desktop" />
             </div>
           </>
         )}

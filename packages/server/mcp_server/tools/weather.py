@@ -1,8 +1,9 @@
 """Weather tool for getting daily weather forecasts."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, Any
+from zoneinfo import ZoneInfo
 
 from ..schemas.weather import WeatherInput, WeatherOutput, WhenEnum
 from ..utils.http_client import HTTPClient
@@ -11,6 +12,16 @@ from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_ke
 from ..config import get_settings
 
 logger = get_logger("weather_tool")
+
+# Default timezone for "today"/"tomorrow" semantics. Mirrors the calendar
+# schema's _DEFAULT_TZ so weather rolls over at user-local midnight rather
+# than the container's UTC midnight (~5 PM PT).
+_USER_TZ = ZoneInfo("America/Los_Angeles")
+
+
+def _today_local() -> date:
+    """User-local date (used wherever 'today' drives forecast windowing or cache keys)."""
+    return datetime.now(_USER_TZ).date()
 
 
 class WeatherTool:
@@ -116,7 +127,7 @@ class WeatherTool:
         cache = await get_cache_service()
         
         # Create cache key based on location and date (not exact time since forecast covers periods)
-        today = datetime.now().date()
+        today = _today_local()
         target_date = today if when == WhenEnum.TODAY else today + timedelta(days=1)
         cache_key = generate_cache_key("weather_forecast", f"{lat:.4f}_{lon:.4f}", target_date.isoformat())
         
@@ -158,7 +169,7 @@ class WeatherTool:
         """Format OpenWeatherMap response into our schema."""
         
         # Determine target date
-        today = datetime.now().date()
+        today = _today_local()
         target_date = today if when == WhenEnum.TODAY else today + timedelta(days=1)
         
         # For mock data or simple current weather, use simplified logic
@@ -169,6 +180,8 @@ class WeatherTool:
                 current_temp=weather_data.get("current_temp", 65.0),
                 condition=weather_data.get("condition", "Partly Cloudy"),
                 precip_chance=weather_data.get("precip_chance", 20.0),
+                humidity=weather_data.get("humidity"),
+                wind_mph=weather_data.get("wind_mph"),
                 summary=weather_data.get("summary", "Partly cloudy"),
                 location=location_name,
                 date=target_date.isoformat()
@@ -197,13 +210,20 @@ class WeatherTool:
         # Get weather summary from the midday forecast
         midday_forecast = target_forecasts[len(target_forecasts) // 2]
         summary = midday_forecast["weather"][0]["description"].title()
-        
+        # Humidity and wind from the same midday slot — keeps them consistent
+        # with the condition/current_temp we surface. Units already imperial
+        # (wind is mph) because the upstream call passes units=imperial.
+        humidity = midday_forecast["main"].get("humidity")
+        wind_mph = midday_forecast.get("wind", {}).get("speed")
+
         return WeatherOutput(
             temp_hi=round(temp_hi, 1),
             temp_lo=round(temp_lo, 1),
             current_temp=round(midday_forecast["main"]["temp"], 1),
             condition=summary,
             precip_chance=round(precip_chance, 1) if precip_chance else None,
+            humidity=round(humidity, 1) if humidity is not None else None,
+            wind_mph=round(wind_mph, 1) if wind_mph is not None else None,
             summary=summary,
             location=location_name,
             date=target_date.isoformat()
@@ -211,7 +231,7 @@ class WeatherTool:
     
     def _get_fallback_weather_response(self, location_name: str, when: WhenEnum) -> WeatherOutput:
         """Generate a fallback weather response when API data is unavailable."""
-        today = datetime.now().date()
+        today = _today_local()
         target_date = today if when == WhenEnum.TODAY else today + timedelta(days=1)
         
         # Provide reasonable default weather data

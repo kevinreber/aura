@@ -451,6 +451,14 @@ body {
 /* Mobile-only chrome — hidden on desktop, shown under 860px. */
 .shell-fab, .shell-tabbar, .cp-sheet-close, .shell-topbar { display: none; }
 
+/* Generic responsive visibility helpers. `.only-mobile` swaps to `display: block`
+   inside the ≤860px media query below. */
+.only-mobile { display: none !important; }
+
+/* In-card tab strip used by ScheduleTabsCard — pill toggle inside the card head. */
+.schedule-tabs { display: flex; gap: 4px; flex: 1; margin-left: 4px; }
+.schedule-tabs .tab { padding: 4px 12px; font-size: 12px; }
+
 /* Tablet: collapse the left rail to an icon strip. */
 @media (max-width: 1180px) and (min-width: 861px) {
   .shell { grid-template-columns: 72px minmax(0,1fr) 320px; }
@@ -516,6 +524,10 @@ body {
   /* The full main-head (eyebrow + greeting + sub + KPIs) now lives in the
      sticky topbar; hide the page-flow copy so nothing duplicates. */
   .main-head { display: none; }
+
+  /* Flip the responsive visibility helpers at the mobile breakpoint. */
+  .only-desktop { display: none !important; }
+  .only-mobile { display: block !important; }
 
   /* copilot → bottom sheet */
   .copilot {

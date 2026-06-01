@@ -77,9 +77,10 @@ export function adaptWeather(w: WeatherData | null | undefined): WeatherVM {
     temp_hi: d?.temp_hi ?? 68,
     temp_lo: d?.temp_lo ?? 52,
     precip_chance: d?.precip_chance ?? 8,
-    // humidity/wind aren't in the current API payload — surfaced as 0 if absent.
-    humidity: (d as { humidity?: number })?.humidity ?? 0,
-    wind: (d as { wind?: number })?.wind ?? 0,
+    // Server returns `wind_mph` and `humidity` as nullable floats. Map to the
+    // VM's UI-friendly names; zero means "hide the stat" downstream.
+    humidity: (d as { humidity?: number | null } | undefined)?.humidity ?? 0,
+    wind: (d as { wind_mph?: number | null } | undefined)?.wind_mph ?? 0,
   };
 }
 

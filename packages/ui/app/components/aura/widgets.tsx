@@ -36,18 +36,25 @@ export function WeatherCard({ wx, className }: { wx: WeatherVM; className?: stri
   return (
     <div className={`card ${className || ''}`}>
       <CardHead icon="CloudSun" title="Weather" meta={<span className="chip">{wx.location.split(',')[0]}</span>} />
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+      {/* Desktop hero — big temp + large icon. Hidden on mobile because
+          the sticky header's NOW KPI already shows the current temp. */}
+      <div className="only-desktop" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <div className="wx-temp">{Math.round(wx.current_temp)}°</div>
           <div className="wx-cond">{wx.condition}</div>
         </div>
         <div style={{ color: 'var(--accent-text)', opacity: 0.7 }}><Icon.CloudSun style={{ width: 46, height: 46 }} /></div>
       </div>
+      {/* Mobile compact — just a single condition line above the stat row. */}
+      <div className="only-mobile" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+        <Icon.CloudSun style={{ width: 18, height: 18, color: 'var(--accent-text)' }} />
+        <span style={{ fontSize: 14, fontWeight: 600 }}>{wx.condition}</span>
+      </div>
       <div className="wx-row">
         <div className="wx-stat"><span className="k">High</span><span className="v">{Math.round(wx.temp_hi)}°</span></div>
         <div className="wx-stat"><span className="k">Low</span><span className="v">{Math.round(wx.temp_lo)}°</span></div>
         <div className="wx-stat"><span className="k">Rain</span><span className="v">{wx.precip_chance}%</span></div>
-        {wx.wind > 0 && <div className="wx-stat"><span className="k">Wind</span><span className="v">{wx.wind} mph</span></div>}
+        {wx.wind > 0 && <div className="wx-stat"><span className="k">Wind</span><span className="v">{Math.round(wx.wind)} mph</span></div>}
       </div>
     </div>
   );
@@ -197,6 +204,101 @@ export function TomorrowCard({ t, className }: { t: TomorrowVM; className?: stri
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// Mobile-only: combines Today's Schedule + Tomorrow into a single tabbed
+// card so the home view doesn't stack two large schedule cards on a phone.
+// Desktop continues to render ScheduleCard and TomorrowCard separately.
+export function ScheduleTabsCard({ events, tomorrow, className }: {
+  events: EventVM[]; tomorrow: TomorrowVM; className?: string;
+}) {
+  const [tab, setTab] = useState<'today' | 'tomorrow'>('today');
+  return (
+    <div className={`card ${className || ''}`}>
+      <div className="card-head">
+        <div className="card-ic"><Icon.Calendar /></div>
+        <div className="schedule-tabs">
+          <button
+            className={`tab ${tab === 'today' ? 'active' : ''}`}
+            onClick={() => setTab('today')}
+          >
+            Today
+          </button>
+          <button
+            className={`tab ${tab === 'tomorrow' ? 'active' : ''}`}
+            onClick={() => setTab('tomorrow')}
+          >
+            Tomorrow
+          </button>
+        </div>
+        <div className="card-meta">
+          <span className="chip">
+            {tab === 'today' ? `${events.length} event${events.length === 1 ? '' : 's'}` : tomorrow.date}
+          </span>
+        </div>
+      </div>
+      {tab === 'today' ? (
+        events.length > 0 ? (
+          <div className="tl">
+            {events.map((e, i) => (
+              <div className="tl-item" key={i}>
+                <span className="tl-time">{e.start}</span>
+                <div className="tl-line">
+                  <span className={`tl-dot ${e.now ? 'now' : e.past ? 'past' : ''}`}></span>
+                  <span className="tl-rail"></span>
+                </div>
+                <div className="tl-body" style={e.past ? { opacity: 0.5 } : undefined}>
+                  <div className="tl-title">{e.title}{e.now && <span className="tl-now">Now</span>}</div>
+                  <div className="tl-sub">{e.location}{e.location && ' · '}{e.start}{e.end && `–${e.end}`}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty">Nothing scheduled today.</div>
+        )
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+            <Icon.CloudSun style={{ width: 20, height: 20, color: 'var(--accent-text)' }} />
+            <span style={{ fontSize: 13.5, fontWeight: 600 }}>{tomorrow.weather.summary}</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-3)' }}>
+              {Math.round(tomorrow.weather.temp_hi)}° / {Math.round(tomorrow.weather.temp_lo)}°
+            </span>
+          </div>
+          {tomorrow.events.length > 0 ? (
+            <div className="tl">
+              {tomorrow.events.map((e, i) => (
+                <div className="tl-item" key={i}>
+                  <span className="tl-time">{e.start}</span>
+                  <div className="tl-line">
+                    <span className="tl-dot"></span>
+                    <span className="tl-rail"></span>
+                  </div>
+                  <div className="tl-body">
+                    <div className="tl-title">{e.title}</div>
+                    <div className="tl-sub">Leave by {e.leaveBy}{e.commute && ` · ${e.commute}`}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty">Nothing scheduled tomorrow.</div>
+          )}
+          {tomorrow.prep.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+              <div className="suggest-label" style={{ marginBottom: 8 }}>Prep tonight</div>
+              {tomorrow.prep.map((p, i) => (
+                <div key={i} style={{ display: 'flex', gap: 9, alignItems: 'center', fontSize: 12.5, color: 'var(--text-2)', padding: '3px 0' }}>
+                  <span style={{ width: 5, height: 5, borderRadius: 99, background: 'var(--accent)', flexShrink: 0 }}></span>{p}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
