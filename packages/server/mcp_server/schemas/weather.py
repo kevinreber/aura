@@ -41,10 +41,18 @@ class WeatherOutput(BaseModel):
         default=None,
         description="Precipitation chance as percentage (0-100)"
     )
+    humidity: Optional[float] = Field(
+        default=None,
+        description="Relative humidity as percentage (0-100)"
+    )
+    wind_mph: Optional[float] = Field(
+        default=None,
+        description="Wind speed in miles per hour"
+    )
     summary: str = Field(description="Brief weather summary")
     location: str = Field(description="Resolved location name")
     date: str = Field(description="Date for the forecast (YYYY-MM-DD)")
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -53,6 +61,8 @@ class WeatherOutput(BaseModel):
                 "current_temp": 65.0,
                 "condition": "Partly Cloudy",
                 "precip_chance": 20.0,
+                "humidity": 62.0,
+                "wind_mph": 9.0,
                 "summary": "Partly cloudy with light winds",
                 "location": "San Francisco, CA",
                 "date": "2024-01-15"
