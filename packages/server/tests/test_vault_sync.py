@@ -10,7 +10,45 @@ import pytest
 
 from mcp_server.config import Settings
 import mcp_server.vault_sync as vault_sync_module
-from mcp_server.vault_sync import VaultSync
+from mcp_server.vault_sync import SPARSE_PATTERNS, VaultSync
+
+
+def _make_filtering_origin(origin: Path) -> None:
+    """Init a bare repo that accepts both `--filter=...` and pushes from a clone.
+
+    GitHub sets these knobs by default; local bare repos don't. Without
+    `uploadpack.allowFilter` the clone falls back to a full fetch (so the
+    test would silently bypass the optimization we're trying to verify),
+    and without disabling `receive.denyCurrentBranch` we can't push from
+    the helper work tree into the bare repo's checked-out branch.
+    """
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(origin), "config", "uploadpack.allowFilter", "true"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(origin), "config", "uploadpack.allowAnySHA1InWant", "true"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(origin), "config", "receive.denyCurrentBranch", "ignore"],
+        check=True, capture_output=True,
+    )
+
+
+def _commit_and_push(work: Path) -> None:
+    """Stage + commit + push from a helper work tree, with deterministic identity."""
+    subprocess.run(["git", "-C", str(work), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(work), "-c", "user.email=t@t", "-c", "user.name=t",
+         "commit", "-m", "test"],
+        check=True, capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(work), "push", "origin", "HEAD"],
+        check=True, capture_output=True,
+    )
 
 
 # Tests that actually shell out to git need git on PATH; skip cleanly if missing.
@@ -164,24 +202,10 @@ class TestRealClone:
         work = tmp_path / "work"
         target = tmp_path / "vault"
 
-        subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+        _make_filtering_origin(origin)
         subprocess.run(["git", "clone", str(origin), str(work)], check=True, capture_output=True)
         (work / "README.md").write_text("hello\n")
-        subprocess.run(["git", "-C", str(work), "add", "."], check=True, capture_output=True)
-        subprocess.run(
-            ["git", "-C", str(work), "-c", "user.email=t@t", "-c", "user.name=t",
-             "commit", "-m", "init"],
-            check=True, capture_output=True,
-        )
-        # Make sure the bare repo accepts pushes from a non-current branch.
-        subprocess.run(
-            ["git", "-C", str(origin), "config", "receive.denyCurrentBranch", "ignore"],
-            check=True, capture_output=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(work), "push", "origin", "HEAD"],
-            check=True, capture_output=True,
-        )
+        _commit_and_push(work)
 
         _make_settings_fixture(
             monkeypatch,
@@ -195,16 +219,60 @@ class TestRealClone:
 
         # Add a commit to origin, then run initial_sync again — should pull.
         (work / "README.md").write_text("hello\nupdated\n")
-        subprocess.run(["git", "-C", str(work), "add", "."], check=True, capture_output=True)
-        subprocess.run(
-            ["git", "-C", str(work), "-c", "user.email=t@t", "-c", "user.name=t",
-             "commit", "-m", "update"],
-            check=True, capture_output=True,
-        )
-        subprocess.run(
-            ["git", "-C", str(work), "push", "origin", "HEAD"],
-            check=True, capture_output=True,
-        )
+        _commit_and_push(work)
 
         await sync.initial_sync()
         assert (target / "README.md").read_text() == "hello\nupdated\n"
+
+    @pytest.mark.asyncio
+    async def test_clone_excludes_sparse_patterns(self, monkeypatch, tmp_path):
+        """Files inside SPARSE_PATTERNS exclude paths must not be checked out.
+
+        Populates the origin with files in every category we care about —
+        a top-level note, a kept subfolder note, and a file inside each
+        excluded directory — then verifies that after `initial_sync()`
+        only the kept files are materialized in the working tree.
+        """
+        origin = tmp_path / "origin.git"
+        work = tmp_path / "work"
+        target = tmp_path / "vault"
+
+        _make_filtering_origin(origin)
+        subprocess.run(["git", "clone", str(origin), str(work)], check=True, capture_output=True)
+
+        # Two "kept" files (top-level note, and an under-Docs note that
+        # doesn't live in the excluded raw/ subdir) plus one file inside
+        # each excluded directory.
+        (work / "README.md").write_text("hello\n")
+        (work / "Docs").mkdir()
+        (work / "Docs" / "notes.md").write_text("notes\n")
+        (work / "Docs" / "raw").mkdir()
+        (work / "Docs" / "raw" / "big.txt").write_text("noise\n")
+        (work / "Dashboards").mkdir()
+        (work / "Dashboards" / "dash.md").write_text("dash\n")
+        (work / "Dashboards" / "screenshots").mkdir()
+        (work / "Dashboards" / "screenshots" / "img.png").write_text("pretend-png\n")
+        _commit_and_push(work)
+
+        _make_settings_fixture(
+            monkeypatch,
+            vault_root=str(target),
+            vault_git_url=str(origin),
+        )
+
+        sync = VaultSync()
+        await sync.initial_sync()
+
+        # Sanity check: sparse-checkout patterns were the ones we expect.
+        assert "!Docs/raw" in SPARSE_PATTERNS
+        assert "!Dashboards/screenshots" in SPARSE_PATTERNS
+
+        # Kept files materialized.
+        assert (target / "README.md").is_file()
+        assert (target / "Docs" / "notes.md").is_file()
+        assert (target / "Dashboards" / "dash.md").is_file()
+
+        # Excluded files absent from the working tree. (They still exist
+        # in the repo's object DB; sparse-checkout governs the working tree.)
+        assert not (target / "Docs" / "raw" / "big.txt").exists()
+        assert not (target / "Dashboards" / "screenshots" / "img.png").exists()

@@ -9,6 +9,12 @@ clone URL at call time so it never persists in git config. SSH/deploy-key
 auth is intentionally not supported here — fine-grained PATs are equally
 scoped (single repo, read-only Contents) but avoid container SSH ceremony.
 
+Clone shape: `--depth 1 --filter=blob:none --sparse`, plus a non-cone
+sparse-checkout pattern set (see `SPARSE_PATTERNS`). The vault is a working
+knowledge base, not a source repo, so we ditch history; the agent only
+searches markdown, so we ditch the large attachment directories. Pulls
+inherit the same sparse rules.
+
 Behavior matrix:
 
 | VAULT_GIT_URL | VAULT_ROOT exists | VAULT_ROOT/.git exists | Action |
@@ -40,10 +46,26 @@ SYNC_INTERVAL_SECS = 15 * 60
 
 # How long a single git invocation may run before we give up on it. Network
 # hiccups happen; we'd rather time out and try again next cycle than block
-# the loop indefinitely. Tuned for the brain-vault size (~400 MB, mostly
-# Obsidian attachments) — a cold clone over the Fly-to-GitHub link can take
-# 1-3 minutes; periodic pulls are usually under a second.
+# the loop indefinitely. With sparse-checkout + blob filter the cold clone
+# is well under a minute even for a multi-hundred-MB vault, but we keep the
+# generous ceiling for slow links and pathologically large incremental pulls.
 GIT_TIMEOUT_SECS = 300.0
+
+# Sparse-checkout patterns applied to the cloned vault. Non-cone gitignore
+# syntax: a matching line *includes* the path in the working tree, a `!`
+# line excludes it. `/*` matches every top-level entry (files + directories
+# with their contents), and the `!` lines carve out the large attachment
+# directories that aren't markdown and so add nothing to vault_search but
+# everything to disk and clone time.
+#
+# Ripgrep already filters by `--type md` at search time — these excludes
+# are a disk/network optimization, not a search-correctness one. Add new
+# excludes here as the vault grows.
+SPARSE_PATTERNS = (
+    "/*",
+    "!Docs/raw",                # ~73 MB of raw imported/clipped content
+    "!Dashboards/screenshots",  # ~35 MB of PNG dashboard screenshots
+)
 
 
 class VaultSync:
@@ -145,10 +167,24 @@ class VaultSync:
     # ------------------------------------------------------------------ internals
 
     async def _clone(self, vault_root: Path) -> None:
-        """Shallow-clone the remote into vault_root.
+        """Shallow + blob-filtered + sparse clone of the remote into vault_root.
 
-        We always shallow-clone (--depth 1) because the vault is a working
-        knowledge base, not source history. Saves time, bandwidth, and disk.
+        Three stacked optimizations vs. a plain `git clone`:
+
+        1. `--depth 1` — drop commit history; the vault is a working
+           knowledge base, not a source repo.
+        2. `--filter=blob:none` — partial clone. Git fetches blob contents
+           lazily on checkout, so excluded sparse paths never download.
+        3. `--sparse` plus a non-cone pattern set — limits the working
+           tree to markdown content, skipping the big attachment dirs
+           listed in `SPARSE_PATTERNS`.
+
+        Together these turn a multi-minute, ~400 MB cold clone into a
+        sub-minute, mostly-markdown checkout. `git pull` later honors the
+        same sparse rules, so the excluded dirs stay excluded across syncs.
+
+        If `sparse-checkout set` fails we log a warning but leave the
+        full-tree clone in place — better than no vault at all.
         """
         vault_root.parent.mkdir(parents=True, exist_ok=True)
         # If a previous attempt left an empty directory, remove it so clone
@@ -160,11 +196,33 @@ class VaultSync:
                 pass
 
         logger.info(f"vault_sync: cloning {self._redacted_url()} into {vault_root}")
-        rc, err = await self._run_git("clone", "--depth", "1", self._authed_url(), str(vault_root))
+        rc, err = await self._run_git(
+            "clone",
+            "--depth", "1",
+            "--filter=blob:none",
+            "--sparse",
+            self._authed_url(),
+            str(vault_root),
+        )
         if rc != 0:
             logger.error(f"vault_sync: clone failed (exit {rc}): {err}")
-        else:
-            logger.info("vault_sync: initial clone complete")
+            return
+
+        rc, err = await self._run_git(
+            "-C", str(vault_root),
+            "sparse-checkout", "set", "--no-cone",
+            *SPARSE_PATTERNS,
+        )
+        if rc != 0:
+            logger.warning(
+                f"vault_sync: sparse-checkout set failed (exit {rc}): {err} — "
+                "vault is cloned but excluded attachment dirs are present"
+            )
+            return
+
+        logger.info(
+            f"vault_sync: initial clone complete (sparse patterns: {', '.join(SPARSE_PATTERNS)})"
+        )
 
     async def _pull(self, vault_root: Path) -> None:
         """Fast-forward only pull. If history diverges, we want to know, not paper over."""
