@@ -79,7 +79,13 @@
   color-scheme: light;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* Tailwind v4 preflight already resets margin/padding/box-sizing on `*`.
+   A second unlayered `*` rule here would beat every layered Tailwind
+   utility (margin/padding/mx-auto, etc.) — so it lives inside @layer base
+   to mirror preflight's priority and stay overridable. */
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+}
 
 /* Suppress transitions during a theme swap so var()-based backgrounds
    never get stuck mid-transition. */
@@ -93,8 +99,12 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow: hidden;
 }
+
+/* The dashboard manages its own scroll panes inside .shell, so the body
+   must NOT scroll there. On any page without the shell (login, errors),
+   leave body scrolling alone so tall content can scroll on mobile. */
+body:has(.shell) { overflow: hidden; }
 
 #root { height: 100vh; }
 
