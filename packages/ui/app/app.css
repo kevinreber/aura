@@ -4,6 +4,10 @@
    and the responsive (tablet + phone) layout. */
 @import "./styles/aura.css";
 
+/* Bind Tailwind `dark:` to the explicit [data-theme="dark"] attribute set
+   by useDarkMode — keeps the manual toggle and `dark:` utilities in sync. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* Expose the redesign fonts to Tailwind utilities too. */
 @theme {
   --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
