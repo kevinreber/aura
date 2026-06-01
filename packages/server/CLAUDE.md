@@ -236,6 +236,11 @@ Vault git sync behavior:
   every 15 minutes via an asyncio background task.
 - Bind-mount detected (populated dir, no `.git`) → server warns and skips sync.
 - All sync failures are logged and swallowed; the server never refuses to boot.
+- Clone shape: `--depth 1 --filter=blob:none --sparse` plus a non-cone
+  sparse-checkout pattern set (`vault_sync.SPARSE_PATTERNS`). Drops commit
+  history, blob bodies for excluded paths, and the big attachment dirs
+  (`Docs/raw`, `Dashboards/screenshots`). Pulls inherit the same sparse rules.
+  Add new excludes by editing `SPARSE_PATTERNS` and redeploying.
 
 Configuration is managed via Pydantic Settings in `mcp_server/config.py`.
 
