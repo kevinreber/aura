@@ -1,15 +1,20 @@
 @import "tailwindcss";
 
+/* Aura redesign design system — tokens, app shell, components, widgets,
+   and the responsive (tablet + phone) layout. */
+@import "./styles/aura.css";
+
+/* Expose the redesign fonts to Tailwind utilities too. */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
 }
 
+/* The app shell paints its own background via the [data-theme] tokens in
+   aura.css; keep the document neutral so there's no flash. */
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
-
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+  height: 100%;
+  margin: 0;
+  background: var(--bg, #14151a);
 }

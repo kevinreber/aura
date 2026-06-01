@@ -5,7 +5,18 @@ import hmac
 import uuid
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from flask import Flask, request, jsonify, make_response, g, Response
+
+# Date defaults for tools like `/tools/calendar` must reflect the *user's*
+# local day, not the container clock (UTC in Docker). The MCP server's
+# calendar schema already assumes America/Los_Angeles — keep these in sync.
+_USER_TZ = ZoneInfo("America/Los_Angeles")
+
+
+def _today_local() -> str:
+    """Today's date in the user's timezone, formatted YYYY-MM-DD."""
+    return datetime.now(_USER_TZ).strftime("%Y-%m-%d")
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -496,7 +507,7 @@ def create_app(testing: bool = False) -> Flask:
 
             else:  # Basic briefing
                 logger.info(f"[{g.request_id}] Generating basic briefing")
-                today = datetime.now().strftime('%Y-%m-%d')
+                today = _today_local()
                 data = await mcp_client.get_all_morning_data(today)
 
                 return jsonify({
@@ -633,7 +644,7 @@ def create_app(testing: bool = False) -> Flask:
     async def get_calendar():
         """Get calendar events."""
         try:
-            date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+            date = request.args.get('date', _today_local())
 
             logger.info(f"[{g.request_id}] Calendar request: {date}")
             calendar_data = await mcp_client.get_calendar_events(date)
