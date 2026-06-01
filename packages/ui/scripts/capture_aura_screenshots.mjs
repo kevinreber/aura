@@ -67,82 +67,108 @@ async function clickMobileTab(page, label) {
   await settle(page, 600);
 }
 
-async function desktopFlow(browser) {
-  console.log("\n── Desktop (1440×900) ──────────────────────────────────");
+// The design system keys off `<html data-theme="dark|light">`. The pre-paint
+// script in root.tsx reads `localStorage.getItem('aura-theme')` and applies
+// it before first paint, so injecting the value via `addInitScript` (which
+// runs before any page script) gets us a flash-free themed capture.
+async function applyTheme(ctx, theme) {
+  await ctx.addInitScript((t) => {
+    try {
+      window.localStorage.setItem("aura-theme", t);
+    } catch {
+      /* private mode / quota — fall through */
+    }
+  }, theme);
+}
+
+async function desktopFlow(browser, theme) {
+  const tag = theme === "light" ? "-light" : "";
+  console.log(`\n── Desktop (1440×900) · ${theme} ────────────────────────`);
   const ctx = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 2,
-    colorScheme: "dark",
+    colorScheme: theme,
   });
   await ctx.addCookies([sessionCookie]);
+  await applyTheme(ctx, theme);
   const page = await ctx.newPage();
 
   await page.goto(UI_URL, { waitUntil: "networkidle" });
   await settle(page, 2000);
 
-  await shoot(page, "desktop-01-today");
+  await shoot(page, `desktop-01-today${tag}`);
 
   await clickNav(page, "Calendar");
-  await shoot(page, "desktop-02-calendar");
+  await shoot(page, `desktop-02-calendar${tag}`);
 
-  await clickNav(page, "Tasks");
-  await shoot(page, "desktop-03-tasks");
+  // Skip the deeper views in light mode — Today + Calendar are enough to
+  // demonstrate the design system in the alternate theme without doubling
+  // the docs payload.
+  if (theme === "dark") {
+    await clickNav(page, "Tasks");
+    await shoot(page, "desktop-03-tasks");
 
-  await clickNav(page, "Markets");
-  await shoot(page, "desktop-04-markets");
+    await clickNav(page, "Markets");
+    await shoot(page, "desktop-04-markets");
 
-  await clickNav(page, "Commute");
-  await shoot(page, "desktop-05-commute");
+    await clickNav(page, "Commute");
+    await shoot(page, "desktop-05-commute");
+  }
 
   await ctx.close();
 }
 
-async function mobileFlow(browser) {
-  console.log("\n── Mobile (iPhone 14 Pro, 393×852) ─────────────────────");
+async function mobileFlow(browser, theme) {
+  const tag = theme === "light" ? "-light" : "";
+  console.log(`\n── Mobile (iPhone 14 Pro, 393×852) · ${theme} ──────────`);
   const ctx = await browser.newContext({
     ...devices["iPhone 14 Pro"],
-    colorScheme: "dark",
+    colorScheme: theme,
   });
   await ctx.addCookies([sessionCookie]);
+  await applyTheme(ctx, theme);
   const page = await ctx.newPage();
 
   await page.goto(UI_URL, { waitUntil: "networkidle" });
   await settle(page, 2000);
 
   // 1. Today, initial state — sticky header, tabbed schedule, commute.
-  await shoot(page, "mobile-01-today-top");
+  await shoot(page, `mobile-01-today-top${tag}`);
 
   // 2. Today scrolled — confirms sticky header pins, weather/markets/habits visible.
   await scrollMain(page, 700);
   await settle(page, 400);
-  await shoot(page, "mobile-02-today-scrolled");
+  await shoot(page, `mobile-02-today-scrolled${tag}`);
 
   // 3. Tabbed schedule on Tomorrow tab.
   await scrollMain(page, 0);
   await settle(page, 400);
   await page.locator(".schedule-tabs .tab:has-text('Tomorrow')").first().click();
   await settle(page, 400);
-  await shoot(page, "mobile-03-schedule-tabs-tomorrow");
+  await shoot(page, `mobile-03-schedule-tabs-tomorrow${tag}`);
 
-  // 4. Slide-up copilot sheet.
-  await page.locator(".shell-fab").click();
-  await settle(page, 600);
-  await shoot(page, "mobile-04-copilot-sheet");
-  // Close the sheet so subsequent shots aren't behind it.
-  await page.locator(".cp-sheet-close").click();
-  await settle(page, 400);
+  // Mobile deeper views (copilot sheet, tasks/markets/weekend) only on dark —
+  // same docs-payload reasoning as desktop.
+  if (theme === "dark") {
+    // 4. Slide-up copilot sheet.
+    await page.locator(".shell-fab").click();
+    await settle(page, 600);
+    await shoot(page, "mobile-04-copilot-sheet");
+    await page.locator(".cp-sheet-close").click();
+    await settle(page, 400);
 
-  // 5. Tasks view via bottom tab bar.
-  await clickMobileTab(page, "Tasks");
-  await shoot(page, "mobile-05-tasks");
+    // 5. Tasks view via bottom tab bar.
+    await clickMobileTab(page, "Tasks");
+    await shoot(page, "mobile-05-tasks");
 
-  // 6. Markets via bottom tab bar.
-  await clickMobileTab(page, "Markets");
-  await shoot(page, "mobile-06-markets");
+    // 6. Markets via bottom tab bar.
+    await clickMobileTab(page, "Markets");
+    await shoot(page, "mobile-06-markets");
 
-  // 7. Weekend planner via bottom tab bar.
-  await clickMobileTab(page, "Weekend");
-  await shoot(page, "mobile-07-weekend");
+    // 7. Weekend planner via bottom tab bar.
+    await clickMobileTab(page, "Weekend");
+    await shoot(page, "mobile-07-weekend");
+  }
 
   await ctx.close();
 }
@@ -150,8 +176,10 @@ async function mobileFlow(browser) {
 async function main() {
   const browser = await chromium.launch({ headless: true });
   try {
-    await desktopFlow(browser);
-    await mobileFlow(browser);
+    for (const theme of ["dark", "light"]) {
+      await desktopFlow(browser, theme);
+      await mobileFlow(browser, theme);
+    }
     console.log(`\n✅ All screenshots saved to ${OUT}`);
   } finally {
     await browser.close();
