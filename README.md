@@ -1,6 +1,148 @@
 # Aura
 
-Unified monorepo for the Aura productivity platform — a personal AI assistant with a real-time dashboard, conversational chat, calendar/todo CRUD, commute intelligence, a weekend orchestrator, and a brain-vault integration that lets the agent answer questions from Kevin's personal knowledge base.
+> Your daily agent, always in context. A personal AI productivity platform that pulls your weather, calendar, tasks, markets, and commute into one place — then lets you chat with it.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/aura-redesign/desktop-01-today.png">
+    <img alt="Aura — Today briefing dashboard" src="docs/screenshots/aura-redesign/desktop-01-today-light.png" width="880">
+  </picture>
+</p>
+
+Aura is a unified monorepo combining a React Router v7 frontend, a LangChain orchestration agent, and an MCP Server exposing ~22 productivity tools. It runs as a single-user app gated by Google OAuth, with a brain-vault integration that lets the agent answer questions from a personal knowledge base.
+
+**Live:** <https://daily-agent-ui.vercel.app> · **Agent:** <https://aura-agent.fly.dev> · **MCP Server:** <https://aura-mcp-server.fly.dev>
+
+---
+
+## Highlights
+
+### Daily briefing — schedule, weather, markets, tasks, all in one view
+The "Today" surface bundles the things you actually need at 8am. Auto light/dark theming follows system preference.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img alt="Today — dark" src="docs/screenshots/aura-redesign/desktop-01-today.png">
+      <p align="center"><sub>Today · dark</sub></p>
+    </td>
+    <td width="50%">
+      <img alt="Today — light" src="docs/screenshots/aura-redesign/desktop-01-today-light.png">
+      <p align="center"><sub>Today · light</sub></p>
+    </td>
+  </tr>
+</table>
+
+### Calendar — today + tomorrow, with "leave by" hints
+
+<p align="center">
+  <img alt="Calendar view" src="docs/screenshots/aura-redesign/desktop-02-calendar.png" width="820">
+</p>
+
+The calendar surface joins Google Calendar with the commute engine so each event gets a "leave by" suggestion based on real-time traffic.
+
+### Tasks — Todoist, grouped by project bucket
+
+<p align="center">
+  <img alt="Tasks view" src="docs/screenshots/aura-redesign/desktop-03-tasks.png" width="820">
+</p>
+
+Filterable by Work / Home / Errands / Personal, with progress per bucket and a quick-notes scratchpad.
+
+### Markets — equities + crypto, with range toggles
+
+<p align="center">
+  <img alt="Markets view" src="docs/screenshots/aura-redesign/desktop-04-markets.png" width="820">
+</p>
+
+Live quotes via Alpha Vantage + CoinGecko, cached aggressively (5-min TTL) to stay within free-tier limits.
+
+### Commute — driving vs. transit, with shuttle awareness
+
+<p align="center">
+  <img alt="Commute view" src="docs/screenshots/aura-redesign/desktop-05-commute.png" width="820">
+</p>
+
+Combines Google Maps directions, the Caltrain GTFS feed, and the MV Connector shuttle schedule into a single "best way to get to work right now" recommendation.
+
+### Weekend planner — trails, concerts, itineraries
+
+<p align="center">
+  <img alt="Weekend planner — mobile" src="docs/screenshots/aura-redesign/mobile-07-weekend.png" width="320">
+</p>
+
+Suggests hikes near you (Google Places), pulls live concert listings (Ticketmaster), and can stitch them into multi-stop weekend itineraries — falls back to JSON fixtures if API keys aren't set.
+
+### Conversational copilot — slash commands + suggested prompts
+
+<table>
+  <tr>
+    <td width="40%">
+      <img alt="Mobile copilot sheet" src="docs/screenshots/aura-redesign/mobile-04-copilot-sheet.png">
+      <p align="center"><sub>Copilot sheet · mobile</sub></p>
+    </td>
+    <td width="60%">
+      <p>Ask Aura anything — your data is already in context. Type <code>/</code> to access slash commands:</p>
+      <ul>
+        <li><code>/summary</code> — narrative recap of your day</li>
+        <li><code>/weather</code> — full forecast with rain/wind</li>
+        <li><code>/finance</code> — current holdings + movers</li>
+        <li><code>/help</code> — list every command</li>
+      </ul>
+      <p>Suggested prompts adapt to whichever surface you're on (Today, Tasks, Markets, …).</p>
+    </td>
+  </tr>
+</table>
+
+### Mobile — same data, redesigned for a thumb
+
+<table>
+  <tr>
+    <td width="33%">
+      <img alt="Today — mobile" src="docs/screenshots/aura-redesign/mobile-01-today-top.png">
+      <p align="center"><sub>Today (top)</sub></p>
+    </td>
+    <td width="33%">
+      <img alt="Today scrolled — mobile" src="docs/screenshots/aura-redesign/mobile-02-today-scrolled.png">
+      <p align="center"><sub>Today (tasks)</sub></p>
+    </td>
+    <td width="33%">
+      <img alt="Schedule tabs — mobile" src="docs/screenshots/aura-redesign/mobile-03-schedule-tabs-tomorrow.png">
+      <p align="center"><sub>Schedule · Tomorrow</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="33%">
+      <img alt="Tasks — mobile" src="docs/screenshots/aura-redesign/mobile-05-tasks.png">
+      <p align="center"><sub>Tasks</sub></p>
+    </td>
+    <td width="33%">
+      <img alt="Markets — mobile" src="docs/screenshots/aura-redesign/mobile-06-markets.png">
+      <p align="center"><sub>Markets</sub></p>
+    </td>
+    <td width="33%">
+      <img alt="Weekend planner — mobile" src="docs/screenshots/aura-redesign/mobile-07-weekend.png">
+      <p align="center"><sub>Weekend</sub></p>
+    </td>
+  </tr>
+</table>
+
+### Login — Google OAuth, allowlist-gated
+
+<table>
+  <tr>
+    <td width="50%">
+      <img alt="Login — dark" src="docs/screenshots/login-redesign/after-desktop-dark.png">
+      <p align="center"><sub>Login · dark</sub></p>
+    </td>
+    <td width="50%">
+      <img alt="Login — light" src="docs/screenshots/login-redesign/after-desktop-light.png">
+      <p align="center"><sub>Login · light</sub></p>
+    </td>
+  </tr>
+</table>
+
+---
 
 ## Architecture
 
@@ -18,6 +160,54 @@ Browser ─▶ UI (5173, React Router v7, auth boundary)
 ```
 
 Claude Desktop, Cursor, and other MCP clients can also connect directly to the MCP Server at `/mcp/sse` — they bypass the UI/Agent entirely.
+
+## Features
+
+**Daily intelligence**
+- Weather (current + 7-day forecast) via OpenWeatherMap
+- Google Calendar — read events, create/update/delete, `find_free_time` for scheduling
+- Todoist — full CRUD over tasks, grouped by project bucket
+- Commute — driving + transit options with real-time traffic, plus Caltrain GTFS and MV Connector shuttle schedules
+- Markets — equities (Alpha Vantage) and crypto (CoinGecko) with watchlist + range toggles
+
+**Weekend orchestrator**
+- Trail suggestions near a location (Google Places)
+- Live concert listings (Ticketmaster Discovery API)
+- Multi-day itinerary composer that stitches the above together
+- Graceful degradation: falls back to bundled JSON fixtures if any external key is unset
+
+**Conversational copilot**
+- LangChain agent over GPT-4o-mini, wired to every MCP tool as a typed LangChain tool
+- Slash commands (`/summary`, `/weather`, `/finance`, `/help`) for fast common actions
+- Streaming chat responses through the UI proxy
+
+**Brain-vault integration**
+- `vault_search`, `vault_read`, `vault_list` MCP tools backed by a sparse-checkout clone of `~/Projects/brain-vault`
+- Lets the agent answer "what did I do last week?" / "tell me about project X" from personal notes
+
+**Auth & security**
+- Google OAuth + email allowlist on the UI
+- UI is the auth boundary; Agent re-validates a shared-secret + verified-email header on every request
+- Session cookies signed with a separate `SESSION_SECRET`
+- No browser-side secrets — everything routes through `/api/v1/*` proxies on the UI server
+
+**Infra**
+- Redis cache (with per-service in-memory fallback) — Weather 30min, Financial 5min, Routes 15min, Geocoding 7d
+- Docker Compose for local dev, Fly.io for Python services, Vercel for the UI
+- Brain-vault syncs as a git sparse-checkout so the server only pulls the folders it needs
+
+## Tech Stack
+
+| Layer | Stack |
+| --- | --- |
+| Frontend | React Router v7, TypeScript, Tailwind CSS, Vitest |
+| AI Agent | Python 3.13, LangChain, GPT-4o-mini, Flask |
+| MCP Server | Python 3.11, FastAPI, official MCP SDK (SSE transport) |
+| Cache | Redis (+ in-memory fallback) |
+| Auth | Google OAuth 2.0, signed session cookies, shared-secret service-to-service hop |
+| External APIs | Google Calendar, Google Maps + Places, OpenWeatherMap, Todoist, Alpha Vantage, CoinGecko, Ticketmaster, Caltrain GTFS |
+| Deploy | Fly.io (`aura-agent`, `aura-mcp-server`), Vercel (UI) |
+| Tooling | Docker Compose, `uv` (Python), `npm` (Node), Make, Playwright (E2E) |
 
 ## Quick Start
 
@@ -123,6 +313,23 @@ uv run pytest --cov=daily_ai_agent
 
 # packages/ui
 npm run typecheck && npm test   # Vitest
+```
+
+## Repository Layout
+
+```
+aura/
+├── packages/
+│   ├── server/                # MCP Server (FastAPI + MCP SDK)
+│   ├── agent/                 # LangChain agent (Flask REST)
+│   └── ui/                    # React Router v7 frontend
+├── docker/                    # Per-service Dockerfiles
+├── docker-compose*.yml        # Dev / prod / e2e stacks
+├── e2e/                       # Cross-service Playwright smoke + full E2E
+├── fly/                       # Fly.io config helpers
+├── scripts/                   # One-off ops scripts (vault sync, etc.)
+├── docs/                      # Architecture docs + screenshots
+└── .claude/                   # Project-local Claude Code skills + hooks
 ```
 
 ## 🤖 Claude Code Integration
