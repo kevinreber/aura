@@ -83,7 +83,7 @@ packages/ui/
 │   ├── root.tsx
 │   └── routes.ts                      # Route configuration (typed)
 ├── scripts/
-│   └── capture_pr_screenshots.mjs     # Playwright screenshot helper
+│   └── capture_aura_screenshots.mjs   # Playwright screenshot helper
 ├── public/
 ├── .env.example
 ├── package.json
