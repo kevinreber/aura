@@ -6,9 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Aura** is a unified monorepo for a personal AI productivity platform. It combines three services into a full-stack application:
 
-- **Server** (MCP Server) - Python/FastAPI backend providing productivity tools via Model Context Protocol. Weather, calendar CRUD, todos, commute intelligence, financial data, **weekend orchestrator** (trails / concerts / itineraries).
+- **Server** (MCP Server) - Python/FastAPI backend providing productivity tools via Model Context Protocol. Weather, calendar CRUD, todos, commute intelligence, financial data, **Navi** the planning orchestrator (trails / concerts / itineraries).
 - **Agent** (AI Agent) - Python/LangChain orchestrator with conversational AI powered by GPT-4o-mini. Wraps MCP tools as LangChain tools; exposes a Flask REST API.
 - **UI** (Web Frontend) - React Router v7 application with real-time dashboard, AI chat, weekend planner, and Google-OAuth login. The UI server is the **auth boundary** — browser fetches go through its `/api/v1/*` proxy routes, never directly to the Agent.
+
+> **Aura vs. Navi (mental model):** *Aura* is the app and the primary
+> conversational agent. *Navi* is the **planning orchestrator** sub-agent
+> (trails / concerts / itineraries — the feature formerly called the "Weekend
+> Orchestrator"). Keep them separable: Aura *calls* Navi through a narrow
+> contract so Navi can potentially be extracted into its own product later.
+> Treat Navi as a component Aura invokes, not part of Aura's core. See
+> [`docs/NAVI_BOUNDARY.md`](docs/NAVI_BOUNDARY.md).
 
 ### Architecture
 
