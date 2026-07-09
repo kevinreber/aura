@@ -20,6 +20,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from .config import get_settings
+from .auth import InternalAuthMiddleware
 from .utils.logging import setup_logging, get_logger
 from .utils.cache import get_cache_service
 
@@ -136,6 +137,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Shared-secret gate for internal callers. No-op until INTERNAL_AUTH_SECRET
+    # is provisioned (local dev); enforced on every route except /health once
+    # the secret is set in prod. Added after CORS so it runs outermost.
+    app.add_middleware(InternalAuthMiddleware, secret=settings.internal_auth_secret)
 
     # Add rate limiter
     app.state.limiter = limiter

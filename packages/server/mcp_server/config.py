@@ -54,6 +54,11 @@ class Settings(BaseSettings):
 
     # Security & CORS
     secret_key: str = "your-secret-key-change-in-production"
+    # Shared-secret auth for internal callers (Aura's Agent, Navi). When set,
+    # every request except /health must present a matching X-Internal-Auth
+    # header; unset means open (local dev only). Mirrors the Agent's UI->Agent
+    # scheme. BaseSettings reads INTERNAL_AUTH_SECRET from the environment.
+    internal_auth_secret: Optional[str] = None
     allowed_origins: List[str] = [
         "http://localhost:3000", 
         "http://localhost:5173", 

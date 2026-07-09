@@ -66,11 +66,21 @@ class MCPClient:
         self.health_url: str = f"{self.base_url}/health"
         self.timeout: int = self.settings.mcp_server_timeout
 
+    def _auth_headers(self) -> Dict[str, str]:
+        """The shared-secret header the MCP server requires (when it enforces
+        auth). Empty when no secret is configured, so local dev still works."""
+        secret = getattr(self.settings, "internal_auth_secret", None)
+        return {"X-Internal-Auth": secret} if secret else {}
+
     @classmethod
     async def get_http_client(cls, timeout: int = 45) -> httpx.AsyncClient:
         """Get or create shared HTTP client for fallback mode."""
         async with cls._connection_lock:
             if cls._http_client is None or cls._http_client.is_closed:
+                headers = {"Content-Type": "application/json"}
+                secret = getattr(get_settings(), "internal_auth_secret", None)
+                if secret:
+                    headers["X-Internal-Auth"] = secret
                 cls._http_client = httpx.AsyncClient(
                     timeout=httpx.Timeout(timeout),
                     limits=httpx.Limits(
@@ -78,7 +88,7 @@ class MCPClient:
                         max_keepalive_connections=20,
                         keepalive_expiry=30.0,
                     ),
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                 )
             return cls._http_client
 
@@ -147,7 +157,7 @@ class MCPClient:
 
         for attempt in range(max_retries + 1):
             try:
-                async with sse_client(self.sse_url) as (read_stream, write_stream):
+                async with sse_client(self.sse_url, headers=self._auth_headers()) as (read_stream, write_stream):
                     async with ClientSession(read_stream, write_stream) as session:
                         await session.initialize()
                         result = await session.call_tool(tool_name, arguments)
@@ -362,7 +372,7 @@ class MCPClient:
     async def list_available_tools(self) -> List[Dict[str, Any]]:
         """List all available tools from the MCP server."""
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, headers=self._auth_headers()) as client:
                 response = await client.get(f"{self.base_url}/tools")
                 response.raise_for_status()
                 data = response.json()
