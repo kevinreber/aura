@@ -167,6 +167,16 @@ allowlist. The UI is the auth boundary; the Agent is an internal service.
 6. The Agent's `before_request` hook re-checks both headers against its
    own `INTERNAL_AUTH_SECRET` + `ALLOWED_EMAILS` (defense in depth).
 
+**MCP Server (`aura-mcp-server`) — shared-secret gate.** The server is deployed
+publicly on Fly and exposes calendar-write and vault-read tools, so it now
+enforces `X-Internal-Auth` too (pure-ASGI `InternalAuthMiddleware`, so it guards
+the `/mcp/sse` stream without buffering). When `INTERNAL_AUTH_SECRET` is set,
+every request except `/health` must carry the matching header; unset means open
+(local dev). Its callers already send it: the Agent's MCP client (SSE + HTTP
+fallback + tool discovery) and Navi (`X-Internal-Auth` from `NAVI_AURA_MCP_SECRET`).
+Use the **same** secret value across the Agent and Server so one shared secret
+covers UI→Agent, Agent→Server, and Navi→Server.
+
 **Adding/removing users:** edit `ALLOWED_EMAILS` and restart both services.
 Allowlist is checked on every request, so removing an email immediately
 invalidates that user's existing session.

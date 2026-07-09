@@ -24,6 +24,14 @@ MCP_SERVER_URL = os.getenv("E2E_MCP_SERVER_URL", "http://localhost:8000")
 HEALTH_CHECK_TIMEOUT = int(os.getenv("E2E_HEALTH_CHECK_TIMEOUT", "120"))
 REQUEST_TIMEOUT = int(os.getenv("E2E_REQUEST_TIMEOUT", "60"))
 
+# When the stack runs with the MCP server / Agent enforcing shared-secret auth,
+# direct calls to protected endpoints must carry this header. Empty by default
+# (local e2e stacks run open), so this is a no-op unless the secret is set.
+INTERNAL_AUTH_SECRET = os.getenv("INTERNAL_AUTH_SECRET", "")
+INTERNAL_AUTH_HEADERS = (
+    {"X-Internal-Auth": INTERNAL_AUTH_SECRET} if INTERNAL_AUTH_SECRET else {}
+)
+
 
 class ServiceHealth:
     """Track health status of all services."""
@@ -59,8 +67,14 @@ def service_urls() -> dict:
 
 @pytest.fixture
 async def http_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Create an async HTTP client for each test."""
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+    """Create an async HTTP client for each test.
+
+    Carries X-Internal-Auth when the stack enforces it (no-op otherwise), so
+    direct calls to protected MCP-server/Agent endpoints aren't rejected.
+    """
+    async with httpx.AsyncClient(
+        timeout=REQUEST_TIMEOUT, headers=INTERNAL_AUTH_HEADERS
+    ) as client:
         yield client
 
 
