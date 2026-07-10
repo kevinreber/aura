@@ -74,7 +74,7 @@ class TestNaviPlannerTool:
             assert "home_base" in kwargs["context"]
 
     @pytest.mark.asyncio
-    async def test_arun_handles_error(self, tool):
+    async def test_arun_handles_unexpected_error(self, tool):
         with patch.object(tool, "_get_navi_client") as mock_get_client:
             mock_client = MagicMock()
             mock_client.plan = AsyncMock(side_effect=Exception("boom"))
@@ -82,7 +82,24 @@ class TestNaviPlannerTool:
 
             result = await tool._arun("plan something")
 
-            assert "Error planning via Navi" in result
+            # Always returns a user-facing string the LLM can relay, never raises.
+            assert "temporarily unavailable" in result
+
+    @pytest.mark.asyncio
+    async def test_arun_navierror_relays_message(self, tool):
+        from daily_ai_agent.services.navi_client import NaviError
+
+        with patch.object(tool, "_get_navi_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.plan = AsyncMock(
+                side_effect=NaviError("Navi didn't respond within 60s — it may be waking up.")
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await tool._arun("plan my saturday")
+
+            assert "Navi didn't respond within 60s" in result
+            assert "try again" in result.lower()
 
     @pytest.mark.asyncio
     async def test_arun_empty_plan(self, tool):
