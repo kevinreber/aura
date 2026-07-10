@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 import asyncio
 
+from loguru import logger
+
 from ..services.mcp_client import MCPClient
-from ..services.navi_client import NaviClient
+from ..services.navi_client import NaviClient, NaviError
 from ..models.config import get_settings
 from ..utils.constants import (
     FINANCIAL_SYMBOLS,
@@ -1187,8 +1189,20 @@ class NaviPlannerTool(BaseTool):
             client = self._get_navi_client()
             plan = await client.plan(intent=intent, on=on, context=context)
             return _format_navi_plan(plan)
+        except NaviError as e:
+            # Expected failure (timeout / unreachable / auth / HTTP). NaviError
+            # messages are user-safe; instruct the LLM to relay it, not retry.
+            logger.warning(f"plan_outing NaviError: {e}")
+            return (
+                f"The planner service (Navi) couldn't complete this request: {e} "
+                f"Tell the user this directly and offer to try again shortly."
+            )
         except Exception as e:
-            return f"Error planning via Navi: {str(e)}"
+            logger.exception(f"plan_outing unexpected error: {e}")
+            return (
+                "The planner service (Navi) hit an unexpected error, so no plan was "
+                "produced. Tell the user planning is temporarily unavailable."
+            )
 
     def _run(self, intent: str, on: Optional[str] = None) -> str:
         return asyncio.run(self._arun(intent, on))

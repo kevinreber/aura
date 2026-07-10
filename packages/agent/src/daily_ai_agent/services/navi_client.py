@@ -9,6 +9,7 @@ docs/NAVI_BOUNDARY.md. Auth mirrors the MCP server: send `X-Internal-Auth` when
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, Optional
 
 import httpx
@@ -49,20 +50,45 @@ class NaviClient:
         if context:
             payload["context"] = context
 
+        # Timing + outcome are logged on every path so a silent failure is
+        # diagnosable from `fly logs` next time (grep "navi.plan").
+        start = time.monotonic()
+        logger.info(f"navi.plan start url={self.base_url} timeout={self.timeout}s intent={intent!r}")
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 resp = await client.post(
                     f"{self.base_url}/plan", json=payload, headers=self._headers()
                 )
                 resp.raise_for_status()
-                return resp.json()
+                data = resp.json()
+                elapsed = time.monotonic() - start
+                logger.info(
+                    f"navi.plan ok in {elapsed:.1f}s blocks={len(data.get('blocks', []))}"
+                )
+                return data
+        except httpx.TimeoutException as e:
+            elapsed = time.monotonic() - start
+            logger.warning(f"navi.plan TIMEOUT after {elapsed:.1f}s (limit {self.timeout}s)")
+            raise NaviError(
+                f"Navi didn't respond within {self.timeout}s — it may be waking up or "
+                f"working on a long plan. Try again in a moment."
+            ) from e
+        except httpx.ConnectError as e:
+            elapsed = time.monotonic() - start
+            logger.warning(f"navi.plan UNREACHABLE at {self.base_url} after {elapsed:.1f}s: {e}")
+            raise NaviError(f"Couldn't reach Navi at {self.base_url}.") from e
         except httpx.HTTPStatusError as e:
-            # 401 here almost always means NAVI_INTERNAL_AUTH_SECRET is unset or
-            # doesn't match Navi's — a config problem, not a user problem.
-            logger.warning(
-                f"Navi /plan returned HTTP {e.response.status_code}: {e.response.text[:200]}"
-            )
-            raise NaviError(f"Navi returned HTTP {e.response.status_code}") from e
+            elapsed = time.monotonic() - start
+            code = e.response.status_code
+            logger.warning(f"navi.plan HTTP {code} after {elapsed:.1f}s: {e.response.text[:200]}")
+            if code == 401:
+                # Config problem, not a user problem: the shared secret is wrong/unset.
+                raise NaviError(
+                    "Navi rejected the request (401) — NAVI_INTERNAL_AUTH_SECRET is "
+                    "missing or doesn't match Navi's."
+                ) from e
+            raise NaviError(f"Navi returned HTTP {code}.") from e
         except httpx.HTTPError as e:
-            logger.warning(f"Navi /plan request failed: {e}")
+            elapsed = time.monotonic() - start
+            logger.warning(f"navi.plan FAILED after {elapsed:.1f}s: {e}")
             raise NaviError(f"Navi request failed: {e}") from e
