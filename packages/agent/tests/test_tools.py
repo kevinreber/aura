@@ -305,7 +305,9 @@ class TestGetAllTools:
         assert "get_morning_briefing" in tool_names
         assert "get_weekend_trails" in tool_names
         assert "get_weekend_concerts" in tool_names
-        assert "generate_weekend_itinerary" in tool_names
+        # Navi supersedes the built-in itinerary generator (see NAVI_BOUNDARY.md).
+        assert "plan_outing" in tool_names
+        assert "generate_weekend_itinerary" not in tool_names
 
     def test_all_tools_have_descriptions(self):
         """Test all tools have descriptions."""

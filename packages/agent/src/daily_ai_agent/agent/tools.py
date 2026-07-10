@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import asyncio
 
 from ..services.mcp_client import MCPClient
+from ..services.navi_client import NaviClient
 from ..models.config import get_settings
 from ..utils.constants import (
     FINANCIAL_SYMBOLS,
@@ -1117,8 +1118,88 @@ class ConcertAlertTool(BaseTool):
         return asyncio.run(self._arun(location, artists, radius_miles, date_range_days))
 
 
+class NaviPlanInput(BaseModel):
+    """Input schema for the Navi planning tool."""
+
+    intent: str = Field(
+        description=(
+            "The user's full planning request in natural language, INCLUDING any "
+            "constraints — e.g. 'plan a chill Saturday in SF, no long drives, "
+            "coffee then a hike' or 'a 2-day trip near Tahoe with hiking and live "
+            "music'. Pass it verbatim; Navi does the scouting and sequencing."
+        )
+    )
+    on: Optional[str] = Field(
+        default=None,
+        description="Target date in YYYY-MM-DD, if the user named a specific day. Omit otherwise.",
+    )
+
+
+def _format_navi_plan(plan: Dict[str, Any]) -> str:
+    """Render a Navi Plan ({summary, blocks[]}) into an LLM-facing string."""
+    summary = (plan.get("summary") or "").strip()
+    blocks = plan.get("blocks", [])
+    if not blocks:
+        return f"Navi returned no plan blocks. {summary}".strip()
+
+    lines = [f"🧭 {summary}" if summary else "🧭 Proposed plan:"]
+    for b in blocks:
+        head = "  • "
+        if b.get("when"):
+            head += f"{b['when']} — "
+        head += b.get("title", "Untitled")
+        if b.get("location"):
+            head += f" @ {b['location']}"
+        lines.append(head)
+        detail = (b.get("detail") or "").strip()
+        if detail:
+            lines.append(f"    {detail}")
+        # Surface honest grounding so the LLM (and user) can trust the source.
+        grounding = b.get("grounding")
+        if grounding == "invented":
+            lines.append("    (note: an inference, not grounded in a source)")
+    return "\n".join(lines)
+
+
+class NaviPlannerTool(BaseTool):
+    """Generate a concrete outing/weekend plan via Navi, the planning orchestrator."""
+
+    name: str = "plan_outing"
+    description: str = (
+        "Generate a concrete, grounded outing or weekend plan from a fuzzy intent. "
+        "Use whenever the user wants you to PLAN or PROPOSE an outing, a day, or a "
+        "multi-day trip — e.g. 'plan my Saturday', 'what should I do this weekend', "
+        "'a weekend near Tahoe with hiking and live music'. This calls Navi, a "
+        "specialized planner that scouts trails/venues/events and stitches a "
+        "time-blocked plan grounded in real data and the user's saved tastes. "
+        "Pass the user's full intent verbatim, including constraints. Prefer this "
+        "over assembling a multi-step outing yourself."
+    )
+    args_schema: Type[BaseModel] = NaviPlanInput
+
+    def _get_navi_client(self) -> NaviClient:
+        return NaviClient()
+
+    async def _arun(self, intent: str, on: Optional[str] = None) -> str:
+        try:
+            settings = get_settings()
+            context = {"home_base": settings.user_location}
+            client = self._get_navi_client()
+            plan = await client.plan(intent=intent, on=on, context=context)
+            return _format_navi_plan(plan)
+        except Exception as e:
+            return f"Error planning via Navi: {str(e)}"
+
+    def _run(self, intent: str, on: Optional[str] = None) -> str:
+        return asyncio.run(self._arun(intent, on))
+
+
 class ItineraryTool(BaseTool):
-    """Tool to generate a multi-day weekend trip itinerary."""
+    """Multi-day itinerary generator.
+
+    SUPERSEDED by NaviPlannerTool (`plan_outing`) and no longer registered in
+    get_all_tools() — Navi now owns plan composition (see docs/NAVI_BOUNDARY.md).
+    Kept for its direct unit tests / as the pre-Navi reference path."""
 
     name: str = "generate_weekend_itinerary"
     description: str = (
@@ -1335,7 +1416,7 @@ def get_all_tools():
         MorningBriefingTool(),
         TrailScoutTool(),
         ConcertAlertTool(),
-        ItineraryTool(),
+        NaviPlannerTool(),  # supersedes ItineraryTool — Navi owns plan composition
         CreateTravelBlockTool(),
         VaultSearchTool(),
         VaultReadTool(),

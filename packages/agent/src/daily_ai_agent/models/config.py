@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     mcp_server_url: str = "http://localhost:8000"
     mcp_server_timeout: int = 45
 
+    # Navi (planning orchestrator) — external service Aura calls for outing/
+    # weekend plans. Auth: send X-Internal-Auth = navi_internal_auth_secret,
+    # whose value is Navi's own NAVI_INTERNAL_AUTH_SECRET. Planning runs an LLM
+    # loop, so the timeout is generous. See docs/NAVI_BOUNDARY.md.
+    navi_url: str = "http://localhost:8100"
+    navi_internal_auth_secret: Optional[str] = None
+    navi_timeout: int = 60
+
     # Agent Configuration
     log_level: str = "INFO"
     enable_memory: bool = True
