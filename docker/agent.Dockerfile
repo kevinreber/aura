@@ -33,4 +33,8 @@ ENV ENVIRONMENT=production DEBUG=false
 USER root
 RUN uv pip install --system gunicorn
 USER appuser
-CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "1", "--worker-class", "sync", "daily_ai_agent.api_server:create_app()"]
+# --timeout 120: plan_outing calls Navi, whose planner+critic loop runs ~45-50s,
+# well past gunicorn's 30s default — which was killing the worker mid-request and
+# leaving the chat with no response. gthread + threads so one long plan doesn't
+# block concurrent requests (calendar, todos, health) on the single worker.
+CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "1", "--worker-class", "gthread", "--threads", "8", "--timeout", "120", "daily_ai_agent.api_server:create_app()"]
