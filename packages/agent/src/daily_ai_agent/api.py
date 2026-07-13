@@ -2,6 +2,7 @@
 
 import asyncio
 import hmac
+import json
 import uuid
 import time
 from datetime import datetime
@@ -406,8 +407,10 @@ def create_app(testing: bool = False) -> Flask:
                 """Generate SSE events from streaming response."""
                 try:
                     async for chunk in orchestrator.chat_stream(message):
-                        # Format as Server-Sent Event
-                        yield f"data: {chunk}\n\n"
+                        # JSON-encode the chunk so newlines/special chars survive the
+                        # single-line `data:` frame — the model's line breaks were
+                        # being stripped, mashing plans into one paragraph.
+                        yield f"data: {json.dumps(chunk)}\n\n"
                     # Send done event
                     yield "data: [DONE]\n\n"
                 except Exception as e:

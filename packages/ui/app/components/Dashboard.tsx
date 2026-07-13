@@ -275,8 +275,17 @@ export default function Dashboard({
             setStreamingMessage('');
             return;
           }
-          if (data.startsWith('[TOOL_START]') || data.startsWith('[TOOL_END]')) continue;
-          accumulated += data;
+          // Content chunks are JSON-encoded so the model's newlines survive the
+          // SSE frame; fall back to the raw string to tolerate the pre-fix agent.
+          let text: string;
+          try {
+            const parsed = JSON.parse(data);
+            text = typeof parsed === 'string' ? parsed : data;
+          } catch {
+            text = data;
+          }
+          if (text.startsWith('[TOOL_START]') || text.startsWith('[TOOL_END]')) continue;
+          accumulated += text;
           setStreamingMessage(accumulated);
         }
       }
