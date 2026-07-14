@@ -128,6 +128,10 @@ function classify(startMs: number, endMs: number, now: number) {
 export function adaptEvents(c: CalendarData | null | undefined): EventVM[] {
   const events = c?.data?.events;
   const now = Date.now();
+  // An upstream error (e.g. expired Google Calendar auth) must not be dressed
+  // up as mock events — show a genuinely empty schedule so the failure is
+  // visible. Mock fallback below stays for the no-data dev/demo case.
+  if (c?.data?.error) return [];
   if (!events?.length) {
     return [
       { title: 'Team Standup', start: '9:00 AM', end: '9:15 AM', cat: 'work', location: 'Zoom',

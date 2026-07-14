@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, date
 import pytz
 
 from mcp_server.tools.calendar import CalendarTool
+from mcp_server.clients.google_calendar import GoogleCalendarAuthError, GoogleCalendarClient
 from mcp_server.schemas.calendar import (
     CalendarInput, CalendarOutput, CalendarEvent,
     CalendarRangeInput, CalendarRangeOutput,
@@ -366,3 +367,204 @@ class TestCalendarHelperMethods:
         events = calendar_tool._generate_weekend_events(saturday)
 
         assert isinstance(events, list)
+
+
+class TestCalendarAuthFailure:
+    """Auth failures must surface as explicit errors — never mock data or empty lists.
+
+    Dates are >7 days out so mock-event caching from other tests (which only
+    populates dates near today) can't short-circuit the fetch under test.
+    """
+
+    @pytest.fixture
+    def calendar_tool(self):
+        """CalendarTool with no Google credentials configured (mock mode)."""
+        return CalendarTool()
+
+    @pytest.fixture
+    def auth_failing_client(self):
+        """Google client whose fetches raise the typed auth error."""
+        client = MagicMock()
+        client.get_events_for_multiple_calendars = AsyncMock(
+            side_effect=GoogleCalendarAuthError()
+        )
+        return client
+
+    @pytest.mark.asyncio
+    async def test_init_auth_error_returns_error_payload(self, calendar_tool):
+        """Auth failure detected at init → error payload, not mock events."""
+        calendar_tool.google_calendar_client = None
+        calendar_tool.google_calendar_auth_error = GoogleCalendarAuthError.DEFAULT_MESSAGE
+
+        result = await calendar_tool.list_events(CalendarInput(date=date.today()))
+
+        assert isinstance(result, CalendarOutput)
+        assert result.auth_expired is True
+        assert "re-authentication required" in result.error
+        assert result.events == []
+        assert result.total_events == 0
+
+    @pytest.mark.asyncio
+    async def test_init_auth_error_returns_error_payload_for_range(self, calendar_tool):
+        calendar_tool.google_calendar_client = None
+        calendar_tool.google_calendar_auth_error = GoogleCalendarAuthError.DEFAULT_MESSAGE
+
+        start = date.today()
+        result = await calendar_tool.list_events_range(
+            CalendarRangeInput(start_date=start, end_date=start + timedelta(days=7))
+        )
+
+        assert isinstance(result, CalendarRangeOutput)
+        assert result.auth_expired is True
+        assert "re-authentication required" in result.error
+        assert result.events == []
+
+    @pytest.mark.asyncio
+    async def test_runtime_auth_error_no_mock_fallback(self, calendar_tool, auth_failing_client):
+        """Token revoked mid-session → error payload; auth error is remembered."""
+        calendar_tool.google_calendar_client = auth_failing_client
+
+        query_date = date.today() + timedelta(days=10)
+        result = await calendar_tool.list_events(CalendarInput(date=query_date))
+
+        assert result.auth_expired is True
+        assert "re-authentication required" in result.error
+        assert result.events == []
+        # Remembered so subsequent calls fail fast without hitting the API
+        assert calendar_tool.google_calendar_auth_error is not None
+
+    @pytest.mark.asyncio
+    async def test_runtime_auth_error_no_mock_fallback_for_range(
+        self, calendar_tool, auth_failing_client
+    ):
+        calendar_tool.google_calendar_client = auth_failing_client
+
+        start = date.today() + timedelta(days=10)
+        result = await calendar_tool.list_events_range(
+            CalendarRangeInput(start_date=start, end_date=start + timedelta(days=1))
+        )
+
+        assert result.auth_expired is True
+        assert result.events == []
+        assert calendar_tool.google_calendar_auth_error is not None
+
+    @pytest.mark.asyncio
+    async def test_empty_calendar_with_valid_auth_unchanged(self, calendar_tool):
+        """Valid auth + no events stays a plain empty result — no error fields."""
+        client = MagicMock()
+        client.get_events_for_multiple_calendars = AsyncMock(return_value=[])
+        calendar_tool.google_calendar_client = client
+
+        query_date = date.today() + timedelta(days=12)
+        result = await calendar_tool.list_events(CalendarInput(date=query_date))
+
+        assert result.error is None
+        assert result.auth_expired is False
+        assert result.events == []
+        assert result.total_events == 0
+
+    @pytest.mark.asyncio
+    async def test_non_auth_error_still_falls_back_to_mock(self, calendar_tool):
+        """Transient (non-auth) API failures keep the existing mock fallback."""
+        client = MagicMock()
+        client.get_events_for_multiple_calendars = AsyncMock(
+            side_effect=RuntimeError("transient API blip")
+        )
+        calendar_tool.google_calendar_client = client
+
+        query_date = date.today() + timedelta(days=13)
+        result = await calendar_tool.list_events(CalendarInput(date=query_date))
+
+        # Mock fallback path: no error surfaced, normal (possibly empty) payload
+        assert result.error is None
+        assert result.auth_expired is False
+
+    @pytest.mark.asyncio
+    async def test_find_free_time_surfaces_auth_error(self, calendar_tool):
+        """find_free_time reports the auth failure instead of fake free slots."""
+        calendar_tool.google_calendar_client = None
+        calendar_tool.google_calendar_auth_error = GoogleCalendarAuthError.DEFAULT_MESSAGE
+
+        result = await calendar_tool.find_free_time(
+            CalendarFindFreeTimeInput(
+                duration_minutes=60,
+                start_date=date.today().isoformat(),
+            )
+        )
+
+        assert result.success is False
+        assert "re-authentication required" in result.message
+
+
+class TestGoogleCalendarClientAuth:
+    """The client raises a typed error for expired/revoked credentials."""
+
+    _CREDS_JSON = (
+        '{"refresh_token": "expired", "client_id": "cid", '
+        '"client_secret": "sec", "token": "tok"}'
+    )
+
+    def _expired_creds_client(self) -> GoogleCalendarClient:
+        """Client whose stored refresh token is rejected by Google."""
+        creds = MagicMock()
+        creds.valid = False
+        creds.refresh_token = "expired"
+        creds.refresh.side_effect = Exception(
+            "invalid_grant: Token has been expired or revoked."
+        )
+        with patch("mcp_server.clients.google_calendar.Credentials", return_value=creds):
+            return GoogleCalendarClient(credentials_json=self._CREDS_JSON)
+
+    def _client_with_service(self, service) -> GoogleCalendarClient:
+        """Client with valid creds and an injected (mock) API service."""
+        creds = MagicMock()
+        creds.valid = True
+        with patch("mcp_server.clients.google_calendar.Credentials", return_value=creds), \
+                patch("mcp_server.clients.google_calendar.build", return_value=service):
+            return GoogleCalendarClient(credentials_json=self._CREDS_JSON)
+
+    @staticmethod
+    def _http_error(status: int):
+        import httplib2
+        from googleapiclient.errors import HttpError
+
+        resp = httplib2.Response({"status": str(status)})
+        return HttpError(resp, b'{"error": {"message": "boom"}}')
+
+    def test_refresh_failure_sets_auth_error(self):
+        client = self._expired_creds_client()
+
+        assert client.service is None
+        assert client.auth_error is not None
+        assert "re-authentication required" in client.auth_error
+
+    @pytest.mark.asyncio
+    async def test_fetch_raises_typed_error_after_refresh_failure(self):
+        client = self._expired_creds_client()
+
+        with pytest.raises(GoogleCalendarAuthError):
+            await client.get_events_for_date(date.today())
+        with pytest.raises(GoogleCalendarAuthError):
+            await client.get_events_for_range(date.today(), date.today() + timedelta(days=1))
+
+    @pytest.mark.asyncio
+    async def test_401_response_raises_typed_error(self):
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.side_effect = self._http_error(401)
+        client = self._client_with_service(service)
+
+        with pytest.raises(GoogleCalendarAuthError):
+            await client.get_events_for_date(date.today())
+        assert client.auth_error is not None
+
+    @pytest.mark.asyncio
+    async def test_non_auth_http_error_still_returns_empty(self):
+        """A 500 from Google is not an auth failure — keep the [] contract."""
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.side_effect = self._http_error(500)
+        client = self._client_with_service(service)
+
+        events = await client.get_events_for_date(date.today())
+
+        assert events == []
+        assert client.auth_error is None
