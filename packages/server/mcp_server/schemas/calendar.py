@@ -64,10 +64,20 @@ class CalendarEvent(BaseModel):
 
 class CalendarOutput(BaseModel):
     """Output schema for calendar_list_events tool."""
-    
+
     date: dt.date = Field(description="Date queried for events")
     events: List[CalendarEvent] = Field(description="List of events for the date")
     total_events: int = Field(description="Total number of events found")
+    error: Optional[str] = Field(
+        default=None,
+        description="Set when the fetch failed (e.g. Google Calendar auth expired). "
+                    "Events are empty — not mock data — when this is set."
+    )
+    auth_expired: bool = Field(
+        default=False,
+        description="True when Google Calendar authentication is expired/revoked "
+                    "and re-authentication is required."
+    )
     
     class Config:
         json_schema_extra = {
@@ -92,11 +102,21 @@ class CalendarOutput(BaseModel):
 
 class CalendarRangeOutput(BaseModel):
     """Output schema for calendar_list_events_range tool."""
-    
+
     start_date: dt.date = Field(description="Start date of the queried range")
     end_date: dt.date = Field(description="End date of the queried range")
     events: List[CalendarEvent] = Field(description="List of events in the date range")
     total_events: int = Field(description="Total number of events found in the range")
+    error: Optional[str] = Field(
+        default=None,
+        description="Set when the fetch failed (e.g. Google Calendar auth expired). "
+                    "Events are empty — not mock data — when this is set."
+    )
+    auth_expired: bool = Field(
+        default=False,
+        description="True when Google Calendar authentication is expired/revoked "
+                    "and re-authentication is required."
+    )
     
     class Config:
         json_schema_extra = {

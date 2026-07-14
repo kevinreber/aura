@@ -217,6 +217,12 @@ class CalendarTool(BaseTool):
         try:
             client = self._get_mcp_client()
             data = await client.get_calendar_events(date)
+
+            # An upstream failure (e.g. expired Google auth) arrives as an
+            # explicit error payload — surface it, don't report "no events".
+            if data.get('error'):
+                return f"Calendar unavailable: {data['error']}"
+
             events = data.get('events', [])
             total = data.get('total_events', 0)
 
@@ -261,9 +267,14 @@ class CalendarRangeTool(BaseTool):
         try:
             client = self._get_mcp_client()
             data = await client.get_calendar_events_range(start_date, end_date)
+
+            # See CalendarTool: error payloads must not read as an empty week.
+            if data.get('error'):
+                return f"Calendar unavailable: {data['error']}"
+
             events = data.get('events', [])
             total = data.get('total_events', 0)
-            
+
             if total == 0:
                 return f"No events scheduled from {start_date} to {end_date}"
             

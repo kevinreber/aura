@@ -100,6 +100,28 @@ class TestCalendarTool:
 
             assert "No events" in result
 
+    @pytest.mark.asyncio
+    async def test_arun_surfaces_auth_error_payload(self, tool):
+        """An error payload (expired Google auth) must not read as 'no events'."""
+        with patch.object(tool, "_get_mcp_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_calendar_events = AsyncMock(
+                return_value={
+                    "date": "2025-01-15",
+                    "events": [],
+                    "total_events": 0,
+                    "error": "Google Calendar authentication expired — "
+                             "re-authentication required",
+                    "auth_expired": True,
+                }
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await tool._arun("2025-01-15")
+
+            assert "re-authentication required" in result
+            assert "No events" not in result
+
 
 class TestCalendarRangeTool:
     """Tests for CalendarRangeTool."""
@@ -134,6 +156,29 @@ class TestCalendarRangeTool:
             assert "2 events" in result
             assert "2025-01-15" in result
             assert "2025-01-16" in result
+
+    @pytest.mark.asyncio
+    async def test_arun_surfaces_auth_error_payload(self, tool):
+        """An error payload (expired Google auth) must not read as an empty week."""
+        with patch.object(tool, "_get_mcp_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.get_calendar_events_range = AsyncMock(
+                return_value={
+                    "start_date": "2025-01-15",
+                    "end_date": "2025-01-16",
+                    "events": [],
+                    "total_events": 0,
+                    "error": "Google Calendar authentication expired — "
+                             "re-authentication required",
+                    "auth_expired": True,
+                }
+            )
+            mock_get_client.return_value = mock_client
+
+            result = await tool._arun("2025-01-15", "2025-01-16")
+
+            assert "re-authentication required" in result
+            assert "No events" not in result
 
 
 class TestTodoTool:

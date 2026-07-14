@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -25,9 +26,23 @@ SCOPES = [
 ]
 
 
+class GoogleCalendarAuthError(Exception):
+    """Google OAuth credentials are expired or revoked — re-authentication required.
+
+    Raised instead of returning empty results so callers can distinguish
+    "auth is broken" from "no events" and surface it rather than silently
+    rendering an empty calendar or falling back to mock data.
+    """
+
+    DEFAULT_MESSAGE = "Google Calendar authentication expired — re-authentication required"
+
+    def __init__(self, message: Optional[str] = None):
+        super().__init__(message or self.DEFAULT_MESSAGE)
+
+
 class GoogleCalendarClient:
     """Client for accessing Google Calendar API."""
-    
+
     def __init__(self, credentials_path: str = None, credentials_json: str = None):
         """
         Initialize Google Calendar client.
@@ -39,6 +54,10 @@ class GoogleCalendarClient:
         self.credentials_path = credentials_path
         self.credentials_json = credentials_json
         self.service = None
+        # Set when credentials are configured but expired/revoked. Fetch
+        # methods raise GoogleCalendarAuthError instead of returning [] so
+        # the failure stays visible.
+        self.auth_error: Optional[str] = None
         # IANA timezone used when writing events back to Google Calendar.
         # Used by update_event when the caller doesn't include a timezone-aware
         # datetime. Defaults to Pacific since this is a personal-use deployment.
@@ -56,6 +75,12 @@ class GoogleCalendarClient:
                 logger.info("Google Calendar API service initialized successfully")
             else:
                 logger.error("Failed to obtain Google Calendar credentials")
+        except GoogleCalendarAuthError as e:
+            # Credentials exist but are expired/revoked. Remember the message
+            # so fetches surface it instead of quietly returning no events.
+            logger.error(f"Google Calendar auth failure during init: {e}")
+            self.auth_error = str(e)
+            self.service = None
         except Exception as e:
             logger.error(f"Error initializing Google Calendar service: {e}")
             self.service = None
@@ -89,13 +114,18 @@ class GoogleCalendarClient:
                             logger.info("Refreshed Google Calendar credentials from env var")
                         except Exception as e:
                             logger.error(f"Error refreshing credentials from env var: {e}")
-                            return None
+                            raise GoogleCalendarAuthError(
+                                f"{GoogleCalendarAuthError.DEFAULT_MESSAGE} "
+                                f"(token refresh failed: {e})"
+                            ) from e
                 else:
                     logger.error("No refresh token found in credentials JSON")
                     return None
                     
                 return creds
-                
+
+            except GoogleCalendarAuthError:
+                raise
             except Exception as e:
                 logger.error(f"Error parsing credentials JSON: {e}")
                 return None
@@ -113,6 +143,7 @@ class GoogleCalendarClient:
                 creds = pickle.load(token)
         
         # If there are no (valid) credentials available, let the user log in
+        refresh_failed_error: Optional[Exception] = None
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 try:
@@ -121,7 +152,8 @@ class GoogleCalendarClient:
                 except Exception as e:
                     logger.error(f"Error refreshing credentials: {e}")
                     creds = None
-            
+                    refresh_failed_error = e
+
             if not creds:
                 try:
                     flow = InstalledAppFlow.from_client_secrets_file(
@@ -130,6 +162,14 @@ class GoogleCalendarClient:
                     logger.info("Completed Google Calendar OAuth flow")
                 except Exception as e:
                     logger.error(f"Error during OAuth flow: {e}")
+                    if refresh_failed_error is not None:
+                        # The stored token is expired/revoked AND interactive
+                        # re-auth failed (e.g. headless server) — this is an
+                        # auth failure, not "no events".
+                        raise GoogleCalendarAuthError(
+                            f"{GoogleCalendarAuthError.DEFAULT_MESSAGE} "
+                            f"(token refresh failed: {refresh_failed_error})"
+                        ) from e
                     return None
             
             # Save the credentials for the next run
@@ -168,9 +208,11 @@ class GoogleCalendarClient:
             List of CalendarEvent objects
         """
         if not self.service:
+            if self.auth_error:
+                raise GoogleCalendarAuthError(self.auth_error)
             logger.error("Google Calendar service not initialized")
             return []
-        
+
         try:
             # Set up time range for the query date in the user's local timezone
             # (not UTC). Bug history: was using start_time.isoformat() + 'Z' which
@@ -213,11 +255,29 @@ class GoogleCalendarClient:
                     continue
             
             return calendar_events
-            
+
+        except (RefreshError, HttpError) as e:
+            self._raise_if_auth_failure(e)
+            logger.error(f"Error fetching Google Calendar events: {e}")
+            return []
         except Exception as e:
             logger.error(f"Error fetching Google Calendar events: {e}")
             return []
-    
+
+    def _raise_if_auth_failure(self, exc: Exception) -> None:
+        """Convert credential-shaped API failures into GoogleCalendarAuthError.
+
+        401s and google-auth RefreshErrors mean the token is expired/revoked;
+        returning [] for those made an auth outage indistinguishable from an
+        empty calendar. Other errors are left to the caller's fallback path.
+        """
+        is_auth = isinstance(exc, RefreshError) or (
+            isinstance(exc, HttpError) and exc.resp is not None and exc.resp.status == 401
+        )
+        if is_auth:
+            self.auth_error = f"{GoogleCalendarAuthError.DEFAULT_MESSAGE} ({exc})"
+            raise GoogleCalendarAuthError(self.auth_error) from exc
+
     def _convert_google_event(self, google_event: Dict[str, Any], calendar_source: str = "primary") -> Optional[CalendarEvent]:
         """Convert a Google Calendar event to our CalendarEvent schema."""
         try:
@@ -370,7 +430,11 @@ class GoogleCalendarClient:
                 
                 # The calendar_source is now set by _convert_google_event
                 all_events.extend(calendar_events)
-                
+
+            except GoogleCalendarAuthError:
+                # Auth is broken for every calendar — don't skip-and-continue,
+                # that would present a partial fetch as an empty calendar.
+                raise
             except Exception as e:
                 logger.error(f"Error fetching events from calendar '{calendar_name}': {e}")
                 continue
@@ -404,9 +468,11 @@ class GoogleCalendarClient:
             List of CalendarEvent objects for the entire range
         """
         if not self.service:
+            if self.auth_error:
+                raise GoogleCalendarAuthError(self.auth_error)
             logger.error("Google Calendar service not initialized")
             return []
-        
+
         try:
             # Localize to user's timezone (not UTC) so date boundaries match
             # how the user thinks about days. See get_events_for_date for the
@@ -444,7 +510,11 @@ class GoogleCalendarClient:
                     calendar_events.append(converted_event)
             
             return calendar_events
-            
+
+        except (RefreshError, HttpError) as e:
+            self._raise_if_auth_failure(e)
+            logger.error(f"Error fetching Google Calendar events for range: {e}")
+            return []
         except Exception as e:
             logger.error(f"Error fetching Google Calendar events for range: {e}")
             return []
@@ -792,6 +862,13 @@ class GoogleCalendarClient:
             calendar = self.service.calendars().get(calendarId='primary').execute()
             logger.info(f"Connected to Google Calendar: {calendar.get('summary', 'Unknown')}")
             return True
+        except (RefreshError, HttpError) as e:
+            # Record auth-shaped failures so the tool layer can surface them
+            # instead of treating a revoked token like "not configured".
+            if isinstance(e, RefreshError) or (e.resp is not None and e.resp.status == 401):
+                self.auth_error = f"{GoogleCalendarAuthError.DEFAULT_MESSAGE} ({e})"
+            logger.error(f"Google Calendar connection test failed: {e}")
+            return False
         except Exception as e:
             logger.error(f"Google Calendar connection test failed: {e}")
             return False

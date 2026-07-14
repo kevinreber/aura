@@ -510,6 +510,10 @@ export interface CalendarData {
       color?: string;
     }>;
     total_events: number;
+    // Set when the upstream fetch failed (e.g. expired Google Calendar auth).
+    // Events are empty — not mock data — when this is present.
+    error?: string;
+    auth_expired?: boolean;
   };
   timestamp: string;
 }

@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import datetime as dt
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import random
 import os
 import pytz
@@ -17,7 +17,7 @@ from ..schemas.calendar import (
 from ..utils.logging import get_logger, log_tool_call
 from ..utils.cache import get_cache_service, cached, CacheTTL, generate_cache_key
 from ..config import get_settings
-from ..clients.google_calendar import GoogleCalendarClient
+from ..clients.google_calendar import GoogleCalendarClient, GoogleCalendarAuthError
 
 logger = get_logger("calendar_tool")
 
@@ -28,6 +28,9 @@ class CalendarTool:
     def __init__(self):
         self.settings = get_settings()
         self.google_calendar_client = None
+        # Set when credentials are configured but expired/revoked. When set,
+        # list methods return an explicit error payload instead of mock data.
+        self.google_calendar_auth_error: Optional[str] = None
         self._initialize_google_calendar()
     
     def _initialize_google_calendar(self):
@@ -56,10 +59,19 @@ class CalendarTool:
             # Test the connection
             if self.google_calendar_client and self.google_calendar_client.test_connection():
                 logger.info("Google Calendar client initialized successfully")
+            elif self.google_calendar_client and self.google_calendar_client.auth_error:
+                # Credentials ARE configured but expired/revoked. Don't treat
+                # this like "not configured" (which silently serves mock data)
+                # — remember it so fetches surface an explicit auth error.
+                self.google_calendar_auth_error = self.google_calendar_client.auth_error
+                logger.error(
+                    f"Google Calendar auth failed at init: {self.google_calendar_auth_error}"
+                )
+                self.google_calendar_client = None
             else:
                 logger.warning("Google Calendar client failed connection test")
                 self.google_calendar_client = None
-                
+
         except Exception as e:
             logger.error(f"Error initializing Google Calendar client: {e}")
             self.google_calendar_client = None
@@ -91,9 +103,23 @@ class CalendarTool:
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call("calendar_list_events", input_data.dict(), duration_ms)
-            
+
             return result
-            
+
+        except GoogleCalendarAuthError as e:
+            # Auth expired/revoked: return an explicit error payload instead of
+            # raising — the MCP SSE transport stringifies exceptions, which
+            # downstream consumers would read as "0 events".
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("calendar_list_events", input_data.dict(), duration_ms)
+            logger.error(f"Google Calendar auth failure: {e}")
+            return CalendarOutput(
+                date=input_data.date,
+                events=[],
+                total_events=0,
+                error=str(e),
+                auth_expired=True,
+            )
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call("calendar_list_events", input_data.dict(), duration_ms)
@@ -128,9 +154,23 @@ class CalendarTool:
             # Log the successful tool call
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call("calendar_list_events_range", input_data.dict(), duration_ms)
-            
+
             return result
-            
+
+        except GoogleCalendarAuthError as e:
+            # See list_events: explicit payload so the failure survives every
+            # transport (SSE stringifies raised exceptions).
+            duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
+            log_tool_call("calendar_list_events_range", input_data.dict(), duration_ms)
+            logger.error(f"Google Calendar auth failure: {e}")
+            return CalendarRangeOutput(
+                start_date=input_data.start_date,
+                end_date=input_data.end_date,
+                events=[],
+                total_events=0,
+                error=str(e),
+                auth_expired=True,
+            )
         except Exception as e:
             duration_ms = (asyncio.get_event_loop().time() - start_time) * 1000
             log_tool_call("calendar_list_events_range", input_data.dict(), duration_ms)
@@ -139,6 +179,11 @@ class CalendarTool:
     
     async def _get_events_for_date(self, query_date: dt.date) -> List[CalendarEvent]:
         """Get events for a specific date from multiple calendars with caching."""
+        # Known-broken auth fails fast — before the cache, so stale cached
+        # (possibly mock) events can't mask the auth outage.
+        if self.google_calendar_auth_error:
+            raise GoogleCalendarAuthError(self.google_calendar_auth_error)
+
         cache = await get_cache_service()
         cache_key = generate_cache_key("calendar_events", query_date.isoformat())
         
@@ -162,6 +207,11 @@ class CalendarTool:
                 logger.debug(f"Cached {len(events)} calendar events for {query_date}")
                 
                 return events
+            except GoogleCalendarAuthError as e:
+                # Token expired/revoked mid-session: surface it, never mock.
+                # Remember it so subsequent calls fail fast.
+                self.google_calendar_auth_error = str(e)
+                raise
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events, falling back to mock data: {e}")
                 events = await self._get_mock_events(query_date)
@@ -179,6 +229,10 @@ class CalendarTool:
     
     async def _get_events_for_range(self, start_date: dt.date, end_date: dt.date) -> List[CalendarEvent]:
         """Get events for a date range from multiple calendars with caching."""
+        # See _get_events_for_date: auth failure beats cache and mock.
+        if self.google_calendar_auth_error:
+            raise GoogleCalendarAuthError(self.google_calendar_auth_error)
+
         cache = await get_cache_service()
         cache_key = generate_cache_key("calendar_events_range", 
                                      start_date.isoformat(), 
@@ -204,6 +258,10 @@ class CalendarTool:
                 logger.debug(f"Cached {len(events)} calendar events for range {start_date} to {end_date}")
                 
                 return events
+            except GoogleCalendarAuthError as e:
+                # Token expired/revoked mid-session: surface it, never mock.
+                self.google_calendar_auth_error = str(e)
+                raise
             except Exception as e:
                 logger.error(f"Error fetching Google Calendar events for range, falling back to mock data: {e}")
                 events = await self._get_mock_events_range(start_date, end_date)

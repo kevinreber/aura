@@ -156,7 +156,11 @@ async def build_tomorrow_briefing(
         calendar_error: Optional[str] = str(calendar)
     else:
         events = calendar.get("events", [])
-        calendar_error = None
+        # The MCP server reports auth failures (expired Google token) as an
+        # explicit error field rather than an exception — surface it too.
+        calendar_error = calendar.get("error")
+        if calendar_error:
+            logger.warning(f"Calendar fetch returned error payload: {calendar_error}")
 
     if isinstance(todos, BaseException):
         logger.warning(f"Todos fetch failed: {todos}")
