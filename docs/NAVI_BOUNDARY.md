@@ -1,6 +1,21 @@
 # Aura ↔ Navi Boundary
 
-**Status:** Draft · **Date:** 2026-07-04
+**Status:** Extraction complete — one-way dependency · **Updated:** 2026-07-14 (original draft 2026-07-04)
+
+> **Status update (2026-07-14).** The extraction this document planned for has
+> happened. Navi lives in its own repo (`kevinreber/navi`) and runs as its own
+> service (Fly app `navi-planner`); Aura calls it through a single entry point —
+> the `plan_outing` agent tool → `POST /plan` with the shared `X-Internal-Auth`
+> secret. Navi now ships **its own native providers** for every data vertical
+> (Open-Meteo weather, OSRM travel, `.ics` calendar free/busy, Ticketmaster
+> events, AllTrails-via-Apify trails), and its Aura-MCP provider fallback has
+> been **removed** (navi PR #38): **Navi never calls Aura — data flows one way.**
+> Aura's `weekend_get_trails` / `weekend_get_concerts` MCP tools and the
+> TrailScout/ConcertAlert agent tools now serve only Aura's own direct
+> lookups, not Navi. The condensed Navi-side summary of this boundary lives at
+> `docs/BOUNDARY.md` in the navi repo. Sections below are kept for the design
+> rationale; where they describe Aura *injecting* capability implementations
+> into Navi, read them as historical.
 
 This document defines the conceptual and architectural boundary between **Aura**
 and **Navi**, and the rules we follow to keep them separable.
@@ -99,10 +114,12 @@ Navi *owns* (not delegated to Aura) two of its own domain services:
 - `ReferenceIngest` + `ReferenceStore` — user-provided references (see below).
 - `AvailabilityService` — days off / free days, source-agnostic (see below).
 
-When Navi runs *inside* Aura, Aura injects implementations backed by its own MCP
-tools. When Navi is extracted, those same interfaces are satisfied by Navi's own
-providers (or Navi calls Aura's MCP server as an external client). Either way,
-Navi's code does not change.
+Historically Aura injected implementations backed by its own MCP tools; as of
+2026-07-14 Navi satisfies every read interface with its own native providers
+and no longer calls Aura's MCP at all. The interfaces remain the seam: a host
+could still inject alternatives without touching Navi's code. `CalendarWriter`
+/ `TodoWriter` (the write-back of an accepted plan) remain **Aura's** — that
+half of "Navi proposes, Aura disposes" is unchanged.
 
 ## Standalone PoC — Navi as its own RAG agent
 
@@ -144,10 +161,12 @@ vault); **enable embeddings only when keyword recall visibly fails.** Vectors ar
 an optimization, not a prerequisite — the PoC is not gated on them. Hybrid
 retrieval: metadata pre-filter → semantic rank.
 
-## Current state (coupling to unwind)
+## Current state at drafting time (2026-07-04, historical — since unwound)
 
-As of 2026-07-04, Navi's pieces live *inside* Aura's packages and share Aura's
-runtime. This is fine for now, but it's the coupling a future extraction pays down:
+As of 2026-07-04, Navi's pieces lived *inside* Aura's packages and shared Aura's
+runtime. This was the coupling the extraction paid down (the in-repo weekend
+tools below remain in Aura, but now only as Aura's own direct lookup features —
+Navi does not use them):
 
 - **Server** — `packages/server/mcp_server/tools/weekend.py`,
   `schemas/weekend.py`; MCP tools `weekend_get_trails` / `weekend_get_concerts` /
@@ -203,9 +222,11 @@ editing Aura's core? The closer we are to "yes", the cleaner the boundary.
   through the defined contract.
 - ❌ Don't add a hard import from Aura core → Navi internals (or the reverse).
 
-## Migration path (incremental, non-breaking)
+## Migration path (incremental, non-breaking) — superseded by the extraction
 
-None of this needs to happen at once. Rough order, each step shippable on its own:
+The standalone-repo extraction leapfrogged this in-place refactor: Navi's
+planning logic, prompt, prefs, capabilities, and UI all live in `kevinreber/navi`
+behind the one `plan_outing` → `/plan` contract. Kept for the record:
 
 1. **Namespace** the existing weekend files under `navi/` (mechanical move; wire-names unchanged).
 2. **Extract** Navi's prompt/routing + preference-gating out of `orchestrator.py` into a Navi prompt module.
