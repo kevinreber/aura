@@ -306,8 +306,8 @@ class TestChatStreamEndpoint:
                 content_type="application/json",
             )
 
-            # Check content type is SSE
-            assert response.content_type == "text/event-stream"
+            # Check content type is SSE (tolerate a "; charset=utf-8" suffix Flask may add)
+            assert response.content_type.startswith("text/event-stream")
 
     def test_chat_stream_emits_tool_events(self, client):
         """Test chat stream emits tool start and end events."""
