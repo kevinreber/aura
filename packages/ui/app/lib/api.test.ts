@@ -364,8 +364,8 @@ describe('AIAgentAPI', () => {
 
       // Use promise.catch to handle the expected rejection
       let error: Error | null = null;
-      const promise = api.sendChatMessage('Hello').catch((e) => {
-        error = e;
+      const promise = api.sendChatMessage('Hello').catch((e: unknown) => {
+        error = e instanceof Error ? e : new Error(String(e));
       });
 
       // Advance through all retries (1s + 2s + 4s) and run all pending timers
@@ -373,7 +373,7 @@ describe('AIAgentAPI', () => {
       await promise;
 
       expect(error).not.toBeNull();
-      expect(error?.message).toContain('API Error: 500');
+      expect((error as Error | null)?.message).toContain('API Error: 500');
       // Initial + 3 retries = 4 calls
       expect(fetch).toHaveBeenCalledTimes(4);
     });
