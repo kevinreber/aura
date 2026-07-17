@@ -6,3 +6,8 @@
 **/tests
 **/*.md
 !**/README.md
+.claude
+docs
+**/.venv
+.envrc
+**/.envrc
