@@ -1,4 +1,6 @@
-import type { TomorrowBriefing } from '../lib/api';
+import { useState } from 'react';
+
+import type { NaviSuggestion, TomorrowBriefing } from '../lib/api';
 
 interface TomorrowBriefingWidgetProps {
   briefing: TomorrowBriefing | null;
@@ -44,6 +46,27 @@ export function TomorrowBriefingWidget({
 }: TomorrowBriefingWidgetProps) {
   const eventCount = briefing?.events.length ?? 0;
   const flagCount = briefing?.flags.length ?? 0;
+
+  // Navi's "for your next free window" nudge. Acted-on cards disappear
+  // locally; the disposition posts through to Navi's learning loop
+  // (best-effort — a failed relay never blocks the UI action).
+  const [actedOn, setActedOn] = useState<string[]>([]);
+  const naviSection = briefing?.navi_suggestions;
+  const naviSuggestions = (naviSection?.suggestions ?? []).filter(
+    (s) => !s.id || !actedOn.includes(s.id),
+  );
+  const sendDisposition = async (s: NaviSuggestion, disposition: string) => {
+    if (s.id) setActedOn((ids) => (s.id ? [...ids, s.id] : ids));
+    try {
+      await fetch('/api/v1/suggestions/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: s.id, disposition }),
+      });
+    } catch {
+      // learning signal lost this once; the card action stands
+    }
+  };
 
   return (
     <div
@@ -192,6 +215,70 @@ export function TomorrowBriefingWidget({
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Navi suggestions — shown only when Navi said the window is
+                  worth it (the worth_notifying gate lives upstream) */}
+              {naviSuggestions.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                    For your {naviSection?.window_label ?? 'free window'} · from your saved ideas
+                  </div>
+                  <div className="space-y-2">
+                    {naviSuggestions.map((s, i) => (
+                      <div
+                        key={s.id ?? `${s.title}-${i}`}
+                        className="p-3 rounded-lg bg-emerald-50/70 dark:bg-emerald-900/15"
+                      >
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                              🧭 {s.title}
+                            </div>
+                            {(s.rationale || s.location) && (
+                              <div className="text-xs text-gray-600 dark:text-gray-300">
+                                {s.rationale || s.location}
+                              </div>
+                            )}
+                          </div>
+                          {s.url && (
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 whitespace-nowrap"
+                            >
+                              open ↗
+                            </a>
+                          )}
+                        </div>
+                        <div className="mt-2 flex gap-3 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => sendDisposition(s, 'accepted')}
+                            className="text-emerald-700 dark:text-emerald-300 hover:underline"
+                          >
+                            👍 Plan it
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => sendDisposition(s, 'saved')}
+                            className="text-gray-600 dark:text-gray-300 hover:underline"
+                          >
+                            Keep for later
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => sendDisposition(s, 'dismissed')}
+                            className="text-gray-500 dark:text-gray-400 hover:underline"
+                          >
+                            ✕ Not for me
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

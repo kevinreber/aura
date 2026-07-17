@@ -29,6 +29,7 @@ from typing import Dict, Any, Optional, AsyncIterator
 from .agent.orchestrator import AgentOrchestrator
 from .agent.briefing import build_tomorrow_briefing, resolve_tomorrow_date
 from .services.mcp_client import MCPClient
+from .services.navi_client import NaviClient, NaviError
 from .models.config import get_settings
 from .utils.constants import (
     APP_VERSION,
@@ -571,6 +572,46 @@ def create_app(testing: bool = False) -> Flask:
                 "error": str(e),
                 "request_id": g.get('request_id', 'unknown'),
             }), 500
+
+    @app.route('/suggestions/<suggestion_id>/feedback', methods=['POST'])
+    @limiter.limit("30 per minute")
+    async def suggestion_feedback(suggestion_id: str):
+        """Relay a suggestion disposition to Navi — the learning half of the
+        suggestions loop. Aura observes what the user did (including
+        "scheduled", which only Aura can know); Navi owns the ranking model
+        (docs/NAVI_BOUNDARY.md).
+        ---
+        tags:
+          - AI Features
+        parameters:
+          - name: suggestion_id
+            in: path
+            type: string
+            required: true
+        responses:
+          200:
+            description: Disposition recorded on the Navi side
+        """
+        allowed = ("accepted", "dismissed", "snoozed", "saved", "scheduled")
+        body = request.get_json(silent=True) or {}
+        disposition = body.get("disposition")
+        if disposition not in allowed:
+            return jsonify({
+                "error": f"disposition must be one of {'|'.join(allowed)}",
+                "request_id": g.get('request_id', 'unknown'),
+            }), 400
+        try:
+            result = await NaviClient().send_feedback(suggestion_id, disposition)
+            return jsonify({
+                **result,
+                "request_id": g.get('request_id', 'unknown'),
+            })
+        except NaviError as e:
+            logger.warning(f"[{g.request_id}] Suggestion feedback failed: {e}")
+            return jsonify({
+                "error": str(e),
+                "request_id": g.get('request_id', 'unknown'),
+            }), 502
 
     # ==================== Tool Endpoints ====================
 

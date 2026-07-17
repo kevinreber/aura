@@ -23,7 +23,8 @@ class NaviError(Exception):
 
 
 class NaviClient:
-    """Thin async client for Navi's HTTP contract (currently just `/plan`)."""
+    """Thin async client for Navi's HTTP contract (`/plan`, `/suggest`,
+    `/suggestions/{id}/feedback`)."""
 
     def __init__(self) -> None:
         settings = get_settings()
@@ -91,4 +92,64 @@ class NaviClient:
         except httpx.HTTPError as e:
             elapsed = time.monotonic() - start
             logger.warning(f"navi.plan FAILED after {elapsed:.1f}s: {e}")
+            raise NaviError(f"Navi request failed: {e}") from e
+
+    async def suggest(self, limit: int = 5) -> Dict[str, Any]:
+        """POST /suggest → ranked outings for the user's next free window.
+
+        Navi resolves the window itself (next weekend extended by adjacent
+        days off) and gates cadence via `worth_notifying` — callers should
+        stay quiet when it's False rather than deliver low-value noise."""
+        start = time.monotonic()
+        logger.info(f"navi.suggest start url={self.base_url}")
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(
+                    f"{self.base_url}/suggest", json={"limit": limit}, headers=self._headers()
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                elapsed = time.monotonic() - start
+                logger.info(
+                    f"navi.suggest ok in {elapsed:.1f}s "
+                    f"n={len(data.get('suggestions', []))} "
+                    f"worth_notifying={data.get('worth_notifying')}"
+                )
+                return data
+        except httpx.TimeoutException as e:
+            logger.warning(f"navi.suggest TIMEOUT after {time.monotonic() - start:.1f}s")
+            raise NaviError(f"Navi didn't respond within {self.timeout}s.") from e
+        except httpx.ConnectError as e:
+            logger.warning(f"navi.suggest UNREACHABLE at {self.base_url}: {e}")
+            raise NaviError(f"Couldn't reach Navi at {self.base_url}.") from e
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            logger.warning(f"navi.suggest HTTP {code}: {e.response.text[:200]}")
+            raise NaviError(f"Navi returned HTTP {code}.") from e
+        except httpx.HTTPError as e:
+            logger.warning(f"navi.suggest FAILED: {e}")
+            raise NaviError(f"Navi request failed: {e}") from e
+
+    async def send_feedback(self, suggestion_id: str, disposition: str) -> Dict[str, Any]:
+        """POST /suggestions/{id}/feedback — the disposition channel that
+        teaches Navi's ranking (Aura observes what the user did; Navi owns the
+        model — docs/NAVI_BOUNDARY.md)."""
+        logger.info(f"navi.feedback {suggestion_id} -> {disposition}")
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                resp = await client.post(
+                    f"{self.base_url}/suggestions/{suggestion_id}/feedback",
+                    json={"disposition": disposition},
+                    headers=self._headers(),
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code
+            logger.warning(f"navi.feedback HTTP {code}: {e.response.text[:200]}")
+            if code == 404:
+                raise NaviError("Navi doesn't know that suggestion (expired or bad id).") from e
+            raise NaviError(f"Navi returned HTTP {code}.") from e
+        except httpx.HTTPError as e:
+            logger.warning(f"navi.feedback FAILED: {e}")
             raise NaviError(f"Navi request failed: {e}") from e

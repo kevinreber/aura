@@ -19,6 +19,7 @@ from loguru import logger
 
 from ..models.config import get_settings
 from ..services.mcp_client import MCPClient
+from ..services.navi_client import NaviClient, NaviError
 
 
 async def compute_per_event_commute(
@@ -125,6 +126,29 @@ def _compute_flags(events_with_commute: list[dict[str, Any]]) -> list[str]:
     return flags
 
 
+async def _fetch_navi_suggestions() -> dict[str, Any]:
+    """Navi's proactive outing suggestions for the user's next free window.
+
+    Best-effort and cadence-gated: returns {} when Navi is unreachable OR when
+    Navi says the window isn't worth interrupting for (worth_notifying False —
+    the anti-noise gate lives on Navi's side; Aura just respects it). The
+    briefing carries at most the top 3 — it's a nudge, not a catalog.
+    """
+    try:
+        data = await NaviClient().suggest()
+    except NaviError as e:
+        logger.warning(f"Navi suggestions fetch failed: {e}")
+        return {}
+    if not data.get("worth_notifying"):
+        return {}
+    return {
+        "window_label": data.get("window_label"),
+        "window_start": data.get("window_start"),
+        "window_end": data.get("window_end"),
+        "suggestions": data.get("suggestions", [])[:3],
+    }
+
+
 def resolve_tomorrow_date(timezone_name: str) -> str:
     """User-local tomorrow as YYYY-MM-DD. Single-user-app heuristic."""
     tz = ZoneInfo(timezone_name)
@@ -139,12 +163,16 @@ async def build_tomorrow_briefing(
     settings = get_settings()
     client = client or MCPClient()
 
-    weather, calendar, todos = await asyncio.gather(
+    weather, calendar, todos, navi_suggestions = await asyncio.gather(
         client.get_weather(settings.user_location, when="tomorrow"),
         client.get_calendar_events(tomorrow_date),
         client.get_todos(),
+        _fetch_navi_suggestions(),
         return_exceptions=True,
     )
+    if isinstance(navi_suggestions, BaseException):  # already best-effort; belt-and-braces
+        logger.warning(f"Navi suggestions fetch raised: {navi_suggestions}")
+        navi_suggestions = {}
 
     weather_data: dict[str, Any] = {} if isinstance(weather, BaseException) else weather
     if isinstance(weather, BaseException):
@@ -180,4 +208,7 @@ async def build_tomorrow_briefing(
         "prep_todos": prep_todos,
         "flags": _compute_flags(events_with_commute),
         "calendar_error": calendar_error,
+        # Navi's "for your next free window" nudge ({} = stay quiet; the
+        # worth_notifying gate is Navi's, per docs/NAVI_BOUNDARY.md).
+        "navi_suggestions": navi_suggestions,
     }

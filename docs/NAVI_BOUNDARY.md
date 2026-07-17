@@ -1,6 +1,21 @@
 # Aura ↔ Navi Boundary
 
-**Status:** Extraction complete — one-way dependency · **Updated:** 2026-07-14 (original draft 2026-07-04)
+**Status:** Extraction complete — one-way dependency · **Updated:** 2026-07-17 (original draft 2026-07-04)
+
+> **Status update (2026-07-17).** The boundary now carries a second flow:
+> **proactive suggestions** (navi backlog 17). The tomorrow briefing calls
+> Navi's `POST /suggest` (best-effort, in the same parallel fan-out as
+> weather/calendar/todos) and shows the top suggestions ONLY when Navi's
+> `worth_notifying` gate says the window is worth interrupting for — the
+> anti-noise cadence decision lives on Navi's side, Aura just respects it.
+> The briefing's feedback buttons relay dispositions
+> (accepted/dismissed/snoozed/saved) through the Agent's
+> `POST /suggestions/{id}/feedback` to Navi, which folds them into its
+> ranking — **Aura observes what the user did; Navi owns the model.** All
+> calls remain Aura→Navi; data still flows one way. There is deliberately
+> NO scheduler: with no push/email transport in Aura, a cron could only
+> pre-fetch what the pull-based briefing already fetches on load — one gets
+> added only if a push channel ever exists.
 
 > **Status update (2026-07-14).** The extraction this document planned for has
 > happened. Navi lives in its own repo (`kevinreber/navi`) and runs as its own
