@@ -579,6 +579,28 @@ export interface TomorrowPrepTodo {
   due_date?: string;
 }
 
+/** One ranked outing from Navi's /suggest (see docs/NAVI_BOUNDARY.md). */
+export interface NaviSuggestion {
+  id?: string | null;
+  reference_id?: string | null;
+  title: string;
+  source?: 'library' | 'discovery';
+  score?: number;
+  reasons?: string[];
+  rationale?: string;
+  url?: string | null;
+  location?: string | null;
+}
+
+/** The briefing's Navi section — {} when Navi stayed quiet (worth_notifying
+ * gate) or was unreachable; the widget hides the section then. */
+export interface NaviSuggestionsSection {
+  window_label?: string;
+  window_start?: string;
+  window_end?: string;
+  suggestions?: NaviSuggestion[];
+}
+
 export interface TomorrowBriefing {
   date: string; // YYYY-MM-DD
   weather: {
@@ -592,6 +614,7 @@ export interface TomorrowBriefing {
   prep_todos: TomorrowPrepTodo[];
   flags: string[];
   calendar_error: string | null;
+  navi_suggestions?: NaviSuggestionsSection | null;
 }
 
 export interface TomorrowBriefingResponse {
